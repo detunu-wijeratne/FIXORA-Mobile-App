@@ -71,6 +71,69 @@ export default function RootLayout() {
           title: "Select Date & Time",
       }}
       />
+
+      <Stack.Screen
+        name="job-details"
+        options={{
+          title: "Job Details",
+      }}
+      />
+
+      <Stack.Screen
+        name="service-location"
+        options={{
+        title: "Service Location",
+      }}
+      />
+
+      <Stack.Screen
+        name="booking-summary"
+        options={{
+        title: "Booking Summary",
+      }}
+      />
+
+      <Stack.Screen
+        name="booking-confirmation"
+        options={{
+        title: "Booking Confirmation",
+      }}
+      />
+
+      <Stack.Screen
+        name="my-bookings"
+        options={{
+        title: "My Bookings",
+      }}
+      />
+
+            <Stack.Screen
+        name="booking-details"
+        options={{
+          title: "Booking Details",
+        }}
+      />
+
+      <Stack.Screen
+        name="customer-chat"
+        options={{
+          title: "Chat",
+        }}
+      />
+
+      <Stack.Screen
+        name="rate-review"
+        options={{
+          title: "Rate & Review",
+        }}
+      />
+
+      <Stack.Screen
+        name="customer-profile"
+        options={{
+          title: "Profile",
+        }}
+      />
     </Stack>
   );
 }

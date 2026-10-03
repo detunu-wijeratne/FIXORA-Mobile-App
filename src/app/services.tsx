@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import CustomerBottomNav from "../components/CustomerBottomNav";
 import {
   ScrollView,
   StyleSheet,
@@ -92,6 +93,7 @@ export default function ServicesScreen() {
           ))}
         </View>
       </ScrollView>
+      <CustomerBottomNav />
     </View>
   );
 }

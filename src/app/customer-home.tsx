@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import CustomerBottomNav from "../components/CustomerBottomNav";
 
 export default function CustomerHomeScreen() {
   const services = [
@@ -132,31 +133,9 @@ export default function CustomerHomeScreen() {
           ))}
         </View>
       </ScrollView>
-
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🏠</Text>
-          <Text style={styles.navActive}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/services")}
-        >
-          <Text style={styles.navIcon}>🛠️</Text>
-          <Text style={styles.navText}>Services</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>📅</Text>
-          <Text style={styles.navText}>Bookings</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>👤</Text>
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+    
+    <CustomerBottomNav />
+    
     </SafeAreaView>
   );
 }
@@ -347,37 +326,4 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
   },
 
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    paddingVertical: 10,
-    justifyContent: "space-around",
-  },
-
-  navItem: {
-    alignItems: "center",
-  },
-
-  navIcon: {
-    fontSize: 20,
-  },
-
-  navActive: {
-    color: "#2563EB",
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-
-  navText: {
-    color: "#64748B",
-    fontSize: 11,
-    marginTop: 2,
-  },
 });
