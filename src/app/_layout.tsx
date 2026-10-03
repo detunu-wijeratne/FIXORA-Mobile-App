@@ -134,6 +134,104 @@ export default function RootLayout() {
           title: "Profile",
         }}
       />
+
+      <Stack.Screen
+        name="provider/login"
+        options={{
+          title: "Provider Login",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/dashboard"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/requests"
+        options={{
+          title: "Incoming Requests",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/request-details"
+        options={{
+          title: "Request Details",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/jobs"
+        options={{
+          title: "My Jobs",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/schedule"
+        options={{
+          title: "Schedule",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/earnings"
+        options={{
+          title: "Earnings",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/profile"
+        options={{
+          title: "Provider Profile",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/job-details"
+        options={{
+          title: "Job Details",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/chat"
+        options={{
+          title: "Chat with Customer",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/availability"
+        options={{
+          title: "Manage Availability",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/settings"
+        options={{
+          title: "Settings",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/create-account"
+        options={{
+          title: "Create Provider Account",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/verification"
+        options={{
+          title: "Provider Verification",
+        }}
+      />
     </Stack>
   );
 }

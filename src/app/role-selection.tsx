@@ -37,7 +37,7 @@ export default function RoleSelectionScreen() {
 
         <TouchableOpacity
           style={styles.card}
-          onPress={() => router.push("/provider-login")}
+          onPress={() => router.push("/provider/login")}
         >
           <View style={styles.iconCircle}>
             <Text style={styles.icon}>🛠️</Text>
