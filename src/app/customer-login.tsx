@@ -1,7 +1,10 @@
 import { router } from "expo-router";
 import { useState } from "react";
+
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+
 import {
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,80 +12,172 @@ import {
   View,
 } from "react-native";
 
-export default function CustomerLoginScreen() {
-  const [mobile, setMobile] = useState("");
-  const [password, setPassword] = useState("");
+import { auth, db } from "../services/firebase";
 
-  const handleLogin = () => {
-    router.push("/customer-home");
+export default function CustomerLoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      alert("Please enter your email and password.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const userCredential =
+        await signInWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password
+        );
+
+      const user = userCredential.user;
+
+      const userDoc = await getDoc(
+        doc(db, "users", user.uid)
+      );
+
+      if (!userDoc.exists()) {
+        alert("Customer profile not found.");
+        return;
+      }
+
+      const data = userDoc.data();
+
+      if (data.role !== "customer") {
+        alert("This account is not a customer account.");
+        return;
+      }
+
+      router.replace("/customer-home");
+    } catch (error: any) {
+      console.log("Customer login error:", error);
+
+      if (error.code === "auth/invalid-credential") {
+        alert("Incorrect email or password.");
+      } else {
+        alert(error.message || "Unable to log in.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickCustomerLogin = async () => {
+    try {
+      setLoading(true);
+
+      const userCredential =
+        await signInWithEmailAndPassword(
+          auth,
+          "shane@gmail.com",
+          "Shane12345"
+        );
+
+      const user = userCredential.user;
+
+      const userDoc = await getDoc(
+        doc(db, "users", user.uid)
+      );
+
+      if (!userDoc.exists()) {
+        alert("Customer profile not found.");
+        return;
+      }
+
+      const data = userDoc.data();
+
+      if (data.role !== "customer") {
+        alert("This account is not a customer account.");
+        return;
+      }
+
+      router.replace("/customer-home");
+    } catch (error: any) {
+      console.log("Quick customer login error:", error);
+
+      if (error.code === "auth/invalid-credential") {
+        alert("Quick login credentials are incorrect.");
+      } else {
+        alert(error.message || "Quick login failed.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
+    <View style={styles.container}>
+      <Text style={styles.brand}>FIXORA</Text>
+
+      <Text style={styles.title}>Customer Login</Text>
+
+      <Text style={styles.subtitle}>
+        Log in to book and manage home services.
+      </Text>
+
+      <Text style={styles.label}>Email Address</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Enter your email"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        value={email}
+        onChangeText={setEmail}
+      />
+
+      <Text style={styles.label}>Password</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Enter your password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      <TouchableOpacity
+        style={[
+          styles.button,
+          loading && styles.disabledButton,
+        ]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Logging In..." : "Log In"}
+        </Text>
       </TouchableOpacity>
 
-      <View style={styles.header}>
-        <Text style={styles.brand}>FIXORA</Text>
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>
-          Log in to continue booking trusted home services.
+      <TouchableOpacity
+        style={[
+          styles.quickLoginButton,
+          loading && styles.disabledButton,
+        ]}
+        onPress={handleQuickCustomerLogin}
+        disabled={loading}
+      >
+        <Text style={styles.quickLoginText}>
+          Quick Customer Login
         </Text>
-      </View>
+      </TouchableOpacity>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Mobile Number</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your mobile number"
-          keyboardType="phone-pad"
-          value={mobile}
-          onChangeText={setMobile}
-        />
-
-        <Text style={styles.label}>Password</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity style={styles.forgotButton}>
-          <Text style={styles.forgotText}>Forgot Password?</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>Log In</Text>
-        </TouchableOpacity>
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <TouchableOpacity style={styles.socialButton}>
-          <Text style={styles.socialText}>Continue with Google</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.socialButton}>
-          <Text style={styles.socialText}>Continue with Apple</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.signupRow}>
-        <Text style={styles.signupText}>Don't have an account? </Text>
-
-        <TouchableOpacity onPress={() => router.push("/customer-signup")}>
-          <Text style={styles.signupLink}>Sign Up</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <TouchableOpacity
+        onPress={() => router.push("/customer-signup")}
+      >
+        <Text style={styles.signupText}>
+          Don't have an account?{" "}
+          <Text style={styles.signupLink}>
+            Create Account
+          </Text>
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -90,29 +185,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-    paddingHorizontal: 24,
-    paddingTop: 20,
-  },
-
-  back: {
-    fontSize: 15,
-    color: "#2563EB",
-    fontWeight: "600",
-  },
-
-  header: {
-    marginTop: 40,
+    padding: 24,
+    paddingTop: 50,
   },
 
   brand: {
     fontSize: 20,
-    color: "#2563EB",
     fontWeight: "800",
-    letterSpacing: 1.5,
+    color: "#2563EB",
   },
 
   title: {
-    marginTop: 24,
+    marginTop: 40,
     fontSize: 30,
     fontWeight: "800",
     color: "#0F172A",
@@ -120,13 +204,8 @@ const styles = StyleSheet.create({
 
   subtitle: {
     marginTop: 8,
-    fontSize: 15,
-    lineHeight: 22,
+    marginBottom: 34,
     color: "#64748B",
-  },
-
-  form: {
-    marginTop: 36,
   },
 
   label: {
@@ -144,75 +223,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginBottom: 18,
-    fontSize: 15,
   },
 
-  forgotButton: {
-    alignSelf: "flex-end",
-    marginBottom: 22,
-  },
-
-  forgotText: {
-    color: "#2563EB",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  loginButton: {
+  button: {
+    marginTop: 6,
     backgroundColor: "#2563EB",
-    paddingVertical: 16,
     borderRadius: 14,
+    paddingVertical: 16,
     alignItems: "center",
   },
 
-  loginButtonText: {
+  quickLoginButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+  },
+
+  quickLoginText: {
+    color: "#2563EB",
+    fontWeight: "700",
+  },
+
+  disabledButton: {
+    opacity: 0.6,
+  },
+
+  buttonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
   },
 
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#CBD5E1",
-  },
-
-  orText: {
-    marginHorizontal: 12,
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  socialButton: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    marginBottom: 12,
-  },
-
-  socialText: {
-    fontSize: 15,
-    color: "#0F172A",
-    fontWeight: "600",
-  },
-
-  signupRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 24,
-  },
-
   signupText: {
+    marginTop: 24,
+    textAlign: "center",
     color: "#64748B",
   },
 

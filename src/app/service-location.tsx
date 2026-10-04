@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
+
 import {
   ScrollView,
   StyleSheet,
@@ -12,40 +13,65 @@ import {
 export default function ServiceLocationScreen() {
   const params = useLocalSearchParams();
 
+  const providerId =
+    typeof params.providerId === "string"
+      ? params.providerId
+      : "";
+
   const name =
-    typeof params.name === "string" ? params.name : "Kamal Perera";
+    typeof params.name === "string"
+      ? params.name
+      : "Service Provider";
 
   const service =
-    typeof params.service === "string" ? params.service : "Plumber";
+    typeof params.service === "string"
+      ? params.service
+      : "Home Service";
 
   const price =
-    typeof params.price === "string" ? params.price : "Rs. 2,500";
+    typeof params.price === "string"
+      ? params.price
+      : "2500";
 
   const date =
-    typeof params.date === "string" ? params.date : "5";
+    typeof params.date === "string"
+      ? params.date
+      : "5";
 
   const time =
-    typeof params.time === "string" ? params.time : "9:30 AM";
+    typeof params.time === "string"
+      ? params.time
+      : "9:30 AM";
 
   const description =
-    typeof params.description === "string" ? params.description : "";
+    typeof params.description === "string"
+      ? params.description
+      : "";
 
-  const [selectedLocation, setSelectedLocation] = useState("home");
+  const [selectedLocation, setSelectedLocation] =
+    useState("home");
+
   const [address, setAddress] = useState(
     "45, Main Street, Colombo 03"
   );
 
   const handleContinue = () => {
+    if (!address.trim()) {
+      alert("Please enter a service address.");
+      return;
+    }
+
     router.push({
       pathname: "/booking-summary",
       params: {
+        providerId,
         name,
         service,
         price,
         date,
         time,
         description,
-        address,
+        address: address.trim(),
       },
     });
   };
@@ -56,30 +82,42 @@ export default function ServiceLocationScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>Where do you need the service?</Text>
+        <Text style={styles.title}>
+          Where do you need the service?
+        </Text>
 
         <Text style={styles.subtitle}>
           Select a saved location or enter a new address.
         </Text>
 
-        <Text style={styles.sectionTitle}>Saved Locations</Text>
+        <Text style={styles.sectionTitle}>
+          Saved Locations
+        </Text>
 
         <TouchableOpacity
           style={[
             styles.locationCard,
-            selectedLocation === "home" && styles.selectedCard,
+            selectedLocation === "home" &&
+              styles.selectedCard,
           ]}
           onPress={() => {
             setSelectedLocation("home");
-            setAddress("45, Main Street, Colombo 03");
+            setAddress(
+              "45, Main Street, Colombo 03"
+            );
           }}
         >
           <View style={styles.iconBox}>
-            <Text style={styles.icon}>🏠</Text>
+            <Text style={styles.icon}>
+              🏠
+            </Text>
           </View>
 
           <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>Home</Text>
+            <Text style={styles.locationTitle}>
+              Home
+            </Text>
+
             <Text style={styles.locationAddress}>
               45, Main Street, Colombo 03
             </Text>
@@ -88,7 +126,8 @@ export default function ServiceLocationScreen() {
           <View
             style={[
               styles.radio,
-              selectedLocation === "home" && styles.radioSelected,
+              selectedLocation === "home" &&
+                styles.radioSelected,
             ]}
           >
             {selectedLocation === "home" && (
@@ -100,19 +139,27 @@ export default function ServiceLocationScreen() {
         <TouchableOpacity
           style={[
             styles.locationCard,
-            selectedLocation === "work" && styles.selectedCard,
+            selectedLocation === "work" &&
+              styles.selectedCard,
           ]}
           onPress={() => {
             setSelectedLocation("work");
-            setAddress("22, Galle Road, Colombo 04");
+            setAddress(
+              "22, Galle Road, Colombo 04"
+            );
           }}
         >
           <View style={styles.iconBox}>
-            <Text style={styles.icon}>🏢</Text>
+            <Text style={styles.icon}>
+              🏢
+            </Text>
           </View>
 
           <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>Work</Text>
+            <Text style={styles.locationTitle}>
+              Work
+            </Text>
+
             <Text style={styles.locationAddress}>
               22, Galle Road, Colombo 04
             </Text>
@@ -121,7 +168,8 @@ export default function ServiceLocationScreen() {
           <View
             style={[
               styles.radio,
-              selectedLocation === "work" && styles.radioSelected,
+              selectedLocation === "work" &&
+                styles.radioSelected,
             ]}
           >
             {selectedLocation === "work" && (
@@ -134,24 +182,33 @@ export default function ServiceLocationScreen() {
           style={styles.currentLocationButton}
           onPress={() => {
             setSelectedLocation("current");
-            setAddress("Current device location");
+            setAddress(
+              "Current device location"
+            );
           }}
         >
-          <Text style={styles.currentLocationIcon}>📍</Text>
+          <Text style={styles.currentLocationIcon}>
+            📍
+          </Text>
 
           <View style={styles.currentLocationContent}>
             <Text style={styles.currentLocationTitle}>
               Use Current Location
             </Text>
+
             <Text style={styles.currentLocationText}>
               Automatically detect your current location
             </Text>
           </View>
 
-          <Text style={styles.arrow}>›</Text>
+          <Text style={styles.arrow}>
+            ›
+          </Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Service Address</Text>
+        <Text style={styles.sectionTitle}>
+          Service Address
+        </Text>
 
         <TextInput
           style={styles.addressInput}
@@ -168,7 +225,10 @@ export default function ServiceLocationScreen() {
         />
 
         <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>Location privacy</Text>
+          <Text style={styles.noteTitle}>
+            Location privacy
+          </Text>
+
           <Text style={styles.noteText}>
             Your exact location will only be used for this booking.
           </Text>

@@ -1,4 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+
 import {
   ScrollView,
   StyleSheet,
@@ -7,23 +17,42 @@ import {
   View,
 } from "react-native";
 
+import { auth, db } from "../services/firebase";
+
 export default function BookingSummaryScreen() {
   const params = useLocalSearchParams();
 
+  const [loading, setLoading] = useState(false);
+
+  const providerId =
+    typeof params.providerId === "string"
+      ? params.providerId
+      : "";
+
   const name =
-    typeof params.name === "string" ? params.name : "Kamal Perera";
+    typeof params.name === "string"
+      ? params.name
+      : "Kamal Perera";
 
   const service =
-    typeof params.service === "string" ? params.service : "Plumber";
+    typeof params.service === "string"
+      ? params.service
+      : "Plumber";
 
   const price =
-    typeof params.price === "string" ? params.price : "Rs. 2,500";
+    typeof params.price === "string"
+      ? params.price
+      : "Rs. 2,500";
 
   const date =
-    typeof params.date === "string" ? params.date : "5";
+    typeof params.date === "string"
+      ? params.date
+      : "5";
 
   const time =
-    typeof params.time === "string" ? params.time : "9:30 AM";
+    typeof params.time === "string"
+      ? params.time
+      : "9:30 AM";
 
   const description =
     typeof params.description === "string"
@@ -35,19 +64,103 @@ export default function BookingSummaryScreen() {
       ? params.address
       : "45, Main Street, Colombo 03";
 
-  const handleConfirm = () => {
-    router.push({
-      pathname: "/booking-confirmation",
-      params: {
-        name,
-        service,
-        price,
-        date,
-        time,
-        description,
-        address,
-      },
-    });
+  const numericPrice =
+    Number(price.replace(/\D/g, "")) || 0;
+
+  const platformFee = 250;
+  const totalAmount = numericPrice + platformFee;
+
+  const handleConfirm = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Please log in as a customer before booking.");
+      router.replace("/customer-login");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Get customer details from Firestore
+      const customerDoc = await getDoc(
+        doc(db, "users", user.uid)
+      );
+
+      let customerName = "Customer";
+      let customerPhone = "";
+
+      if (customerDoc.exists()) {
+        const customerData = customerDoc.data();
+
+        customerName =
+          customerData.name || "Customer";
+
+        customerPhone =
+          customerData.phone || "";
+      }
+
+      // Create the real booking in Firestore
+      const bookingRef = await addDoc(
+        collection(db, "bookings"),
+        {
+          customerId: user.uid,
+          customerName,
+          customerPhone,
+          customerEmail: user.email || "",
+
+          providerId: providerId || null,
+          providerName: name,
+
+          service,
+          date,
+          time,
+
+          description,
+          address,
+
+          servicePrice: numericPrice,
+          platformFee,
+          totalAmount,
+
+          status: "pending",
+
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+      );
+
+      console.log(
+        "Booking created:",
+        bookingRef.id
+      );
+
+      router.replace({
+        pathname: "/booking-confirmation",
+        params: {
+          bookingId: bookingRef.id,
+          name,
+          service,
+          price,
+          date,
+          time,
+          description,
+          address,
+        },
+      });
+    } catch (error: any) {
+      console.log(
+        "Booking creation error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to create booking."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,104 +169,176 @@ export default function BookingSummaryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>Review your booking</Text>
+        <Text style={styles.title}>
+          Review your booking
+        </Text>
 
         <Text style={styles.subtitle}>
-          Check the details below before confirming your service.
+          Check the details below before confirming your
+          service.
         </Text>
 
         <View style={styles.providerCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👨‍🔧</Text>
+            <Text style={styles.avatarText}>
+              👨‍🔧
+            </Text>
           </View>
 
           <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>{name}</Text>
-            <Text style={styles.providerService}>{service}</Text>
-            <Text style={styles.verified}>✓ Verified Provider</Text>
+            <Text style={styles.providerName}>
+              {name}
+            </Text>
+
+            <Text style={styles.providerService}>
+              {service}
+            </Text>
+
+            <Text style={styles.verified}>
+              ✓ Verified Provider
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Booking Details</Text>
+          <Text style={styles.sectionTitle}>
+            Booking Details
+          </Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Service</Text>
-            <Text style={styles.value}>{service}</Text>
+            <Text style={styles.label}>
+              Service
+            </Text>
+
+            <Text style={styles.value}>
+              {service}
+            </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Date</Text>
-            <Text style={styles.value}>October {date}</Text>
+            <Text style={styles.label}>
+              Date
+            </Text>
+
+            <Text style={styles.value}>
+              October {date}
+            </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Time</Text>
-            <Text style={styles.value}>{time}</Text>
+            <Text style={styles.label}>
+              Time
+            </Text>
+
+            <Text style={styles.value}>
+              {time}
+            </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Starting Price</Text>
-            <Text style={styles.value}>{price}</Text>
+            <Text style={styles.label}>
+              Starting Price
+            </Text>
+
+            <Text style={styles.value}>
+              {price}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Location</Text>
+          <Text style={styles.sectionTitle}>
+            Service Location
+          </Text>
 
           <View style={styles.infoBox}>
-            <Text style={styles.infoIcon}>📍</Text>
-            <Text style={styles.infoText}>{address}</Text>
+            <Text style={styles.infoIcon}>
+              📍
+            </Text>
+
+            <Text style={styles.infoText}>
+              {address}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Problem Description</Text>
+          <Text style={styles.sectionTitle}>
+            Problem Description
+          </Text>
 
           <View style={styles.descriptionBox}>
-            <Text style={styles.descriptionText}>{description}</Text>
+            <Text style={styles.descriptionText}>
+              {description}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Price Summary</Text>
+          <Text style={styles.sectionTitle}>
+            Price Summary
+          </Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Estimated service charge</Text>
-            <Text style={styles.value}>{price}</Text>
+            <Text style={styles.label}>
+              Estimated service charge
+            </Text>
+
+            <Text style={styles.value}>
+              {price}
+            </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Platform fee</Text>
-            <Text style={styles.value}>Rs. 250</Text>
+            <Text style={styles.label}>
+              Platform fee
+            </Text>
+
+            <Text style={styles.value}>
+              Rs. 250
+            </Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.row}>
-            <Text style={styles.totalLabel}>Estimated Total</Text>
+            <Text style={styles.totalLabel}>
+              Estimated Total
+            </Text>
+
             <Text style={styles.totalValue}>
-              Rs. {Number(price.replace(/\D/g, "")) + 250}
+              Rs. {totalAmount.toLocaleString()}
             </Text>
           </View>
         </View>
 
         <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>Note</Text>
+          <Text style={styles.noteTitle}>
+            Note
+          </Text>
+
           <Text style={styles.noteText}>
-            The final service price may change depending on the actual work
-            required. The provider can confirm the final amount before work
-            begins.
+            The final service price may change depending
+            on the actual work required. The provider can
+            confirm the final amount before work begins.
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
         <TouchableOpacity
-          style={styles.confirmButton}
+          style={[
+            styles.confirmButton,
+            loading && styles.disabledButton,
+          ]}
           onPress={handleConfirm}
+          disabled={loading}
         >
-          <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+          <Text style={styles.confirmButtonText}>
+            {loading
+              ? "Creating Booking..."
+              : "Confirm Booking"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -348,6 +533,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
+  },
+
+  disabledButton: {
+    opacity: 0.6,
   },
 
   confirmButtonText: {

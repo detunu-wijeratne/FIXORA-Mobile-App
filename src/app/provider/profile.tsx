@@ -1,111 +1,518 @@
 import { router } from "expo-router";
+import { signOut } from "firebase/auth";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import { auth, db } from "../../services/firebase";
+
+type ProviderData = {
+  name?: string;
+  category?: string;
+  district?: string;
+  phone?: string;
+  email?: string;
+  verificationStatus?: string;
+};
+
+type Review = {
+  rating?: number;
+  providerId?: string | null;
+};
+
+type Booking = {
+  status?: string;
+  providerId?: string | null;
+};
 
 export default function ProviderProfileScreen() {
+  const [provider, setProvider] =
+    useState<ProviderData | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [reviewCount, setReviewCount] =
+    useState(0);
+
+  const [averageRating, setAverageRating] =
+    useState(0);
+
+  const [completedJobs, setCompletedJobs] =
+    useState(0);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      router.replace("/provider/login");
+      return;
+    }
+
+    const loadProvider = async () => {
+      try {
+        const providerDoc = await getDoc(
+          doc(db, "users", user.uid)
+        );
+
+        if (!providerDoc.exists()) {
+          console.log(
+            "Provider profile not found."
+          );
+
+          setLoading(false);
+          return;
+        }
+
+        setProvider(
+          providerDoc.data() as ProviderData
+        );
+      } catch (error) {
+        console.log(
+          "Error loading provider profile:",
+          error
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProvider();
+
+    const reviewsQuery = query(
+      collection(db, "reviews"),
+      where("providerId", "==", user.uid)
+    );
+
+    const unsubscribeReviews =
+      onSnapshot(
+        reviewsQuery,
+        (snapshot) => {
+          const reviews =
+            snapshot.docs.map(
+              (reviewDoc) =>
+                reviewDoc.data() as Review
+            );
+
+          setReviewCount(
+            reviews.length
+          );
+
+          if (reviews.length === 0) {
+            setAverageRating(0);
+            return;
+          }
+
+          const totalRating =
+            reviews.reduce(
+              (total, review) =>
+                total +
+                Number(
+                  review.rating || 0
+                ),
+              0
+            );
+
+          setAverageRating(
+            totalRating /
+              reviews.length
+          );
+        },
+        (error) => {
+          console.log(
+            "Review loading error:",
+            error
+          );
+        }
+      );
+
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("providerId", "==", user.uid)
+    );
+
+    const unsubscribeBookings =
+      onSnapshot(
+        bookingsQuery,
+        (snapshot) => {
+          const jobs =
+            snapshot.docs
+              .map(
+                (bookingDoc) =>
+                  bookingDoc.data() as Booking
+              )
+              .filter(
+                (booking) =>
+                  booking.status ===
+                  "completed"
+              );
+
+          setCompletedJobs(
+            jobs.length
+          );
+        },
+        (error) => {
+          console.log(
+            "Completed jobs loading error:",
+            error
+          );
+        }
+      );
+
+    return () => {
+      unsubscribeReviews();
+      unsubscribeBookings();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+
+      router.replace(
+        "/provider/login"
+      );
+    } catch (error: any) {
+      console.log(
+        "Logout error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to log out."
+      );
+    }
+  };
+
+  if (loading) {
+    return (
+      <View
+        style={
+          styles.loadingContainer
+        }
+      >
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+        />
+
+        <Text
+          style={styles.loadingText}
+        >
+          Loading profile...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={
+          false
+        }
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
-        <View style={styles.profileHeader}>
+        <View
+          style={styles.profileHeader}
+        >
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👨‍🔧</Text>
+            <Text
+              style={styles.avatarText}
+            >
+              👨‍🔧
+            </Text>
           </View>
 
-          <Text style={styles.name}>Ahmad Perera</Text>
-          <Text style={styles.service}>Plumber</Text>
+          <Text style={styles.name}>
+            {provider?.name ||
+              "Provider"}
+          </Text>
 
-          <View style={styles.verifiedBadge}>
-            <Text style={styles.verifiedText}>✓ Verified Provider</Text>
+          <Text style={styles.service}>
+            {provider?.category ||
+              "Service Provider"}
+          </Text>
+
+          <Text
+            style={styles.district}
+          >
+            📍{" "}
+            {provider?.district ||
+              "Service area not set"}
+          </Text>
+
+          <View
+            style={[
+              styles.verifiedBadge,
+              provider?.verificationStatus !==
+                "approved" &&
+                styles.pendingBadge,
+            ]}
+          >
+            <Text
+              style={[
+                styles.verifiedText,
+                provider?.verificationStatus !==
+                  "approved" &&
+                  styles.pendingText,
+              ]}
+            >
+              {provider?.verificationStatus ===
+              "approved"
+                ? "✓ Verified Provider"
+                : "Verification Pending"}
+            </Text>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>4.9</Text>
-              <Text style={styles.statLabel}>Rating</Text>
+              <Text
+                style={styles.statValue}
+              >
+                {averageRating > 0
+                  ? averageRating.toFixed(
+                      1
+                    )
+                  : "0.0"}
+              </Text>
+
+              <Text
+                style={styles.statLabel}
+              >
+                Rating
+              </Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>126</Text>
-              <Text style={styles.statLabel}>Reviews</Text>
+              <Text
+                style={styles.statValue}
+              >
+                {reviewCount}
+              </Text>
+
+              <Text
+                style={styles.statLabel}
+              >
+                Reviews
+              </Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>142</Text>
-              <Text style={styles.statLabel}>Jobs</Text>
+              <Text
+                style={styles.statValue}
+              >
+                {completedJobs}
+              </Text>
+
+              <Text
+                style={styles.statLabel}
+              >
+                Jobs
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemIcon}>👤</Text>
-            <Text style={styles.itemText}>Edit Profile</Text>
-            <Text style={styles.arrow}>›</Text>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() =>
+              router.push("/provider/edit-profile")
+            }
+          >
+            <Text
+              style={styles.itemIcon}
+            >
+              👤
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Edit Profile
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.item}
-            onPress={() => router.push("/provider/availability")}
+            onPress={() =>
+              router.push(
+                "/provider/availability"
+              )
+            }
           >
-            <Text style={styles.itemIcon}>📅</Text>
-            <Text style={styles.itemText}>Manage Availability</Text>
-            <Text style={styles.arrow}>›</Text>
+            <Text
+              style={styles.itemIcon}
+            >
+              📅
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Manage Availability
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemIcon}>🛠️</Text>
-            <Text style={styles.itemText}>Services & Pricing</Text>
-            <Text style={styles.arrow}>›</Text>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() =>
+              alert(
+                "Services & Pricing can be connected next."
+              )
+            }
+          >
+            <Text
+              style={styles.itemIcon}
+            >
+              🛠️
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Services & Pricing
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemIcon}>📄</Text>
-            <Text style={styles.itemText}>Verification Documents</Text>
-            <Text style={styles.arrow}>›</Text>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() =>
+              router.push(
+                "/provider/verification"
+              )
+            }
+          >
+            <Text
+              style={styles.itemIcon}
+            >
+              📄
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Verification Documents
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.item}
-            onPress={() => router.push("/provider/settings")}
+            onPress={() =>
+              router.push(
+                "/provider/settings"
+              )
+            }
           >
-            <Text style={styles.itemIcon}>⚙️</Text>
-            <Text style={styles.itemText}>Settings</Text>
-            <Text style={styles.arrow}>›</Text>
+            <Text
+              style={styles.itemIcon}
+            >
+              ⚙️
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Settings
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemIcon}>🔔</Text>
-            <Text style={styles.itemText}>Notifications</Text>
-            <Text style={styles.arrow}>›</Text>
+          <TouchableOpacity
+            style={styles.item}
+          >
+            <Text
+              style={styles.itemIcon}
+            >
+              🔔
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Notifications
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.item}>
-            <Text style={styles.itemIcon}>❓</Text>
-            <Text style={styles.itemText}>Help & Support</Text>
-            <Text style={styles.arrow}>›</Text>
+          <TouchableOpacity
+            style={styles.item}
+          >
+            <Text
+              style={styles.itemIcon}
+            >
+              ❓
+            </Text>
+
+            <Text
+              style={styles.itemText}
+            >
+              Help & Support
+            </Text>
+
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => router.replace("/provider/login")}
+          onPress={handleLogout}
         >
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text
+            style={styles.logoutText}
+          >
+            Log Out
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -118,6 +525,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F7F7FC",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#F7F7FC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: "#64748B",
   },
 
   scrollContent: {
@@ -156,6 +576,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 14,
     color: "#64748B",
+    textAlign: "center",
+  },
+
+  district: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#64748B",
+    textAlign: "center",
   },
 
   verifiedBadge: {
@@ -170,6 +598,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#1D4ED8",
     fontWeight: "700",
+  },
+
+  pendingBadge: {
+    backgroundColor: "#FEF3C7",
+  },
+
+  pendingText: {
+    color: "#92400E",
   },
 
   statsRow: {

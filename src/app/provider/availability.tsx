@@ -1,161 +1,517 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
+import { auth, db } from "../../services/firebase";
+
+type DayAvailability = {
+  enabled: boolean;
+  slots: string[];
+};
+
+type Availability = {
+  monday: DayAvailability;
+  tuesday: DayAvailability;
+  wednesday: DayAvailability;
+  thursday: DayAvailability;
+  friday: DayAvailability;
+  saturday: DayAvailability;
+  sunday: DayAvailability;
+};
+
+const defaultAvailability: Availability = {
+  monday: {
+    enabled: true,
+    slots: ["09:00 AM - 12:00 PM"],
+  },
+
+  tuesday: {
+    enabled: true,
+    slots: ["09:00 AM - 12:00 PM"],
+  },
+
+  wednesday: {
+    enabled: true,
+    slots: ["09:00 AM - 12:00 PM"],
+  },
+
+  thursday: {
+    enabled: true,
+    slots: ["09:00 AM - 12:00 PM"],
+  },
+
+  friday: {
+    enabled: true,
+    slots: ["09:00 AM - 12:00 PM"],
+  },
+
+  saturday: {
+    enabled: false,
+    slots: [],
+  },
+
+  sunday: {
+    enabled: false,
+    slots: [],
+  },
+};
+
 export default function ProviderAvailabilityScreen() {
-  const [days, setDays] = useState([
-    {
-      day: "Monday",
-      enabled: true,
-      slots: ["9:00 AM", "11:00 AM", "2:00 PM"],
-    },
-    {
-      day: "Tuesday",
-      enabled: true,
-      slots: ["9:30 AM", "1:00 PM", "4:00 PM"],
-    },
-    {
-      day: "Wednesday",
-      enabled: true,
-      slots: ["10:00 AM", "2:30 PM"],
-    },
-    {
-      day: "Thursday",
-      enabled: false,
-      slots: [],
-    },
-    {
-      day: "Friday",
-      enabled: true,
-      slots: ["9:00 AM", "12:00 PM", "3:00 PM"],
-    },
-  ]);
+  const [availability, setAvailability] =
+    useState<Availability>(defaultAvailability);
 
-  const toggleDay = (index: number) => {
-    setDays((current) =>
-      current.map((item, i) =>
-        i === index
-          ? { ...item, enabled: !item.enabled }
-          : item
-      )
-    );
+  const [newSlot, setNewSlot] = useState("");
+  const [selectedDay, setSelectedDay] =
+    useState<keyof Availability>("monday");
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadAvailability();
+  }, []);
+
+  const loadAvailability = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert(
+        "Login Required",
+        "Please log in again."
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const availabilityRef = doc(
+        db,
+        "providerAvailability",
+        user.uid
+      );
+
+      const snapshot = await getDoc(
+        availabilityRef
+      );
+
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+
+        if (data.availability) {
+          setAvailability(
+            data.availability as Availability
+          );
+        }
+      }
+    } catch (error: any) {
+      console.log(
+        "Load availability error:",
+        error
+      );
+
+      Alert.alert(
+        "Error",
+        error.message ||
+          "Unable to load availability."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addSlot = (index: number) => {
-    setDays((current) =>
-      current.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              slots: [...item.slots, "5:00 PM"],
-            }
-          : item
-      )
-    );
+  const saveAvailability = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert(
+        "Login Required",
+        "Please log in again."
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      await setDoc(
+        doc(
+          db,
+          "providerAvailability",
+          user.uid
+        ),
+        {
+          providerId: user.uid,
+          availability,
+          updatedAt: serverTimestamp(),
+        },
+        {
+          merge: true,
+        }
+      );
+
+      Alert.alert(
+        "Availability Saved",
+        "Your availability has been updated successfully."
+      );
+    } catch (error: any) {
+      console.log(
+        "Save availability error:",
+        error
+      );
+
+      Alert.alert(
+        "Error",
+        error.message ||
+          "Unable to save availability."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const removeSlot = (dayIndex: number, slotIndex: number) => {
-    setDays((current) =>
-      current.map((item, i) =>
-        i === dayIndex
-          ? {
-              ...item,
-              slots: item.slots.filter(
-                (_, index) => index !== slotIndex
-              ),
-            }
-          : item
-      )
-    );
+  const toggleDay = (
+    day: keyof Availability
+  ) => {
+    setAvailability((current) => ({
+      ...current,
+
+      [day]: {
+        ...current[day],
+        enabled: !current[day].enabled,
+      },
+    }));
   };
 
-  const saveChanges = () => {
-    Alert.alert(
-      "Availability Updated",
-      "Your availability changes have been saved."
-    );
+  const addSlot = () => {
+    const slot = newSlot.trim();
+
+    if (!slot) {
+      Alert.alert(
+        "Enter Time Slot",
+        "Example: 02:00 PM - 05:00 PM"
+      );
+      return;
+    }
+
+    const existingSlots =
+      availability[selectedDay].slots;
+
+    if (existingSlots.includes(slot)) {
+      Alert.alert(
+        "Duplicate Slot",
+        "This time slot already exists."
+      );
+      return;
+    }
+
+    setAvailability((current) => ({
+      ...current,
+
+      [selectedDay]: {
+        ...current[selectedDay],
+        enabled: true,
+
+        slots: [
+          ...current[selectedDay].slots,
+          slot,
+        ],
+      },
+    }));
+
+    setNewSlot("");
   };
+
+  const deleteSlot = (
+    day: keyof Availability,
+    slotIndex: number
+  ) => {
+    setAvailability((current) => ({
+      ...current,
+
+      [day]: {
+        ...current[day],
+
+        slots: current[day].slots.filter(
+          (_, index) =>
+            index !== slotIndex
+        ),
+      },
+    }));
+  };
+
+  const dayLabels: {
+    key: keyof Availability;
+    label: string;
+  }[] = [
+    {
+      key: "monday",
+      label: "Monday",
+    },
+    {
+      key: "tuesday",
+      label: "Tuesday",
+    },
+    {
+      key: "wednesday",
+      label: "Wednesday",
+    },
+    {
+      key: "thursday",
+      label: "Thursday",
+    },
+    {
+      key: "friday",
+      label: "Friday",
+    },
+    {
+      key: "saturday",
+      label: "Saturday",
+    },
+    {
+      key: "sunday",
+      label: "Sunday",
+    },
+  ];
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.loadingText}>
+          Loading availability...
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={styles.title}>Manage Availability</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={
+        styles.scrollContent
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.title}>
+        Manage Availability
+      </Text>
 
-        <Text style={styles.subtitle}>
-          Choose which days and times customers can book you.
+      <Text style={styles.subtitle}>
+        Set the days and time slots when
+        customers can book your services.
+      </Text>
+
+      <View style={styles.addCard}>
+        <Text style={styles.sectionTitle}>
+          Add Time Slot
         </Text>
 
-        <View style={styles.dayList}>
-          {days.map((item, dayIndex) => (
-            <View key={item.day} style={styles.dayCard}>
-              <View style={styles.dayHeader}>
-                <View>
-                  <Text style={styles.dayName}>{item.day}</Text>
+        <Text style={styles.label}>
+          Select Day
+        </Text>
 
-                  <Text style={styles.dayStatus}>
-                    {item.enabled
-                      ? "Available for bookings"
-                      : "Unavailable"}
-                  </Text>
-                </View>
-
-                <Switch
-                  value={item.enabled}
-                  onValueChange={() => toggleDay(dayIndex)}
-                />
-              </View>
-
-              {item.enabled && (
-                <>
-                  <View style={styles.slots}>
-                    {item.slots.map((slot, slotIndex) => (
-                      <TouchableOpacity
-                        key={`${slot}-${slotIndex}`}
-                        style={styles.slot}
-                        onPress={() =>
-                          removeSlot(dayIndex, slotIndex)
-                        }
-                      >
-                        <Text style={styles.slotText}>{slot}</Text>
-                        <Text style={styles.remove}>×</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => addSlot(dayIndex)}
-                  >
-                    <Text style={styles.addButtonText}>
-                      + Add Time Slot
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={saveChanges}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.daySelector}
         >
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          {dayLabels.map((day) => (
+            <TouchableOpacity
+              key={day.key}
+              style={[
+                styles.dayButton,
+
+                selectedDay === day.key &&
+                  styles.selectedDayButton,
+              ]}
+              onPress={() =>
+                setSelectedDay(day.key)
+              }
+            >
+              <Text
+                style={[
+                  styles.dayButtonText,
+
+                  selectedDay === day.key &&
+                    styles.selectedDayText,
+                ]}
+              >
+                {day.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <Text style={styles.label}>
+          Time Slot
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Example: 02:00 PM - 05:00 PM"
+          placeholderTextColor="#94A3B8"
+          value={newSlot}
+          onChangeText={setNewSlot}
+        />
+
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={addSlot}
+        >
+          <Text style={styles.addButtonText}>
+            + Add Slot
+          </Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      <Text style={styles.scheduleTitle}>
+        Weekly Schedule
+      </Text>
+
+      {dayLabels.map((day) => {
+        const data =
+          availability[day.key];
+
+        return (
+          <View
+            key={day.key}
+            style={styles.dayCard}
+          >
+            <View style={styles.dayHeader}>
+              <View>
+                <Text style={styles.dayTitle}>
+                  {day.label}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.dayStatus,
+
+                    data.enabled
+                      ? styles.availableText
+                      : styles.unavailableText,
+                  ]}
+                >
+                  {data.enabled
+                    ? "Available"
+                    : "Unavailable"}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+
+                  data.enabled
+                    ? styles.enabledButton
+                    : styles.disabledToggleButton,
+                ]}
+                onPress={() =>
+                  toggleDay(day.key)
+                }
+              >
+                <Text
+                  style={[
+                    styles.toggleText,
+
+                    data.enabled
+                      ? styles.enabledText
+                      : styles.disabledToggleText,
+                  ]}
+                >
+                  {data.enabled
+                    ? "ON"
+                    : "OFF"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {data.enabled ? (
+              data.slots.length === 0 ? (
+                <Text
+                  style={styles.noSlotsText}
+                >
+                  No time slots added.
+                </Text>
+              ) : (
+                <View style={styles.slots}>
+                  {data.slots.map(
+                    (slot, index) => (
+                      <View
+                        key={`${slot}-${index}`}
+                        style={styles.slotRow}
+                      >
+                        <Text
+                          style={
+                            styles.slotText
+                          }
+                        >
+                          🕒 {slot}
+                        </Text>
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            deleteSlot(
+                              day.key,
+                              index
+                            )
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.deleteText
+                            }
+                          >
+                            Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )
+                  )}
+                </View>
+              )
+            ) : (
+              <Text
+                style={styles.noSlotsText}
+              >
+                You are unavailable on this day.
+              </Text>
+            )}
+          </View>
+        );
+      })}
+
+      <TouchableOpacity
+        style={[
+          styles.saveButton,
+          saving &&
+            styles.disabledButton,
+        ]}
+        disabled={saving}
+        onPress={saveAvailability}
+      >
+        <Text style={styles.saveButtonText}>
+          {saving
+            ? "Saving..."
+            : "Save Availability"}
+        </Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -165,35 +521,126 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F7FC",
   },
 
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F7F7FC",
+  },
+
+  loadingText: {
+    color: "#64748B",
+  },
+
   scrollContent: {
     padding: 18,
-    paddingBottom: 110,
+    paddingBottom: 40,
   },
 
   title: {
-    fontSize: 27,
+    fontSize: 26,
     fontWeight: "800",
     color: "#0F172A",
   },
 
   subtitle: {
-    marginTop: 6,
+    marginTop: 7,
     fontSize: 13,
     lineHeight: 20,
     color: "#64748B",
   },
 
-  dayList: {
+  addCard: {
     marginTop: 20,
-    gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  label: {
+    marginTop: 15,
+    marginBottom: 7,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  daySelector: {
+    marginBottom: 5,
+  },
+
+  dayButton: {
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    backgroundColor: "#FFFFFF",
+  },
+
+  selectedDayButton: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+
+  dayButtonText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+
+  selectedDayText: {
+    color: "#FFFFFF",
+  },
+
+  input: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 13,
+    color: "#0F172A",
+  },
+
+  addButton: {
+    marginTop: 12,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 11,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+
+  addButtonText: {
+    color: "#2563EB",
+    fontWeight: "800",
+  },
+
+  scheduleTitle: {
+    marginTop: 24,
+    marginBottom: 2,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
   },
 
   dayCard: {
+    marginTop: 12,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
+    padding: 15,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    padding: 15,
   },
 
   dayHeader: {
@@ -202,7 +649,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  dayName: {
+  dayTitle: {
     fontSize: 15,
     fontWeight: "800",
     color: "#0F172A",
@@ -210,75 +657,93 @@ const styles = StyleSheet.create({
 
   dayStatus: {
     marginTop: 3,
-    fontSize: 11,
-    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  availableText: {
+    color: "#16A34A",
+  },
+
+  unavailableText: {
+    color: "#DC2626",
+  },
+
+  toggleButton: {
+    minWidth: 55,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    alignItems: "center",
+  },
+
+  enabledButton: {
+    backgroundColor: "#DCFCE7",
+  },
+
+  disabledToggleButton: {
+    backgroundColor: "#FEE2E2",
+  },
+
+  toggleText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  enabledText: {
+    color: "#166534",
+  },
+
+  disabledToggleText: {
+    color: "#B91C1C",
   },
 
   slots: {
     marginTop: 14,
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
 
-  slot: {
+  slotRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    padding: 11,
   },
 
   slotText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#1D4ED8",
-  },
-
-  remove: {
-    marginLeft: 7,
-    fontSize: 16,
-    color: "#64748B",
-  },
-
-  addButton: {
-    marginTop: 14,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#2563EB",
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center",
-  },
-
-  addButtonText: {
-    color: "#2563EB",
     fontSize: 12,
-    fontWeight: "700",
+    color: "#334155",
   },
 
-  bottomBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    padding: 14,
+  deleteText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#DC2626",
+  },
+
+  noSlotsText: {
+    marginTop: 13,
+    fontSize: 11,
+    color: "#94A3B8",
   },
 
   saveButton: {
-    backgroundColor: "#1D4ED8",
-    borderRadius: 12,
-    paddingVertical: 15,
+    marginTop: 22,
+    backgroundColor: "#2563EB",
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: "center",
   },
 
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  disabledButton: {
+    opacity: 0.6,
   },
 });

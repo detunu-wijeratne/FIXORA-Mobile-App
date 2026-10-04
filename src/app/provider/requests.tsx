@@ -1,49 +1,135 @@
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import { auth, db } from "../../services/firebase";
+
+type Booking = {
+  id: string;
+
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+
+  providerId?: string | null;
+  providerName?: string;
+
+  service?: string;
+  date?: string;
+  time?: string;
+  description?: string;
+  address?: string;
+
+  servicePrice?: number;
+  platformFee?: number;
+  totalAmount?: number;
+
+  status?: string;
+};
 
 export default function ProviderRequestsScreen() {
-  const requests = [
-    {
-      id: "RQ001",
-      customer: "Suresh Kumar",
-      service: "Leak Repair & Pipe Diagnostics",
-      date: "16 Apr 2025",
-      time: "10:00 AM",
-      location: "Kollupitiya, Colombo 03",
-      payout: "Rs. 3,500",
-      rating: "4.9",
-      reviews: "12",
-    },
-    {
-      id: "RQ002",
-      customer: "Nadeesha Silva",
-      service: "Kitchen Sink Repair",
-      date: "16 Apr 2025",
-      time: "1:30 PM",
-      location: "Bambalapitiya, Colombo 04",
-      payout: "Rs. 2,800",
-      rating: "4.8",
-      reviews: "8",
-    },
-    {
-      id: "RQ003",
-      customer: "Kasun Fernando",
-      service: "Bathroom Pipe Inspection",
-      date: "17 Apr 2025",
-      time: "9:00 AM",
-      location: "Colombo 07",
-      payout: "Rs. 3,200",
-      rating: "4.7",
-      reviews: "15",
-    },
-  ];
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      router.replace("/provider/login");
+      return;
+    }
+
+    console.log(
+      "Logged provider UID:",
+      user.uid
+    );
+
+    /*
+      Load only bookings assigned to this provider.
+
+      We only use providerId in the Firestore query.
+      Then we filter pending bookings locally.
+
+      This avoids needing a Firestore composite index.
+    */
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("providerId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      bookingsQuery,
+
+      (snapshot) => {
+        console.log(
+          "Bookings assigned to provider:",
+          snapshot.docs.length
+        );
+
+        const loadedBookings: Booking[] =
+          snapshot.docs
+            .map((bookingDoc) => {
+              const data = bookingDoc.data();
+
+              console.log(
+                "Provider booking:",
+                bookingDoc.id,
+                data
+              );
+
+              return {
+                id: bookingDoc.id,
+                ...data,
+              } as Booking;
+            })
+            .filter(
+              (booking) =>
+                booking.status === "pending"
+            );
+
+        console.log(
+          "Pending requests:",
+          loadedBookings.length
+        );
+
+        setBookings(loadedBookings);
+        setLoading(false);
+      },
+
+      (error) => {
+        console.log(
+          "Error loading provider requests:",
+          error
+        );
+
+        alert(
+          error.message ||
+            "Unable to load booking requests."
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -51,88 +137,232 @@ export default function ProviderRequestsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>Incoming Requests</Text>
-
-        <Text style={styles.subtitle}>
-          Review new service requests and decide whether to accept them.
+        <Text style={styles.title}>
+          Incoming Requests
         </Text>
 
-        <View style={styles.filterRow}>
-          <TouchableOpacity style={[styles.filterButton, styles.activeFilter]}>
-            <Text style={styles.activeFilterText}>All</Text>
-          </TouchableOpacity>
+        <Text style={styles.subtitle}>
+          Review new customer service requests.
+        </Text>
 
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterText}>Today</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterText}>Tomorrow</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.requestList}>
-          {requests.map((request) => (
-            <TouchableOpacity
-              key={request.id}
-              style={styles.card}
-              activeOpacity={0.7}
-              onPress={() =>
-                router.push({
-                  pathname: "/provider/request-details",
-                  params: request,
-                })
-              }
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              styles.activeTab,
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                styles.activeTabText,
+              ]}
             >
-              <View style={styles.topRow}>
-                <View style={styles.serviceArea}>
-                  <Text style={styles.service}>{request.service}</Text>
-                  <Text style={styles.requestId}>{request.id}</Text>
-                </View>
+              All
+            </Text>
+          </TouchableOpacity>
 
-                <View>
-                  <Text style={styles.payout}>{request.payout}</Text>
-                  <Text style={styles.payoutLabel}>Est. payout</Text>
-                </View>
-              </View>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>
+              Today
+            </Text>
+          </TouchableOpacity>
 
-              <View style={styles.customerRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>SK</Text>
-                </View>
-
-                <View style={styles.customerInfo}>
-                  <Text style={styles.customerName}>
-                    {request.customer}
-                  </Text>
-
-                  <Text style={styles.rating}>
-                    ⭐ {request.rating} ({request.reviews} reviews)
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.infoSection}>
-                <Text style={styles.info}>
-                  📅 {request.date}
-                </Text>
-
-                <Text style={styles.info}>
-                  🕐 {request.time}
-                </Text>
-
-                <Text style={styles.info}>
-                  📍 {request.location}
-                </Text>
-              </View>
-
-              <View style={styles.cardBottom}>
-                <Text style={styles.viewText}>View Request</Text>
-                <Text style={styles.arrow}>›</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>
+              Tomorrow
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color="#2563EB"
+            />
+
+            <Text style={styles.loadingText}>
+              Loading requests...
+            </Text>
+          </View>
+        ) : bookings.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>
+              📭
+            </Text>
+
+            <Text style={styles.emptyTitle}>
+              No pending requests
+            </Text>
+
+            <Text style={styles.emptyText}>
+              There are currently no pending
+              bookings assigned to you.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.requestList}>
+            {bookings.map((booking) => (
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.requestCard}
+                onPress={() =>
+                  router.push({
+                    pathname:
+                      "/provider/request-details",
+
+                    params: {
+                      bookingId: booking.id,
+
+                      customer:
+                        booking.customerName ||
+                        "Customer",
+
+                      phone:
+                        booking.customerPhone ||
+                        "",
+
+                      email:
+                        booking.customerEmail ||
+                        "",
+
+                      service:
+                        booking.service ||
+                        "Home Service",
+
+                      date:
+                        booking.date ||
+                        "",
+
+                      time:
+                        booking.time ||
+                        "",
+
+                      location:
+                        booking.address ||
+                        "",
+
+                      description:
+                        booking.description ||
+                        "",
+
+                      price: String(
+                        booking.servicePrice ||
+                          0
+                      ),
+
+                      totalAmount: String(
+                        booking.totalAmount ||
+                          0
+                      ),
+
+                      status:
+                        booking.status ||
+                        "pending",
+                    },
+                  })
+                }
+              >
+                <View style={styles.cardTop}>
+                  <View
+                    style={styles.serviceIcon}
+                  >
+                    <Text
+                      style={
+                        styles.serviceEmoji
+                      }
+                    >
+                      🔧
+                    </Text>
+                  </View>
+
+                  <View
+                    style={styles.requestInfo}
+                  >
+                    <Text
+                      style={
+                        styles.serviceTitle
+                      }
+                    >
+                      {booking.service ||
+                        "Home Service"}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.customerName
+                      }
+                    >
+                      {booking.customerName ||
+                        "Customer"}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={
+                      styles.pendingBadge
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.pendingText
+                      }
+                    >
+                      Pending
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.details}>
+                  <Text
+                    style={styles.detailText}
+                  >
+                    📅 October{" "}
+                    {booking.date || "-"} •{" "}
+                    {booking.time || "-"}
+                  </Text>
+
+                  <Text
+                    style={styles.detailText}
+                  >
+                    📍{" "}
+                    {booking.address ||
+                      "Location not provided"}
+                  </Text>
+                </View>
+
+                <View style={styles.bottomRow}>
+                  <View>
+                    <Text
+                      style={
+                        styles.priceLabel
+                      }
+                    >
+                      Estimated Service
+                    </Text>
+
+                    <Text style={styles.price}>
+                      Rs.{" "}
+                      {Number(
+                        booking.servicePrice ||
+                          0
+                      ).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={
+                      styles.viewDetails
+                    }
+                  >
+                    View Details →
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       <ProviderBottomNav />
@@ -160,48 +390,82 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 6,
     fontSize: 13,
-    lineHeight: 20,
     color: "#64748B",
   },
 
-  filterRow: {
+  tabs: {
     marginTop: 20,
     flexDirection: "row",
-    gap: 10,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 12,
+    padding: 4,
   },
 
-  filterButton: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+
+  activeTab: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+  },
+
+  tabText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  activeTabText: {
+    color: "#1D4ED8",
+  },
+
+  loadingContainer: {
+    marginTop: 50,
+    alignItems: "center",
+  },
+
+  loadingText: {
+    marginTop: 12,
+    color: "#64748B",
+  },
+
+  emptyCard: {
+    marginTop: 30,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 30,
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
 
-  activeFilter: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1D4ED8",
+  emptyIcon: {
+    fontSize: 38,
   },
 
-  filterText: {
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  emptyText: {
+    marginTop: 6,
+    fontSize: 12,
     color: "#64748B",
-    fontWeight: "600",
-    fontSize: 12,
-  },
-
-  activeFilterText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 12,
+    textAlign: "center",
   },
 
   requestList: {
-    marginTop: 20,
-    gap: 14,
+    marginTop: 16,
+    gap: 12,
   },
 
-  card: {
+  requestCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 15,
@@ -209,92 +473,67 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
   },
 
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  serviceArea: {
-    flex: 1,
-    paddingRight: 12,
-  },
-
-  service: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  requestId: {
-    marginTop: 4,
-    fontSize: 10,
-    color: "#94A3B8",
-  },
-
-  payout: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1D4ED8",
-    textAlign: "right",
-  },
-
-  payoutLabel: {
-    marginTop: 2,
-    fontSize: 9,
-    color: "#94A3B8",
-    textAlign: "right",
-  },
-
-  customerRow: {
-    marginTop: 14,
+  cardTop: {
     flexDirection: "row",
     alignItems: "center",
   },
 
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#DBEAFE",
+  serviceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 11,
+  serviceEmoji: {
+    fontSize: 21,
+  },
+
+  requestInfo: {
+    flex: 1,
+    marginLeft: 11,
+  },
+
+  serviceTitle: {
+    fontSize: 14,
     fontWeight: "800",
-    color: "#1D4ED8",
-  },
-
-  customerInfo: {
-    marginLeft: 10,
-  },
-
-  customerName: {
-    fontSize: 13,
-    fontWeight: "700",
     color: "#0F172A",
   },
 
-  rating: {
+  customerName: {
     marginTop: 3,
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  infoSection: {
-    marginTop: 14,
-    gap: 6,
-  },
-
-  info: {
     fontSize: 12,
     color: "#64748B",
   },
 
-  cardBottom: {
+  pendingBadge: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+
+  pendingText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+
+  details: {
     marginTop: 14,
-    paddingTop: 12,
+    gap: 6,
+  },
+
+  detailText: {
+    fontSize: 12,
+    color: "#475569",
+  },
+
+  bottomRow: {
+    marginTop: 15,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
     flexDirection: "row",
@@ -302,14 +541,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  viewText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1D4ED8",
+  priceLabel: {
+    fontSize: 10,
+    color: "#64748B",
   },
 
-  arrow: {
-    fontSize: 24,
-    color: "#94A3B8",
+  price: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  viewDetails: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
   },
 });

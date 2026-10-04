@@ -1,30 +1,158 @@
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+
 import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+
+import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import { auth, db } from "../../services/firebase";
+
+type Booking = {
+  id: string;
+
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+
+  providerId?: string | null;
+
+  service?: string;
+  date?: string;
+  time?: string;
+  address?: string;
+  description?: string;
+
+  servicePrice?: number;
+  totalAmount?: number;
+
+  status?: string;
+};
 
 export default function ProviderScheduleScreen() {
-  const jobs = [
-    {
-      id: "JB001",
-      time: "9:30 AM",
-      title: "Leak Repair",
-      customer: "Suresh Kumar",
-      location: "Colombo 03",
-    },
-    {
-      id: "JB002",
-      time: "2:00 PM",
-      title: "Pipe Installation",
-      customer: "Nadeesha Silva",
-      location: "Colombo 04",
-    },
-  ];
+  const [jobs, setJobs] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      router.replace("/provider/login");
+      return;
+    }
+
+    const scheduleQuery = query(
+      collection(db, "bookings"),
+      where("providerId", "==", user.uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      scheduleQuery,
+      (snapshot) => {
+        const loadedJobs: Booking[] =
+          snapshot.docs
+            .map((jobDoc) => ({
+              id: jobDoc.id,
+              ...jobDoc.data(),
+            }))
+            .filter(
+              (job: any) =>
+                job.status === "confirmed" ||
+                job.status === "in_progress"
+            ) as Booking[];
+
+        loadedJobs.sort((a, b) => {
+          const dateA = Number(a.date || 0);
+          const dateB = Number(b.date || 0);
+
+          if (dateA !== dateB) {
+            return dateA - dateB;
+          }
+
+          return String(a.time || "").localeCompare(
+            String(b.time || "")
+          );
+        });
+
+        setJobs(loadedJobs);
+        setLoading(false);
+      },
+      (error) => {
+        console.log(
+          "Schedule loading error:",
+          error
+        );
+
+        alert(
+          error.message ||
+            "Unable to load schedule."
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const openJobDetails = (job: Booking) => {
+    router.push({
+      pathname: "/provider/job-details",
+
+      params: {
+        bookingId: job.id,
+
+        customer:
+          job.customerName ||
+          "Customer",
+
+        phone:
+          job.customerPhone || "",
+
+        email:
+          job.customerEmail || "",
+
+        service:
+          job.service ||
+          "Home Service",
+
+        date:
+          job.date || "",
+
+        time:
+          job.time || "",
+
+        location:
+          job.address || "",
+
+        description:
+          job.description || "",
+
+        price: String(
+          job.servicePrice || 0
+        ),
+
+        totalAmount: String(
+          job.totalAmount || 0
+        ),
+
+        status:
+          job.status || "confirmed",
+      },
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -32,92 +160,132 @@ export default function ProviderScheduleScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>Schedule</Text>
+        <Text style={styles.title}>
+          Schedule
+        </Text>
 
         <Text style={styles.subtitle}>
           View your jobs and manage your available time slots.
         </Text>
 
-        <View style={styles.dateRow}>
-          {["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18"].map(
-            (item, index) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.dateCard,
-                  index === 2 && styles.activeDateCard,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dateText,
-                    index === 2 && styles.activeDateText,
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
-        </View>
-
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Today's Jobs</Text>
+          <Text style={styles.sectionTitle}>
+            Upcoming Jobs
+          </Text>
 
           <TouchableOpacity
-            onPress={() => router.push("/provider/jobs")}
+            onPress={() =>
+              router.push("/provider/jobs")
+            }
           >
-            <Text style={styles.link}>View All</Text>
+            <Text style={styles.link}>
+              View All
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.jobList}>
-          {jobs.map((job) => (
-            <TouchableOpacity
-              key={job.id}
-              style={styles.jobCard}
-              onPress={() =>
-                router.push({
-                  pathname: "/provider/job-details",
-                  params: {
-                    id: job.id,
-                    customer: job.customer,
-                    service: job.title,
-                    time: job.time,
-                    location: job.location,
-                    status: "Confirmed",
-                  },
-                })
-              }
-            >
-              <View style={styles.timeBox}>
-                <Text style={styles.timeText}>{job.time}</Text>
-              </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color="#2563EB"
+            />
 
-              <View style={styles.jobInfo}>
-                <Text style={styles.jobTitle}>{job.title}</Text>
-                <Text style={styles.customer}>{job.customer}</Text>
-                <Text style={styles.location}>
-                  📍 {job.location}
+            <Text style={styles.loadingText}>
+              Loading schedule...
+            </Text>
+          </View>
+        ) : jobs.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>
+              📅
+            </Text>
+
+            <Text style={styles.emptyTitle}>
+              No scheduled jobs
+            </Text>
+
+            <Text style={styles.emptyText}>
+              Accepted bookings will appear here.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.jobList}>
+            {jobs.map((job) => (
+              <TouchableOpacity
+                key={job.id}
+                style={styles.jobCard}
+                onPress={() =>
+                  openJobDetails(job)
+                }
+              >
+                <View style={styles.timeBox}>
+                  <Text style={styles.timeText}>
+                    {job.time || "-"}
+                  </Text>
+
+                  <Text style={styles.dateText}>
+                    Oct {job.date || "-"}
+                  </Text>
+                </View>
+
+                <View style={styles.jobInfo}>
+                  <Text style={styles.jobTitle}>
+                    {job.service ||
+                      "Home Service"}
+                  </Text>
+
+                  <Text style={styles.customer}>
+                    {job.customerName ||
+                      "Customer"}
+                  </Text>
+
+                  <Text style={styles.location}>
+                    📍{" "}
+                    {job.address ||
+                      "Location not provided"}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.status,
+                      job.status ===
+                        "in_progress" &&
+                        styles.progressStatus,
+                    ]}
+                  >
+                    {job.status ===
+                    "in_progress"
+                      ? "In Progress"
+                      : "Confirmed"}
+                  </Text>
+                </View>
+
+                <Text style={styles.arrow}>
+                  ›
                 </Text>
-              </View>
-
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Availability</Text>
+          <Text style={styles.sectionTitle}>
+            Availability
+          </Text>
         </View>
 
         <View style={styles.availabilityCard}>
           <View style={styles.availabilityInfo}>
-            <Text style={styles.availabilityTitle}>
+            <Text
+              style={styles.availabilityTitle}
+            >
               Manage Availability
             </Text>
 
-            <Text style={styles.availabilityText}>
+            <Text
+              style={styles.availabilityText}
+            >
               Add, remove or change the time slots customers can book.
             </Text>
           </View>
@@ -125,10 +293,16 @@ export default function ProviderScheduleScreen() {
           <TouchableOpacity
             style={styles.manageButton}
             onPress={() =>
-              router.push("/provider/availability")
+              router.push(
+                "/provider/availability"
+              )
             }
           >
-            <Text style={styles.manageButtonText}>Manage</Text>
+            <Text
+              style={styles.manageButtonText}
+            >
+              Manage
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -162,37 +336,6 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
 
-  dateRow: {
-    marginTop: 20,
-    flexDirection: "row",
-    gap: 8,
-  },
-
-  dateCard: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  activeDateCard: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1D4ED8",
-  },
-
-  dateText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#475569",
-  },
-
-  activeDateText: {
-    color: "#FFFFFF",
-  },
-
   sectionHeader: {
     marginTop: 24,
     marginBottom: 12,
@@ -213,6 +356,43 @@ const styles = StyleSheet.create({
     color: "#1D4ED8",
   },
 
+  loadingContainer: {
+    marginTop: 30,
+    alignItems: "center",
+  },
+
+  loadingText: {
+    marginTop: 10,
+    color: "#64748B",
+  },
+
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 28,
+    alignItems: "center",
+  },
+
+  emptyIcon: {
+    fontSize: 34,
+  },
+
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  emptyText: {
+    marginTop: 5,
+    fontSize: 12,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
   jobList: {
     gap: 12,
   },
@@ -228,8 +408,8 @@ const styles = StyleSheet.create({
   },
 
   timeBox: {
-    width: 70,
-    minHeight: 58,
+    width: 74,
+    minHeight: 62,
     backgroundColor: "#EFF6FF",
     borderRadius: 14,
     alignItems: "center",
@@ -240,6 +420,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     color: "#1D4ED8",
+    textAlign: "center",
+  },
+
+  dateText: {
+    marginTop: 4,
+    fontSize: 10,
+    color: "#64748B",
   },
 
   jobInfo: {
@@ -263,6 +450,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 11,
     color: "#64748B",
+  },
+
+  status: {
+    marginTop: 6,
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#166534",
+  },
+
+  progressStatus: {
+    color: "#1D4ED8",
   },
 
   arrow: {

@@ -1,13 +1,16 @@
 import { router } from "expo-router";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { auth, db } from "../../services/firebase";
 
 export default function ProviderCreateAccountScreen() {
   const [name, setName] = useState("Ahmad Rasheed");
@@ -20,19 +23,80 @@ export default function ProviderCreateAccountScreen() {
   const [password, setPassword] = useState("ColomboPro#2025");
   const [confirmPassword, setConfirmPassword] = useState("ColomboPro#2025");
   const [agreed, setAgreed] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const continueToVerification = () => {
-    router.push({
+  const continueToVerification = async () => {
+  if (!name.trim() || !email.trim() || !password.trim()) {
+    alert("Please complete all required fields.");
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    alert("Passwords do not match.");
+    return;
+  }
+
+  if (!agreed) {
+    alert("Please accept the Partner Agreement.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // 1. Create Firebase Authentication account
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email.trim(),
+      password
+    );
+
+    const user = userCredential.user;
+
+    // 2. Save provider profile in Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      role: "provider",
+
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim().toLowerCase(),
+
+      category,
+      district,
+
+      verificationStatus: "not_submitted",
+      accountStatus: "active",
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // 3. Continue to verification
+    router.replace({
       pathname: "/provider/verification",
       params: {
+        providerId: user.uid,
         name,
-        phone,
         email,
-        category,
-        district,
       },
     });
-  };
+  } catch (error: any) {
+    console.log("Provider registration error:", error);
+
+    if (error.code === "auth/email-already-in-use") {
+      alert("An account already exists with this email.");
+    } else if (error.code === "auth/invalid-email") {
+      alert("Please enter a valid email address.");
+    } else if (error.code === "auth/weak-password") {
+      alert("Please use a stronger password.");
+    } else {
+      alert(error.message || "Unable to create provider account.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={styles.container}>
@@ -151,14 +215,22 @@ export default function ProviderCreateAccountScreen() {
           <TouchableOpacity
             style={[
               styles.continueButton,
-              (!agreed || password !== confirmPassword) &&
+              (!agreed ||
+                password !== confirmPassword ||
+                loading) &&
                 styles.disabledButton,
             ]}
-            disabled={!agreed || password !== confirmPassword}
+            disabled={
+              !agreed ||
+              password !== confirmPassword ||
+              loading
+            }
             onPress={continueToVerification}
           >
             <Text style={styles.continueText}>
-              Continue to Document Verification →
+              {loading
+                ? "Creating Account..."
+                : "Continue to Document Verification →"}
             </Text>
           </TouchableOpacity>
 

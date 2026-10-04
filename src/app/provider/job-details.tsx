@@ -1,65 +1,171 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
+
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
+import { db } from "../../services/firebase";
 
 export default function ProviderJobDetailsScreen() {
   const params = useLocalSearchParams();
 
+  const bookingId =
+    typeof params.bookingId === "string"
+      ? params.bookingId
+      : "";
+
   const customer =
     typeof params.customer === "string"
       ? params.customer
-      : "Suresh Kumar";
+      : "Customer";
+
+  const phone =
+    typeof params.phone === "string"
+      ? params.phone
+      : "";
+
+  const email =
+    typeof params.email === "string"
+      ? params.email
+      : "";
 
   const service =
     typeof params.service === "string"
       ? params.service
-      : "Leak Repair & Pipe Diagnostics";
+      : "Home Service";
 
   const date =
     typeof params.date === "string"
       ? params.date
-      : "16 Apr 2025";
+      : "";
 
   const time =
     typeof params.time === "string"
       ? params.time
-      : "10:00 AM";
+      : "";
 
   const location =
     typeof params.location === "string"
       ? params.location
-      : "Kollupitiya, Colombo 03";
+      : "";
 
-  const payout =
-    typeof params.payout === "string"
-      ? params.payout
-      : "Rs. 3,500";
+  const description =
+    typeof params.description === "string"
+      ? params.description
+      : "No description provided";
 
-  const initialStatus =
+  const price =
+    typeof params.price === "string"
+      ? params.price
+      : "0";
+
+  const totalAmount =
+    typeof params.totalAmount === "string"
+      ? params.totalAmount
+      : "0";
+
+  const [status, setStatus] = useState(
     typeof params.status === "string"
       ? params.status
-      : "Confirmed";
+      : "confirmed"
+  );
 
-  const [status, setStatus] = useState(initialStatus);
+  const [loading, setLoading] = useState(false);
 
-  const startJob = () => {
-    setStatus("In Progress");
-    Alert.alert("Job Started", "The job status is now In Progress.");
+  const handleStartJob = async () => {
+    if (!bookingId) {
+      Alert.alert("Error", "Booking ID not found.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await updateDoc(
+        doc(db, "bookings", bookingId),
+        {
+          status: "in_progress",
+          startedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+      );
+
+      setStatus("in_progress");
+
+      Alert.alert(
+        "Job Started",
+        "The job status is now In Progress."
+      );
+    } catch (error: any) {
+      console.log("Start job error:", error);
+
+      Alert.alert(
+        "Error",
+        error.message || "Unable to start job."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const completeJob = () => {
-    setStatus("Completed");
-    Alert.alert(
-      "Job Completed",
-      "The job has been marked as completed."
-    );
+  const handleCompleteJob = async () => {
+    if (!bookingId) {
+      Alert.alert("Error", "Booking ID not found.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await updateDoc(
+        doc(db, "bookings", bookingId),
+        {
+          status: "completed",
+          completedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+      );
+
+      setStatus("completed");
+
+      Alert.alert(
+        "Job Completed",
+        "The job has been marked as completed."
+      );
+    } catch (error: any) {
+      console.log("Complete job error:", error);
+
+      Alert.alert(
+        "Error",
+        error.message || "Unable to complete job."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusLabel = () => {
+    if (status === "in_progress") {
+      return "IN PROGRESS";
+    }
+
+    if (status === "completed") {
+      return "COMPLETED";
+    }
+
+    return "CONFIRMED";
   };
 
   return (
@@ -68,46 +174,36 @@ export default function ProviderJobDetailsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.statusCard}>
-          <View>
-            <Text style={styles.statusLabel}>Current Status</Text>
-            <Text style={styles.statusValue}>{status}</Text>
-          </View>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Job Details</Text>
 
-          <Text style={styles.payout}>{payout}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer</Text>
-
-          <View style={styles.customerRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>SK</Text>
-            </View>
-
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{customer}</Text>
-              <Text style={styles.rating}>⭐ 4.9 · 12 reviews</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.chatButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/provider/chat",
-                  params: {
-                    customer,
-                  },
-                })
-              }
+          <View
+            style={[
+              styles.statusBadge,
+              status === "in_progress" &&
+                styles.progressBadge,
+              status === "completed" &&
+                styles.completedBadge,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                status === "in_progress" &&
+                  styles.progressText,
+                status === "completed" &&
+                  styles.completedText,
+              ]}
             >
-              <Text style={styles.chatText}>💬</Text>
-            </TouchableOpacity>
+              {getStatusLabel()}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Job Details</Text>
+          <Text style={styles.sectionTitle}>
+            Service Details
+          </Text>
 
           <View style={styles.row}>
             <Text style={styles.label}>Service</Text>
@@ -116,7 +212,9 @@ export default function ProviderJobDetailsScreen() {
 
           <View style={styles.row}>
             <Text style={styles.label}>Date</Text>
-            <Text style={styles.value}>{date}</Text>
+            <Text style={styles.value}>
+              October {date}
+            </Text>
           </View>
 
           <View style={styles.row}>
@@ -125,38 +223,117 @@ export default function ProviderJobDetailsScreen() {
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Payout</Text>
-            <Text style={styles.priceValue}>{payout}</Text>
+            <Text style={styles.label}>
+              Service Price
+            </Text>
+
+            <Text style={styles.value}>
+              Rs. {Number(price).toLocaleString()}
+            </Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text style={styles.label}>
+              Customer Total
+            </Text>
+
+            <Text style={styles.totalValue}>
+              Rs. {Number(totalAmount).toLocaleString()}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Location</Text>
+          <Text style={styles.sectionTitle}>
+            Customer
+          </Text>
 
-          <View style={styles.locationBox}>
-            <Text style={styles.locationIcon}>📍</Text>
-            <Text style={styles.locationText}>{location}</Text>
+          <View style={styles.customerRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {customer
+                  .split(" ")
+                  .map((word) => word[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={styles.customerInfo}>
+              <Text style={styles.customerName}>
+                {customer}
+              </Text>
+
+              {phone ? (
+                <Text style={styles.customerDetail}>
+                  📞 {phone}
+                </Text>
+              ) : null}
+
+              {email ? (
+                <Text style={styles.customerDetail}>
+                  ✉️ {email}
+                </Text>
+              ) : null}
+            </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.chatButton}
+            onPress={() =>
+              router.push({
+                pathname: "/provider/chat",
+                params: {
+                  bookingId,
+                  customer,
+                },
+              })
+            }
+          >
+            <Text style={styles.chatButtonText}>
+              💬 Chat with Customer
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Problem Description</Text>
+          <Text style={styles.sectionTitle}>
+            Service Location
+          </Text>
 
           <Text style={styles.description}>
-            Water is leaking from the pipe under the kitchen sink. Please check
-            the connection and repair or replace the damaged section.
+            📍 {location || "Location not provided"}
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Job Progress</Text>
+          <Text style={styles.sectionTitle}>
+            Problem Description
+          </Text>
+
+          <View style={styles.descriptionBox}>
+            <Text style={styles.description}>
+              {description}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Job Progress
+          </Text>
 
           <View style={styles.progressItem}>
-            <View style={styles.completeDot} />
-            <View style={styles.progressContent}>
-              <Text style={styles.progressTitle}>Booking Confirmed</Text>
-              <Text style={styles.progressText}>
-                Customer booking was accepted.
+            <View style={styles.progressDotActive} />
+
+            <View style={styles.progressInfo}>
+              <Text style={styles.progressTitle}>
+                Booking Confirmed
+              </Text>
+
+              <Text style={styles.progressDescription}>
+                Provider accepted the customer request.
               </Text>
             </View>
           </View>
@@ -166,17 +343,20 @@ export default function ProviderJobDetailsScreen() {
           <View style={styles.progressItem}>
             <View
               style={
-                status === "In Progress" || status === "Completed"
-                  ? styles.completeDot
-                  : styles.pendingDot
+                status === "in_progress" ||
+                status === "completed"
+                  ? styles.progressDotActive
+                  : styles.progressDot
               }
             />
-            <View style={styles.progressContent}>
-              <Text style={styles.progressTitle}>Job Started</Text>
-              <Text style={styles.progressText}>
-                {status === "Confirmed"
-                  ? "Waiting for provider to start."
-                  : "Service work has started."}
+
+            <View style={styles.progressInfo}>
+              <Text style={styles.progressTitle}>
+                Job In Progress
+              </Text>
+
+              <Text style={styles.progressDescription}>
+                Service work has started.
               </Text>
             </View>
           </View>
@@ -186,50 +366,72 @@ export default function ProviderJobDetailsScreen() {
           <View style={styles.progressItem}>
             <View
               style={
-                status === "Completed"
-                  ? styles.completeDot
-                  : styles.pendingDot
+                status === "completed"
+                  ? styles.progressDotActive
+                  : styles.progressDot
               }
             />
-            <View style={styles.progressContent}>
-              <Text style={styles.progressTitle}>Job Completed</Text>
-              <Text style={styles.progressText}>
-                {status === "Completed"
-                  ? "Service has been completed."
-                  : "Completion is still pending."}
+
+            <View style={styles.progressInfo}>
+              <Text style={styles.progressTitle}>
+                Job Completed
+              </Text>
+
+              <Text style={styles.progressDescription}>
+                Service work has been completed.
               </Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        {status === "Confirmed" && (
+      {status === "confirmed" && (
+        <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={startJob}
-          >
-            <Text style={styles.primaryButtonText}>Start Job</Text>
-          </TouchableOpacity>
-        )}
-
-        {status === "In Progress" && (
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={completeJob}
+            style={[
+              styles.primaryButton,
+              loading && styles.disabledButton,
+            ]}
+            disabled={loading}
+            onPress={handleStartJob}
           >
             <Text style={styles.primaryButtonText}>
-              Mark as Completed
+              {loading
+                ? "Starting Job..."
+                : "Start Job"}
             </Text>
           </TouchableOpacity>
-        )}
+        </View>
+      )}
 
-        {status === "Completed" && (
+      {status === "in_progress" && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              loading && styles.disabledButton,
+            ]}
+            disabled={loading}
+            onPress={handleCompleteJob}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading
+                ? "Completing Job..."
+                : "Mark as Completed"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {status === "completed" && (
+        <View style={styles.bottomBar}>
           <View style={styles.completedBox}>
-            <Text style={styles.completedText}>✓ Job Completed</Text>
+            <Text style={styles.completedBoxText}>
+              ✓ Job Completed
+            </Text>
           </View>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -245,50 +447,89 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  statusCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
-  statusLabel: {
-    fontSize: 11,
-    color: "#64748B",
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0F172A",
   },
 
-  statusValue: {
-    marginTop: 4,
-    fontSize: 17,
+  statusBadge: {
+    backgroundColor: "#DCFCE7",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+
+  statusText: {
+    fontSize: 10,
     fontWeight: "800",
+    color: "#166534",
+  },
+
+  progressBadge: {
+    backgroundColor: "#DBEAFE",
+  },
+
+  progressText: {
     color: "#1D4ED8",
   },
 
-  payout: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#1D4ED8",
+  completedBadge: {
+    backgroundColor: "#E2E8F0",
+  },
+
+  completedText: {
+    color: "#475569",
   },
 
   section: {
-    marginTop: 14,
+    marginTop: 16,
     backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
     borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
 
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
     color: "#0F172A",
+    marginBottom: 10,
+  },
+
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  label: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  value: {
+    maxWidth: "60%",
+    fontSize: 12,
+    textAlign: "right",
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  totalValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#2563EB",
   },
 
   customerRow: {
-    marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -303,9 +544,9 @@ const styles = StyleSheet.create({
   },
 
   avatarText: {
-    color: "#1D4ED8",
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
+    color: "#1D4ED8",
   },
 
   customerInfo: {
@@ -314,129 +555,96 @@ const styles = StyleSheet.create({
   },
 
   customerName: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
     color: "#0F172A",
   },
 
-  rating: {
-    marginTop: 3,
+  customerDetail: {
+    marginTop: 4,
     fontSize: 11,
     color: "#64748B",
   },
 
   chatButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  chatText: {
-    fontSize: 19,
-  },
-
-  row: {
     marginTop: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: "center",
   },
 
-  label: {
-    fontSize: 13,
-    color: "#64748B",
+  chatButtonText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "700",
   },
 
-  value: {
-    maxWidth: "60%",
-    textAlign: "right",
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#0F172A",
-  },
-
-  priceValue: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#1D4ED8",
-  },
-
-  locationBox: {
-    marginTop: 13,
-    flexDirection: "row",
-  },
-
-  locationIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-
-  locationText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#475569",
+  descriptionBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
   },
 
   description: {
-    marginTop: 12,
-    fontSize: 13,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 19,
     color: "#475569",
   },
 
   progressItem: {
     flexDirection: "row",
-    marginTop: 16,
+    alignItems: "flex-start",
   },
 
-  completeDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#16A34A",
-  },
-
-  pendingDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+  progressDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 2,
     borderColor: "#CBD5E1",
     backgroundColor: "#FFFFFF",
+    marginTop: 2,
   },
 
-  progressLine: {
-    width: 2,
-    height: 26,
-    backgroundColor: "#E2E8F0",
-    marginLeft: 8,
+  progressDotActive: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#2563EB",
+    marginTop: 2,
   },
 
-  progressContent: {
+  progressInfo: {
     flex: 1,
     marginLeft: 12,
   },
 
   progressTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: "#0F172A",
   },
 
-  progressText: {
+  progressDescription: {
     marginTop: 3,
-    fontSize: 12,
+    fontSize: 11,
     color: "#64748B",
+  },
+
+  progressLine: {
+    width: 2,
+    height: 28,
+    backgroundColor: "#CBD5E1",
+    marginLeft: 6,
+    marginVertical: 4,
   },
 
   bottomBar: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
@@ -444,14 +652,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: "#1D4ED8",
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-
-  completeButton: {
-    backgroundColor: "#16A34A",
+    backgroundColor: "#2563EB",
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
@@ -459,8 +660,11 @@ const styles = StyleSheet.create({
 
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "800",
+  },
+
+  disabledButton: {
+    opacity: 0.6,
   },
 
   completedBox: {
@@ -470,8 +674,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  completedText: {
-    color: "#16A34A",
+  completedBoxText: {
+    color: "#166534",
     fontWeight: "800",
   },
 });

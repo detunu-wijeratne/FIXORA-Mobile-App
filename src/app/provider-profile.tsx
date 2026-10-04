@@ -10,28 +10,48 @@ import {
 export default function ProviderProfileScreen() {
   const params = useLocalSearchParams();
 
+  const providerId =
+    typeof params.providerId === "string"
+      ? params.providerId
+      : "";
+
   const name =
-    typeof params.name === "string" ? params.name : "Kamal Perera";
+    typeof params.name === "string"
+      ? params.name
+      : "Service Provider";
 
   const service =
-    typeof params.service === "string" ? params.service : "Plumber";
+    typeof params.service === "string"
+      ? params.service
+      : "Home Service";
 
   const rating =
-    typeof params.rating === "string" ? params.rating : "4.9";
+    typeof params.rating === "string"
+      ? params.rating
+      : "0";
 
   const reviews =
-    typeof params.reviews === "string" ? params.reviews : "126";
+    typeof params.reviews === "string"
+      ? params.reviews
+      : "0";
 
-  const distance =
-    typeof params.distance === "string" ? params.distance : "1.2 km";
+  const district =
+    typeof params.district === "string"
+      ? params.district
+      : "Location not set";
 
   const experience =
-    typeof params.experience === "string" ? params.experience : "8 years";
+    typeof params.experience === "string"
+      ? params.experience
+      : "New provider";
 
   const price =
-    typeof params.price === "string" ? params.price : "Rs. 2,500";
+    typeof params.price === "string"
+      ? params.price
+      : "2500";
 
-  const verified = params.verified !== "false";
+  const verified =
+    params.verified === "true";
 
   return (
     <View style={styles.container}>
@@ -46,108 +66,137 @@ export default function ProviderProfileScreen() {
 
           <Text style={styles.name}>{name}</Text>
 
-          <Text style={styles.service}>{service}</Text>
+          <Text style={styles.service}>
+            {service}
+          </Text>
 
           {verified && (
             <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>✓ Verified Provider</Text>
+              <Text style={styles.verifiedText}>
+                ✓ Verified Provider
+              </Text>
             </View>
           )}
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>⭐ {rating}</Text>
-              <Text style={styles.statLabel}>{reviews} reviews</Text>
+              <Text style={styles.statValue}>
+                ⭐ {rating === "0" ? "New" : rating}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                {reviews} reviews
+              </Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{experience}</Text>
-              <Text style={styles.statLabel}>Experience</Text>
+              <Text style={styles.statValue}>
+                {experience}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                Experience
+              </Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{distance}</Text>
-              <Text style={styles.statLabel}>Away</Text>
+              <Text
+                style={styles.statValue}
+                numberOfLines={2}
+              >
+                {district}
+              </Text>
+
+              <Text style={styles.statLabel}>
+                District
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionTitle}>
+            About
+          </Text>
 
           <Text style={styles.description}>
-            Experienced and reliable professional providing quality home
-            services. Available for repairs, installations and general service
-            requests.
+            Experienced and reliable professional
+            providing quality home services.
+            Available for repairs, installations
+            and general service requests.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Details</Text>
+          <Text style={styles.sectionTitle}>
+            Service Details
+          </Text>
 
           <View style={styles.detailCard}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Service</Text>
-              <Text style={styles.detailValue}>{service}</Text>
+              <Text style={styles.detailLabel}>
+                Service
+              </Text>
+
+              <Text style={styles.detailValue}>
+                {service}
+              </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Starting price</Text>
-              <Text style={styles.detailValue}>{price}</Text>
+              <Text style={styles.detailLabel}>
+                Starting price
+              </Text>
+
+              <Text style={styles.detailValue}>
+                Rs.{" "}
+                {Number(price).toLocaleString()}
+              </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Availability</Text>
-              <Text style={styles.available}>Available Today</Text>
+              <Text style={styles.detailLabel}>
+                District
+              </Text>
+
+              <Text style={styles.detailValue}>
+                {district}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>
+                Availability
+              </Text>
+
+              <Text style={styles.available}>
+                Available
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Reviews</Text>
+            <Text style={styles.sectionTitle}>
+              Reviews
+            </Text>
 
             <TouchableOpacity>
-              <Text style={styles.seeAll}>See all</Text>
+              <Text style={styles.seeAll}>
+                See all
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.reviewCard}>
-            <View style={styles.reviewTop}>
-              <View style={styles.smallAvatar}>
-                <Text>👤</Text>
-              </View>
-
-              <View style={styles.reviewUser}>
-                <Text style={styles.reviewName}>Nadeesha Silva</Text>
-                <Text style={styles.reviewRating}>⭐⭐⭐⭐⭐</Text>
-              </View>
-            </View>
-
-            <Text style={styles.reviewText}>
-              Very professional and arrived on time. The work was completed
-              quickly and everything was explained clearly.
-            </Text>
-          </View>
-
-          <View style={styles.reviewCard}>
-            <View style={styles.reviewTop}>
-              <View style={styles.smallAvatar}>
-                <Text>👤</Text>
-              </View>
-
-              <View style={styles.reviewUser}>
-                <Text style={styles.reviewName}>Kasun Fernando</Text>
-                <Text style={styles.reviewRating}>⭐⭐⭐⭐⭐</Text>
-              </View>
-            </View>
-
-            <Text style={styles.reviewText}>
-              Good service and reasonable pricing. Would book again.
+            <Text style={styles.noReviewText}>
+              Reviews will appear here after
+              customers complete services.
             </Text>
           </View>
         </View>
@@ -155,8 +204,14 @@ export default function ProviderProfileScreen() {
 
       <View style={styles.bottomBar}>
         <View>
-          <Text style={styles.bottomLabel}>Starting from</Text>
-          <Text style={styles.bottomPrice}>{price}</Text>
+          <Text style={styles.bottomLabel}>
+            Starting from
+          </Text>
+
+          <Text style={styles.bottomPrice}>
+            Rs.{" "}
+            {Number(price).toLocaleString()}
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -165,7 +220,9 @@ export default function ProviderProfileScreen() {
           onPress={() =>
             router.push({
               pathname: "/select-date-time",
+
               params: {
+                providerId,
                 name,
                 service,
                 price,
@@ -173,7 +230,9 @@ export default function ProviderProfileScreen() {
             })
           }
         >
-          <Text style={styles.bookButtonText}>Book Now</Text>
+          <Text style={styles.bookButtonText}>
+            Book Now
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -249,12 +308,14 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     alignItems: "center",
+    paddingHorizontal: 4,
   },
 
   statValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "700",
     color: "#0F172A",
+    textAlign: "center",
   },
 
   statLabel: {
@@ -309,6 +370,8 @@ const styles = StyleSheet.create({
   },
 
   detailValue: {
+    maxWidth: "60%",
+    textAlign: "right",
     fontSize: 14,
     fontWeight: "700",
     color: "#0F172A",
@@ -340,37 +403,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
 
-  reviewTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  smallAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  reviewUser: {
-    marginLeft: 10,
-  },
-
-  reviewName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  reviewRating: {
-    marginTop: 2,
-    fontSize: 11,
-  },
-
-  reviewText: {
-    marginTop: 10,
+  noReviewText: {
     fontSize: 13,
     lineHeight: 20,
     color: "#64748B",

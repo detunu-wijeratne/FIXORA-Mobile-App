@@ -232,6 +232,27 @@ export default function RootLayout() {
           title: "Provider Verification",
         }}
       />
+
+      <Stack.Screen
+        name="customer-signup"
+        options={{
+          title: "Create Account",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/edit-profile"
+        options={{
+          title: "Edit Provider Profile",
+        }}
+      />
+
+      <Stack.Screen
+        name="customer-edit-profile"
+        options={{
+          title: "Edit Profile",
+        }}
+      />
     </Stack>
   );
 }

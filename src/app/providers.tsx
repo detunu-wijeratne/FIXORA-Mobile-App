@@ -1,5 +1,15 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
+
 import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
+
+import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,55 +18,118 @@ import {
   View,
 } from "react-native";
 
+import { db } from "../services/firebase";
+
+type Provider = {
+  id: string;
+  name?: string;
+  category?: string;
+  district?: string;
+  email?: string;
+  phone?: string;
+
+  verificationStatus?: string;
+  accountStatus?: string;
+
+  rating?: number;
+  reviewCount?: number;
+  experience?: string;
+  price?: number;
+};
+
 export default function ProvidersScreen() {
   const { service } = useLocalSearchParams();
 
   const selectedService =
-    typeof service === "string" ? service : "Service Providers";
+    typeof service === "string"
+      ? service
+      : "Service Providers";
 
-  const providers = [
-    {
-      id: 1,
-      name: "Kamal Perera",
-      service: "Plumber",
-      rating: "4.9",
-      reviews: "126",
-      distance: "1.2 km",
-      experience: "8 years",
-      price: "Rs. 2,500",
-      verified: true,
-    },
-    {
-      id: 2,
-      name: "Nimal Fernando",
-      service: "Plumber",
-      rating: "4.8",
-      reviews: "98",
-      distance: "2.1 km",
-      experience: "6 years",
-      price: "Rs. 2,200",
-      verified: true,
-    },
-    {
-      id: 3,
-      name: "Saman Jayasinghe",
-      service: "Plumber",
-      rating: "4.6",
-      reviews: "74",
-      distance: "3.4 km",
-      experience: "5 years",
-      price: "Rs. 2,000",
-      verified: false,
-    },
-  ];
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const providersQuery = query(
+      collection(db, "users"),
+      where("role", "==", "provider")
+    );
+
+    const unsubscribe = onSnapshot(
+      providersQuery,
+      (snapshot) => {
+        const loadedProviders: Provider[] =
+          snapshot.docs
+            .map((providerDoc) => ({
+              id: providerDoc.id,
+              ...providerDoc.data(),
+            }))
+            .filter(
+              (provider: any) =>
+                provider.accountStatus !== "disabled"
+            ) as Provider[];
+
+        console.log(
+          "Providers found:",
+          loadedProviders.length
+        );
+
+        setProviders(loadedProviders);
+        setLoading(false);
+      },
+      (error) => {
+        console.log(
+          "Error loading providers:",
+          error
+        );
+
+        alert(
+          error.message ||
+            "Unable to load providers."
+        );
+
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredProviders = providers.filter(
+    (provider) => {
+      const searchText = search
+        .trim()
+        .toLowerCase();
+
+      if (!searchText) {
+        return true;
+      }
+
+      return (
+        provider.name
+          ?.toLowerCase()
+          .includes(searchText) ||
+        provider.category
+          ?.toLowerCase()
+          .includes(searchText) ||
+        provider.district
+          ?.toLowerCase()
+          .includes(searchText)
+      );
+    }
+  );
 
   return (
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
-        <Text style={styles.title}>{selectedService}</Text>
+        <Text style={styles.title}>
+          {selectedService}
+        </Text>
 
         <Text style={styles.subtitle}>
           Find trusted professionals near you.
@@ -64,103 +137,294 @@ export default function ProvidersScreen() {
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Text style={styles.searchIcon}>
+              🔍
+            </Text>
 
             <TextInput
               style={styles.searchInput}
               placeholder="Search providers..."
               placeholderTextColor="#94A3B8"
+              value={search}
+              onChangeText={setSearch}
             />
           </View>
 
-          <TouchableOpacity style={styles.filterButton}>
-            <Text style={styles.filterIcon}>⚙️</Text>
+          <TouchableOpacity
+            style={styles.filterButton}
+          >
+            <Text style={styles.filterIcon}>
+              ⚙️
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsText}>
-            {providers.length} providers found
-          </Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color="#2563EB"
+            />
 
-          <TouchableOpacity>
-            <Text style={styles.sortText}>Sort ▾</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.loadingText}>
+              Loading providers...
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsText}>
+                {filteredProviders.length}{" "}
+                {filteredProviders.length === 1
+                  ? "provider"
+                  : "providers"}{" "}
+                found
+              </Text>
 
-        <View style={styles.providerList}>
-          {providers.map((provider) => (
-            <TouchableOpacity
-              key={provider.id}
-              style={styles.card}
-              activeOpacity={0.7}
-              onPress={() =>
-                router.push({
-                  pathname: "/provider-profile",
-                  params: {
-                    id: provider.id,
-                    name: provider.name,
-                    service: provider.service,
-                    rating: provider.rating,
-                    reviews: provider.reviews,
-                    distance: provider.distance,
-                    experience: provider.experience,
-                    price: provider.price,
-                    verified: provider.verified ? "true" : "false",
-                  },
-                })
-              }
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>👨‍🔧</Text>
-              </View>
+              <TouchableOpacity>
+                <Text style={styles.sortText}>
+                  Sort ▾
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.providerInfo}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.providerName}>{provider.name}</Text>
-
-                  {provider.verified && (
-                    <Text style={styles.verified}>✓ Verified</Text>
-                  )}
-                </View>
-
-                <Text style={styles.providerService}>
-                  {provider.service}
+            {filteredProviders.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyIcon}>
+                  👨‍🔧
                 </Text>
 
-                <View style={styles.ratingRow}>
-                  <Text style={styles.rating}>
-                    ⭐ {provider.rating}
-                  </Text>
+                <Text style={styles.emptyTitle}>
+                  No providers found
+                </Text>
 
-                  <Text style={styles.reviews}>
-                    ({provider.reviews} reviews)
-                  </Text>
-                </View>
-
-                <View style={styles.detailsRow}>
-                  <Text style={styles.detail}>
-                    📍 {provider.distance}
-                  </Text>
-
-                  <Text style={styles.detail}>
-                    🧰 {provider.experience}
-                  </Text>
-                </View>
-
-                <View style={styles.bottomRow}>
-                  <Text style={styles.price}>
-                    From {provider.price}
-                  </Text>
-
-                  <Text style={styles.viewProfile}>
-                    View Profile
-                  </Text>
-                </View>
+                <Text style={styles.emptyText}>
+                  Try another search.
+                </Text>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+            ) : (
+              <View style={styles.providerList}>
+                {filteredProviders.map(
+                  (provider) => {
+                    const verified =
+                      provider.verificationStatus ===
+                      "approved";
+
+                    const rating =
+                      provider.rating ?? 0;
+
+                    const reviewCount =
+                      provider.reviewCount ?? 0;
+
+                    const experience =
+                      provider.experience ||
+                      "New provider";
+
+                    const price =
+                      provider.price ?? 2500;
+
+                    return (
+                      <TouchableOpacity
+                        key={provider.id}
+                        style={styles.card}
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          router.push({
+                            pathname:
+                              "/provider-profile",
+
+                            params: {
+                              providerId:
+                                provider.id,
+
+                              name:
+                                provider.name ||
+                                "Service Provider",
+
+                              service:
+                                provider.category ||
+                                selectedService,
+
+                              category:
+                                provider.category ||
+                                "",
+
+                              district:
+                                provider.district ||
+                                "",
+
+                              email:
+                                provider.email ||
+                                "",
+
+                              phone:
+                                provider.phone ||
+                                "",
+
+                              rating:
+                                String(rating),
+
+                              reviews:
+                                String(
+                                  reviewCount
+                                ),
+
+                              experience,
+
+                              price: String(
+                                price
+                              ),
+
+                              verified:
+                                verified
+                                  ? "true"
+                                  : "false",
+                            },
+                          })
+                        }
+                      >
+                        <View
+                          style={styles.avatar}
+                        >
+                          <Text
+                            style={
+                              styles.avatarText
+                            }
+                          >
+                            👨‍🔧
+                          </Text>
+                        </View>
+
+                        <View
+                          style={
+                            styles.providerInfo
+                          }
+                        >
+                          <View
+                            style={styles.nameRow}
+                          >
+                            <Text
+                              style={
+                                styles.providerName
+                              }
+                            >
+                              {provider.name ||
+                                "Service Provider"}
+                            </Text>
+
+                            {verified && (
+                              <Text
+                                style={
+                                  styles.verified
+                                }
+                              >
+                                ✓ Verified
+                              </Text>
+                            )}
+                          </View>
+
+                          <Text
+                            style={
+                              styles.providerService
+                            }
+                          >
+                            {provider.category ||
+                              "Service Provider"}
+                          </Text>
+
+                          <View
+                            style={
+                              styles.ratingRow
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.rating
+                              }
+                            >
+                              ⭐{" "}
+                              {rating > 0
+                                ? rating.toFixed(
+                                    1
+                                  )
+                                : "New"}
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.reviews
+                              }
+                            >
+                              ({reviewCount}{" "}
+                              {reviewCount === 1
+                                ? "review"
+                                : "reviews"})
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.detailsRow
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.detail
+                              }
+                            >
+                              📍{" "}
+                              {provider.district ||
+                                "Location not set"}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.detailsRow
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.detail
+                              }
+                            >
+                              🧰 {experience}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.bottomRow
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.price
+                              }
+                            >
+                              From Rs.{" "}
+                              {Number(
+                                price
+                              ).toLocaleString()}
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.viewProfile
+                              }
+                            >
+                              View Profile
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+                )}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -230,6 +494,16 @@ const styles = StyleSheet.create({
 
   filterIcon: {
     fontSize: 20,
+  },
+
+  loadingContainer: {
+    marginTop: 60,
+    alignItems: "center",
+  },
+
+  loadingText: {
+    marginTop: 12,
+    color: "#64748B",
   },
 
   resultsHeader: {
@@ -327,11 +601,11 @@ const styles = StyleSheet.create({
 
   detailsRow: {
     flexDirection: "row",
-    gap: 12,
     marginTop: 7,
   },
 
   detail: {
+    flex: 1,
     fontSize: 12,
     color: "#64748B",
   },
@@ -353,5 +627,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#2563EB",
+  },
+
+  emptyCard: {
+    marginTop: 35,
+    padding: 30,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignItems: "center",
+  },
+
+  emptyIcon: {
+    fontSize: 38,
+  },
+
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  emptyText: {
+    marginTop: 5,
+    fontSize: 12,
+    color: "#64748B",
   },
 });

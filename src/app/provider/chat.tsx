@@ -1,5 +1,15 @@
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import {
+  addDoc,
+  collection,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
+
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,71 +21,181 @@ import {
   View,
 } from "react-native";
 
+import { auth, db } from "../../services/firebase";
+
+type ChatMessage = {
+  id: string;
+  text: string;
+  sender: "customer" | "provider";
+  senderId?: string;
+};
+
 export default function ProviderChatScreen() {
   const params = useLocalSearchParams();
+
+  const bookingId =
+    typeof params.bookingId === "string"
+      ? params.bookingId
+      : "";
 
   const customer =
     typeof params.customer === "string"
       ? params.customer
-      : "Suresh Kumar";
+      : "Customer";
 
   const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sending, setSending] = useState(false);
 
-  const [messages, setMessages] = useState([
-    {
-      id: "1",
-      text: "Hello, I have accepted your booking.",
-      sender: "provider",
-    },
-    {
-      id: "2",
-      text: "Thanks. Around what time will you arrive?",
-      sender: "customer",
-    },
-    {
-      id: "3",
-      text: "I should arrive around 10:00 AM.",
-      sender: "provider",
-    },
-  ]);
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
+  useEffect(() => {
+    if (!bookingId) {
+      return;
+    }
 
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      {
-        id: Date.now().toString(),
-        text: message.trim(),
-        sender: "provider",
+    const messagesQuery = query(
+      collection(
+        db,
+        "chats",
+        bookingId,
+        "messages"
+      ),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (snapshot) => {
+        const loadedMessages: ChatMessage[] =
+          snapshot.docs.map((messageDoc) => ({
+            id: messageDoc.id,
+            ...messageDoc.data(),
+          })) as ChatMessage[];
+
+        setMessages(loadedMessages);
+
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({
+            animated: true,
+          });
+        }, 100);
       },
-    ]);
+      (error) => {
+        console.log(
+          "Provider chat listener error:",
+          error
+        );
+      }
+    );
 
-    setMessage("");
+    return () => unsubscribe();
+  }, [bookingId]);
+
+  const sendMessage = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Please log in first.");
+      return;
+    }
+
+    if (!bookingId) {
+      alert("Booking ID not found.");
+      return;
+    }
+
+    if (!message.trim()) {
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      await addDoc(
+        collection(
+          db,
+          "chats",
+          bookingId,
+          "messages"
+        ),
+        {
+          text: message.trim(),
+          sender: "provider",
+          senderId: user.uid,
+          createdAt: serverTimestamp(),
+        }
+      );
+
+      setMessage("");
+    } catch (error: any) {
+      console.log(
+        "Send provider message error:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Unable to send message."
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getInitials = () => {
+    return customer
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={
+        Platform.OS === "ios"
+          ? "padding"
+          : undefined
+      }
     >
       <View style={styles.customerHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>SK</Text>
+          <Text style={styles.avatarText}>
+            {getInitials()}
+          </Text>
         </View>
 
         <View>
-          <Text style={styles.customerName}>{customer}</Text>
-          <Text style={styles.onlineText}>Online</Text>
+          <Text style={styles.customerName}>
+            {customer}
+          </Text>
+
+          <Text style={styles.onlineText}>
+            Booking Chat
+          </Text>
         </View>
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messageList}
+        contentContainerStyle={[
+          styles.messageList,
+          messages.length === 0 &&
+            styles.emptyMessageList,
+        ]}
+        onContentSizeChange={() =>
+          flatListRef.current?.scrollToEnd({
+            animated: true,
+          })
+        }
         renderItem={({ item }) => {
-          const isProvider = item.sender === "provider";
+          const isProvider =
+            item.sender === "provider";
 
           return (
             <View
@@ -108,6 +228,22 @@ export default function ProviderChatScreen() {
             </View>
           );
         }}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>
+              💬
+            </Text>
+
+            <Text style={styles.emptyTitle}>
+              No messages yet
+            </Text>
+
+            <Text style={styles.emptyText}>
+              Send a message to start the
+              conversation.
+            </Text>
+          </View>
+        }
       />
 
       <View style={styles.inputArea}>
@@ -121,10 +257,19 @@ export default function ProviderChatScreen() {
         />
 
         <TouchableOpacity
-          style={styles.sendButton}
+          style={[
+            styles.sendButton,
+            (!message.trim() || sending) &&
+              styles.disabledButton,
+          ]}
           onPress={sendMessage}
+          disabled={
+            !message.trim() || sending
+          }
         >
-          <Text style={styles.sendText}>Send</Text>
+          <Text style={styles.sendText}>
+            {sending ? "..." : "Send"}
+          </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -178,6 +323,35 @@ const styles = StyleSheet.create({
   messageList: {
     padding: 16,
     paddingBottom: 24,
+  },
+
+  emptyMessageList: {
+    flexGrow: 1,
+  },
+
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+  },
+
+  emptyIcon: {
+    fontSize: 36,
+  },
+
+  emptyTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  emptyText: {
+    marginTop: 5,
+    fontSize: 12,
+    textAlign: "center",
+    color: "#64748B",
   },
 
   messageRow: {
@@ -258,5 +432,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 14,
+  },
+
+  disabledButton: {
+    opacity: 0.5,
   },
 });

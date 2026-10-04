@@ -1,13 +1,15 @@
 import { router } from "expo-router";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { auth, db } from "../../services/firebase";
 
 export default function ProviderVerificationScreen() {
   const [frontNIC, setFrontNIC] = useState(true);
@@ -15,14 +17,39 @@ export default function ProviderVerificationScreen() {
   const [certificate, setCertificate] = useState(false);
   const [businessDoc, setBusinessDoc] = useState(false);
 
-  const submitVerification = () => {
-    if (!frontNIC || !backNIC || !certificate) {
+  const submitVerification = async () => {
+  if (!frontNIC || !backNIC || !certificate) {
+    Alert.alert(
+      "Missing Documents",
+      "Please upload both sides of your NIC and your trade certificate."
+    );
+    return;
+  }
+
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
       Alert.alert(
-        "Missing Documents",
-        "Please upload both sides of your NIC and your trade certificate."
+        "Error",
+        "No logged-in provider was found."
       );
       return;
     }
+
+    await updateDoc(doc(db, "users", user.uid), {
+      verificationStatus: "pending",
+
+      verificationDocuments: {
+        frontNIC,
+        backNIC,
+        tradeCertificate: certificate,
+        optionalDocument: businessDoc,
+      },
+
+      verificationSubmittedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
     Alert.alert(
       "Verification Submitted",
@@ -30,11 +57,20 @@ export default function ProviderVerificationScreen() {
       [
         {
           text: "Continue",
-          onPress: () => router.replace("/provider/dashboard"),
+          onPress: () =>
+            router.replace("/provider/dashboard"),
         },
       ]
     );
-  };
+  } catch (error: any) {
+    console.log("Verification update error:", error);
+
+    Alert.alert(
+      "Error",
+      error.message || "Unable to submit verification."
+    );
+  }
+};
 
   return (
     <View style={styles.container}>

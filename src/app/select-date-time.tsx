@@ -1,4 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+
 import {
   ScrollView,
   StyleSheet,
@@ -6,19 +8,29 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useState } from "react";
 
 export default function SelectDateTimeScreen() {
   const params = useLocalSearchParams();
 
+  const providerId =
+    typeof params.providerId === "string"
+      ? params.providerId
+      : "";
+
   const name =
-    typeof params.name === "string" ? params.name : "Kamal Perera";
+    typeof params.name === "string"
+      ? params.name
+      : "Service Provider";
 
   const service =
-    typeof params.service === "string" ? params.service : "Plumber";
+    typeof params.service === "string"
+      ? params.service
+      : "Home Service";
 
   const price =
-    typeof params.price === "string" ? params.price : "Rs. 2,500";
+    typeof params.price === "string"
+      ? params.price
+      : "2500";
 
   const dates = [
     { day: "Mon", date: "5" },
@@ -38,28 +50,46 @@ export default function SelectDateTimeScreen() {
     "4:00 PM",
   ];
 
-  const [selectedDate, setSelectedDate] = useState("5");
-  const [selectedTime, setSelectedTime] = useState("9:30 AM");
+  const [selectedDate, setSelectedDate] =
+    useState("5");
+
+  const [selectedTime, setSelectedTime] =
+    useState("9:30 AM");
 
   return (
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
         <View style={styles.providerCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👨‍🔧</Text>
+            <Text style={styles.avatarText}>
+              👨‍🔧
+            </Text>
           </View>
 
           <View>
-            <Text style={styles.providerName}>{name}</Text>
-            <Text style={styles.providerService}>{service}</Text>
-            <Text style={styles.price}>From {price}</Text>
+            <Text style={styles.providerName}>
+              {name}
+            </Text>
+
+            <Text style={styles.providerService}>
+              {service}
+            </Text>
+
+            <Text style={styles.price}>
+              From Rs.{" "}
+              {Number(price).toLocaleString()}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Select a date</Text>
+        <Text style={styles.sectionTitle}>
+          Select a date
+        </Text>
 
         <ScrollView
           horizontal
@@ -67,21 +97,26 @@ export default function SelectDateTimeScreen() {
           contentContainerStyle={styles.dateRow}
         >
           {dates.map((item) => {
-            const selected = selectedDate === item.date;
+            const selected =
+              selectedDate === item.date;
 
             return (
               <TouchableOpacity
                 key={item.date}
                 style={[
                   styles.dateCard,
-                  selected && styles.selectedDateCard,
+                  selected &&
+                    styles.selectedDateCard,
                 ]}
-                onPress={() => setSelectedDate(item.date)}
+                onPress={() =>
+                  setSelectedDate(item.date)
+                }
               >
                 <Text
                   style={[
                     styles.dayText,
-                    selected && styles.selectedText,
+                    selected &&
+                      styles.selectedText,
                   ]}
                 >
                   {item.day}
@@ -90,7 +125,8 @@ export default function SelectDateTimeScreen() {
                 <Text
                   style={[
                     styles.dateText,
-                    selected && styles.selectedText,
+                    selected &&
+                      styles.selectedText,
                   ]}
                 >
                   {item.date}
@@ -100,25 +136,32 @@ export default function SelectDateTimeScreen() {
           })}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Available time slots</Text>
+        <Text style={styles.sectionTitle}>
+          Available time slots
+        </Text>
 
         <View style={styles.timeGrid}>
           {timeSlots.map((time) => {
-            const selected = selectedTime === time;
+            const selected =
+              selectedTime === time;
 
             return (
               <TouchableOpacity
                 key={time}
                 style={[
                   styles.timeCard,
-                  selected && styles.selectedTimeCard,
+                  selected &&
+                    styles.selectedTimeCard,
                 ]}
-                onPress={() => setSelectedTime(time)}
+                onPress={() =>
+                  setSelectedTime(time)
+                }
               >
                 <Text
                   style={[
                     styles.timeText,
-                    selected && styles.selectedText,
+                    selected &&
+                      styles.selectedText,
                   ]}
                 >
                   {time}
@@ -129,18 +172,28 @@ export default function SelectDateTimeScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Your selection</Text>
+          <Text style={styles.summaryTitle}>
+            Your selection
+          </Text>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Date</Text>
+            <Text style={styles.summaryLabel}>
+              Date
+            </Text>
+
             <Text style={styles.summaryValue}>
               October {selectedDate}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Time</Text>
-            <Text style={styles.summaryValue}>{selectedTime}</Text>
+            <Text style={styles.summaryLabel}>
+              Time
+            </Text>
+
+            <Text style={styles.summaryValue}>
+              {selectedTime}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -152,6 +205,7 @@ export default function SelectDateTimeScreen() {
             router.push({
               pathname: "/job-details",
               params: {
+                providerId,
                 name,
                 service,
                 price,
@@ -161,7 +215,9 @@ export default function SelectDateTimeScreen() {
             })
           }
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>
+            Continue
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

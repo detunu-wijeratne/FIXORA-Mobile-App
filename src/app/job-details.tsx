@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
+
 import {
   ScrollView,
   StyleSheet,
@@ -12,27 +13,44 @@ import {
 export default function JobDetailsScreen() {
   const params = useLocalSearchParams();
 
+  const providerId =
+    typeof params.providerId === "string"
+      ? params.providerId
+      : "";
+
   const name =
-    typeof params.name === "string" ? params.name : "Kamal Perera";
+    typeof params.name === "string"
+      ? params.name
+      : "Service Provider";
 
   const service =
-    typeof params.service === "string" ? params.service : "Plumber";
+    typeof params.service === "string"
+      ? params.service
+      : "Home Service";
 
   const price =
-    typeof params.price === "string" ? params.price : "Rs. 2,500";
+    typeof params.price === "string"
+      ? params.price
+      : "2500";
 
   const date =
-    typeof params.date === "string" ? params.date : "5";
+    typeof params.date === "string"
+      ? params.date
+      : "5";
 
   const time =
-    typeof params.time === "string" ? params.time : "9:30 AM";
+    typeof params.time === "string"
+      ? params.time
+      : "9:30 AM";
 
-  const [description, setDescription] = useState("");
+  const [description, setDescription] =
+    useState("");
 
   const handleContinue = () => {
     router.push({
       pathname: "/service-location",
       params: {
+        providerId,
         name,
         service,
         price,
@@ -47,39 +65,67 @@ export default function JobDetailsScreen() {
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
-        <Text style={styles.title}>Tell us about the job</Text>
+        <Text style={styles.title}>
+          Tell us about the job
+        </Text>
 
         <Text style={styles.subtitle}>
           Describe the issue so the provider knows what to expect.
         </Text>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Booking details</Text>
+          <Text style={styles.summaryTitle}>
+            Booking details
+          </Text>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Provider</Text>
-            <Text style={styles.summaryValue}>{name}</Text>
+            <Text style={styles.summaryLabel}>
+              Provider
+            </Text>
+
+            <Text style={styles.summaryValue}>
+              {name}
+            </Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Service</Text>
-            <Text style={styles.summaryValue}>{service}</Text>
+            <Text style={styles.summaryLabel}>
+              Service
+            </Text>
+
+            <Text style={styles.summaryValue}>
+              {service}
+            </Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Date</Text>
-            <Text style={styles.summaryValue}>October {date}</Text>
+            <Text style={styles.summaryLabel}>
+              Date
+            </Text>
+
+            <Text style={styles.summaryValue}>
+              October {date}
+            </Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Time</Text>
-            <Text style={styles.summaryValue}>{time}</Text>
+            <Text style={styles.summaryLabel}>
+              Time
+            </Text>
+
+            <Text style={styles.summaryValue}>
+              {time}
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.label}>Problem Description</Text>
+        <Text style={styles.label}>
+          Problem Description
+        </Text>
 
         <TextInput
           style={styles.descriptionInput}
@@ -92,29 +138,47 @@ export default function JobDetailsScreen() {
           onChangeText={setDescription}
         />
 
-        <Text style={styles.label}>Add Photos</Text>
+        <Text style={styles.label}>
+          Add Photos
+        </Text>
 
         <Text style={styles.photoHint}>
           Photos can help the provider understand the issue before arriving.
         </Text>
 
         <View style={styles.photoRow}>
-          <TouchableOpacity style={styles.photoButton}>
-            <Text style={styles.photoIcon}>📷</Text>
-            <Text style={styles.photoText}>Take Photo</Text>
+          <TouchableOpacity
+            style={styles.photoButton}
+          >
+            <Text style={styles.photoIcon}>
+              📷
+            </Text>
+
+            <Text style={styles.photoText}>
+              Take Photo
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.photoButton}>
-            <Text style={styles.photoIcon}>🖼️</Text>
-            <Text style={styles.photoText}>Choose Photo</Text>
+          <TouchableOpacity
+            style={styles.photoButton}
+          >
+            <Text style={styles.photoIcon}>
+              🖼️
+            </Text>
+
+            <Text style={styles.photoText}>
+              Choose Photo
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>Tip</Text>
+          <Text style={styles.noteTitle}>
+            Tip
+          </Text>
+
           <Text style={styles.noteText}>
-            Include where the issue is located, when it started, and anything
-            the provider should bring.
+            Include where the issue is located, when it started, and anything the provider should bring.
           </Text>
         </View>
       </ScrollView>
@@ -124,7 +188,9 @@ export default function JobDetailsScreen() {
           style={styles.continueButton}
           onPress={handleContinue}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>
+            Continue
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -183,6 +249,8 @@ const styles = StyleSheet.create({
   },
 
   summaryValue: {
+    maxWidth: "60%",
+    textAlign: "right",
     fontSize: 13,
     fontWeight: "600",
     color: "#0F172A",
