@@ -10,6 +10,7 @@ import {
 
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,6 +36,8 @@ type Provider = {
   reviewCount?: number;
   experience?: string;
   price?: number;
+
+  profileImageUrl?: string;
 };
 
 type ReviewStats = {
@@ -80,8 +83,7 @@ export default function ProvidersScreen() {
             }))
             .filter(
               (provider: any) =>
-                provider.accountStatus !==
-                "disabled"
+                provider.accountStatus !== "disabled"
             ) as Provider[];
 
         console.log(
@@ -109,12 +111,6 @@ export default function ProvidersScreen() {
 
     /*
       LOAD REAL REVIEWS
-
-      This calculates:
-      - average rating
-      - number of reviews
-
-      directly from Firestore reviews.
     */
 
     const unsubscribeReviews = onSnapshot(
@@ -163,13 +159,10 @@ export default function ProvidersScreen() {
             const data =
               totals[providerId];
 
-            calculatedStats[
-              providerId
-            ] = {
+            calculatedStats[providerId] = {
               rating:
                 data.count > 0
-                  ? data.total /
-                    data.count
+                  ? data.total / data.count
                   : 0,
 
               count: data.count,
@@ -259,9 +252,7 @@ export default function ProvidersScreen() {
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Text
-              style={styles.searchIcon}
-            >
+            <Text style={styles.searchIcon}>
               🔍
             </Text>
 
@@ -277,9 +268,7 @@ export default function ProvidersScreen() {
           <TouchableOpacity
             style={styles.filterButton}
           >
-            <Text
-              style={styles.filterIcon}
-            >
+            <Text style={styles.filterIcon}>
               ⚙️
             </Text>
           </TouchableOpacity>
@@ -287,9 +276,7 @@ export default function ProvidersScreen() {
 
         {loading ? (
           <View
-            style={
-              styles.loadingContainer
-            }
+            style={styles.loadingContainer}
           >
             <ActivityIndicator
               size="large"
@@ -297,9 +284,7 @@ export default function ProvidersScreen() {
             />
 
             <Text
-              style={
-                styles.loadingText
-              }
+              style={styles.loadingText}
             >
               Loading providers...
             </Text>
@@ -307,18 +292,13 @@ export default function ProvidersScreen() {
         ) : (
           <>
             <View
-              style={
-                styles.resultsHeader
-              }
+              style={styles.resultsHeader}
             >
               <Text
-                style={
-                  styles.resultsText
-                }
+                style={styles.resultsText}
               >
                 {filteredProviders.length}{" "}
-                {filteredProviders.length ===
-                1
+                {filteredProviders.length === 1
                   ? "provider"
                   : "providers"}{" "}
                 found
@@ -326,61 +306,34 @@ export default function ProvidersScreen() {
 
               <TouchableOpacity>
                 <Text
-                  style={
-                    styles.sortText
-                  }
+                  style={styles.sortText}
                 >
                   Sort ▾
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {filteredProviders.length ===
-            0 ? (
-              <View
-                style={
-                  styles.emptyCard
-                }
-              >
-                <Text
-                  style={
-                    styles.emptyIcon
-                  }
-                >
+            {filteredProviders.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyIcon}>
                   👨‍🔧
                 </Text>
 
-                <Text
-                  style={
-                    styles.emptyTitle
-                  }
-                >
+                <Text style={styles.emptyTitle}>
                   No providers found
                 </Text>
 
-                <Text
-                  style={
-                    styles.emptyText
-                  }
-                >
+                <Text style={styles.emptyText}>
                   Try another search.
                 </Text>
               </View>
             ) : (
-              <View
-                style={
-                  styles.providerList
-                }
-              >
+              <View style={styles.providerList}>
                 {filteredProviders.map(
                   (provider) => {
                     const verified =
                       provider.verificationStatus ===
                       "approved";
-
-                    /*
-                      REAL REVIEW VALUES
-                    */
 
                     const rating =
                       reviewStats[
@@ -401,20 +354,13 @@ export default function ProvidersScreen() {
                       "New provider";
 
                     const price =
-                      provider.price ??
-                      2500;
+                      provider.price ?? 2500;
 
                     return (
                       <TouchableOpacity
-                        key={
-                          provider.id
-                        }
-                        style={
-                          styles.card
-                        }
-                        activeOpacity={
-                          0.7
-                        }
+                        key={provider.id}
+                        style={styles.card}
+                        activeOpacity={0.7}
                         onPress={() =>
                           router.push({
                             pathname:
@@ -449,9 +395,7 @@ export default function ProvidersScreen() {
                                 "",
 
                               rating:
-                                String(
-                                  rating
-                                ),
+                                String(rating),
 
                               reviews:
                                 String(
@@ -461,31 +405,44 @@ export default function ProvidersScreen() {
                               experience,
 
                               price:
-                                String(
-                                  price
-                                ),
+                                String(price),
 
                               verified:
                                 verified
                                   ? "true"
                                   : "false",
+
+                              profileImageUrl:
+                                provider.profileImageUrl ||
+                                "",
                             },
                           })
                         }
                       >
-                        <View
-                          style={
-                            styles.avatar
-                          }
-                        >
-                          <Text
+                        {provider.profileImageUrl ? (
+                          <Image
+                            source={{
+                              uri:
+                                provider.profileImageUrl,
+                            }}
                             style={
-                              styles.avatarText
+                              styles.avatarImage
                             }
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View
+                            style={styles.avatar}
                           >
-                            👨‍🔧
-                          </Text>
-                        </View>
+                            <Text
+                              style={
+                                styles.avatarText
+                              }
+                            >
+                              👨‍🔧
+                            </Text>
+                          </View>
+                        )}
 
                         <View
                           style={
@@ -537,8 +494,7 @@ export default function ProvidersScreen() {
                               }
                             >
                               ⭐{" "}
-                              {rating >
-                              0
+                              {rating > 0
                                 ? rating.toFixed(
                                     1
                                   )
@@ -550,12 +506,8 @@ export default function ProvidersScreen() {
                                 styles.reviews
                               }
                             >
-                              (
-                              {
-                                reviewCount
-                              }{" "}
-                              {reviewCount ===
-                              1
+                              ({reviewCount}{" "}
+                              {reviewCount === 1
                                 ? "review"
                                 : "reviews"}
                               )
@@ -589,9 +541,7 @@ export default function ProvidersScreen() {
                               }
                             >
                               🧰{" "}
-                              {
-                                experience
-                              }
+                              {experience}
                             </Text>
                           </View>
 
@@ -748,6 +698,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  avatarImage: {
+    width: 62,
+    height: 62,
+    borderRadius: 16,
+    backgroundColor: "#EFF6FF",
   },
 
   avatarText: {

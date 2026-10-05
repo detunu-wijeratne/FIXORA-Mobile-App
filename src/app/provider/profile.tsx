@@ -1,17 +1,27 @@
+import * as ImagePicker from "expo-image-picker";
+
+import { File } from "expo-file-system";
+import { fetch } from "expo/fetch";
+
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
+
 import {
   collection,
   doc,
   getDoc,
   onSnapshot,
   query,
+  updateDoc,
   where,
 } from "firebase/firestore";
+
 import { useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +32,9 @@ import {
 import ProviderBottomNav from "../../components/ProviderBottomNav";
 import { auth, db } from "../../services/firebase";
 
+const CLOUDINARY_CLOUD_NAME = "yuoh84r1";
+const CLOUDINARY_UPLOAD_PRESET = "fixora_uploads";
+
 type ProviderData = {
   name?: string;
   category?: string;
@@ -29,6 +42,7 @@ type ProviderData = {
   phone?: string;
   email?: string;
   verificationStatus?: string;
+  profileImageUrl?: string;
 };
 
 type Review = {
@@ -47,6 +61,9 @@ export default function ProviderProfileScreen() {
 
   const [loading, setLoading] =
     useState(true);
+
+  const [uploadingPhoto, setUploadingPhoto] =
+    useState(false);
 
   const [reviewCount, setReviewCount] =
     useState(0);
@@ -67,9 +84,14 @@ export default function ProviderProfileScreen() {
 
     const loadProvider = async () => {
       try {
-        const providerDoc = await getDoc(
-          doc(db, "users", user.uid)
-        );
+        const providerDoc =
+          await getDoc(
+            doc(
+              db,
+              "users",
+              user.uid
+            )
+          );
 
         if (!providerDoc.exists()) {
           console.log(
@@ -96,8 +118,15 @@ export default function ProviderProfileScreen() {
     loadProvider();
 
     const reviewsQuery = query(
-      collection(db, "reviews"),
-      where("providerId", "==", user.uid)
+      collection(
+        db,
+        "reviews"
+      ),
+      where(
+        "providerId",
+        "==",
+        user.uid
+      )
     );
 
     const unsubscribeReviews =
@@ -143,8 +172,15 @@ export default function ProviderProfileScreen() {
       );
 
     const bookingsQuery = query(
-      collection(db, "bookings"),
-      where("providerId", "==", user.uid)
+      collection(
+        db,
+        "bookings"
+      ),
+      where(
+        "providerId",
+        "==",
+        user.uid
+      )
     );
 
     const unsubscribeBookings =
@@ -180,6 +216,152 @@ export default function ProviderProfileScreen() {
       unsubscribeBookings();
     };
   }, []);
+
+  const uploadProfilePhotoToCloudinary = async (
+    uri: string
+  ) => {
+    const file =
+      new File(uri);
+
+    const formData =
+      new FormData();
+
+    formData.append(
+      "file",
+      file as any
+    );
+
+    formData.append(
+      "upload_preset",
+      CLOUDINARY_UPLOAD_PRESET
+    );
+
+    const response =
+      await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+    const data: any =
+      await response.json();
+
+    console.log(
+      "Provider profile Cloudinary response:",
+      data
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error?.message ||
+          "Profile photo upload failed."
+      );
+    }
+
+    if (!data?.secure_url) {
+      throw new Error(
+        "Cloudinary did not return an image URL."
+      );
+    }
+
+    return data.secure_url as string;
+  };
+
+  const chooseProfilePhoto = async () => {
+    try {
+      const user =
+        auth.currentUser;
+
+      if (!user) {
+        router.replace(
+          "/provider/login"
+        );
+
+        return;
+      }
+
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "Photo Permission Required",
+          "Please allow photo access to choose a profile picture."
+        );
+
+        return;
+      }
+
+      const result =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+      if (
+        result.canceled ||
+        result.assets.length === 0
+      ) {
+        return;
+      }
+
+      setUploadingPhoto(
+        true
+      );
+
+      const selectedUri =
+        result.assets[0].uri;
+
+      const imageUrl =
+        await uploadProfilePhotoToCloudinary(
+          selectedUri
+        );
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          user.uid
+        ),
+        {
+          profileImageUrl:
+            imageUrl,
+        }
+      );
+
+      setProvider(
+        (current) => ({
+          ...(current || {}),
+          profileImageUrl:
+            imageUrl,
+        })
+      );
+
+      Alert.alert(
+        "Profile Updated",
+        "Your profile picture was updated successfully."
+      );
+    } catch (error: any) {
+      console.log(
+        "Provider profile photo error:",
+        error
+      );
+
+      Alert.alert(
+        "Upload Failed",
+        error?.message ||
+          "Unable to update your profile picture."
+      );
+    } finally {
+      setUploadingPhoto(
+        false
+      );
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -235,20 +417,92 @@ export default function ProviderProfileScreen() {
         <View
           style={styles.profileHeader}
         >
-          <View style={styles.avatar}>
-            <Text
-              style={styles.avatarText}
+          <TouchableOpacity
+            style={
+              styles.avatarWrapper
+            }
+            onPress={
+              chooseProfilePhoto
+            }
+            disabled={
+              uploadingPhoto
+            }
+            activeOpacity={0.8}
+          >
+            {provider?.profileImageUrl ? (
+              <Image
+                source={{
+                  uri:
+                    provider.profileImageUrl,
+                }}
+                style={
+                  styles.avatarImage
+                }
+                resizeMode="cover"
+              />
+            ) : (
+              <View
+                style={styles.avatar}
+              >
+                <Text
+                  style={
+                    styles.avatarText
+                  }
+                >
+                  👨‍🔧
+                </Text>
+              </View>
+            )}
+
+            <View
+              style={
+                styles.cameraBadge
+              }
             >
-              👨‍🔧
+              {uploadingPhoto ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#FFFFFF"
+                />
+              ) : (
+                <Text
+                  style={
+                    styles.cameraBadgeText
+                  }
+                >
+                  📷
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={
+              chooseProfilePhoto
+            }
+            disabled={
+              uploadingPhoto
+            }
+          >
+            <Text
+              style={
+                styles.changePhotoText
+              }
+            >
+              {uploadingPhoto
+                ? "Uploading..."
+                : "Change Profile Photo"}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <Text style={styles.name}>
             {provider?.name ||
               "Provider"}
           </Text>
 
-          <Text style={styles.service}>
+          <Text
+            style={styles.service}
+          >
             {provider?.category ||
               "Service Provider"}
           </Text>
@@ -284,8 +538,12 @@ export default function ProviderProfileScreen() {
             </Text>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
+          <View
+            style={styles.statsRow}
+          >
+            <View
+              style={styles.statItem}
+            >
               <Text
                 style={styles.statValue}
               >
@@ -303,9 +561,13 @@ export default function ProviderProfileScreen() {
               </Text>
             </View>
 
-            <View style={styles.divider} />
+            <View
+              style={styles.divider}
+            />
 
-            <View style={styles.statItem}>
+            <View
+              style={styles.statItem}
+            >
               <Text
                 style={styles.statValue}
               >
@@ -319,9 +581,13 @@ export default function ProviderProfileScreen() {
               </Text>
             </View>
 
-            <View style={styles.divider} />
+            <View
+              style={styles.divider}
+            />
 
-            <View style={styles.statItem}>
+            <View
+              style={styles.statItem}
+            >
               <Text
                 style={styles.statValue}
               >
@@ -341,7 +607,9 @@ export default function ProviderProfileScreen() {
           <TouchableOpacity
             style={styles.item}
             onPress={() =>
-              router.push("/provider/edit-profile")
+              router.push(
+                "/provider/edit-profile"
+              )
             }
           >
             <Text
@@ -552,6 +820,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
+  avatarWrapper: {
+    position: "relative",
+  },
+
   avatar: {
     width: 90,
     height: 90,
@@ -561,8 +833,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#DBEAFE",
+  },
+
   avatarText: {
     fontSize: 42,
+  },
+
+  cameraBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 31,
+    height: 31,
+    borderRadius: 16,
+    backgroundColor: "#2563EB",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cameraBadgeText: {
+    fontSize: 13,
+  },
+
+  changePhotoText: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
   },
 
   name: {
