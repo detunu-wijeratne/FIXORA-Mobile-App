@@ -5,8 +5,11 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 import {
@@ -47,6 +50,61 @@ export default function RateReviewScreen() {
   const [review, setReview] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const updateProviderRating = async () => {
+    if (!providerId) {
+      return;
+    }
+
+    const reviewsQuery = query(
+      collection(db, "reviews"),
+      where("providerId", "==", providerId)
+    );
+
+    const snapshot = await getDocs(reviewsQuery);
+
+    const ratings = snapshot.docs.map((reviewDoc) => {
+      const data = reviewDoc.data();
+
+      return Number(data.rating || 0);
+    });
+
+    if (ratings.length === 0) {
+      await updateDoc(
+        doc(db, "users", providerId),
+        {
+          rating: 0,
+          reviewCount: 0,
+          updatedAt: serverTimestamp(),
+        }
+      );
+
+      return;
+    }
+
+    const totalRating = ratings.reduce(
+      (total, value) => total + value,
+      0
+    );
+
+    const averageRating =
+      totalRating / ratings.length;
+
+    await updateDoc(
+      doc(db, "users", providerId),
+      {
+        rating: averageRating,
+        reviewCount: ratings.length,
+        updatedAt: serverTimestamp(),
+      }
+    );
+
+    console.log(
+      "Provider rating updated:",
+      averageRating,
+      ratings.length
+    );
+  };
+
   const handleSubmit = async () => {
     const user = auth.currentUser;
 
@@ -65,6 +123,16 @@ export default function RateReviewScreen() {
         "Error",
         "Booking ID was not found."
       );
+
+      return;
+    }
+
+    if (!providerId) {
+      Alert.alert(
+        "Error",
+        "Provider ID was not found."
+      );
+
       return;
     }
 
@@ -73,6 +141,7 @@ export default function RateReviewScreen() {
         "Rating Required",
         "Please select a star rating."
       );
+
       return;
     }
 
@@ -87,7 +156,7 @@ export default function RateReviewScreen() {
           customerId: user.uid,
           customerEmail: user.email || "",
 
-          providerId: providerId || null,
+          providerId,
           providerName: provider,
 
           service,
@@ -109,6 +178,12 @@ export default function RateReviewScreen() {
           updatedAt: serverTimestamp(),
         }
       );
+
+      /*
+        Recalculate provider rating
+        after the new review is saved.
+      */
+      await updateProviderRating();
 
       Alert.alert(
         "Review Submitted",

@@ -1,7 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
 
 import {
+  collection,
+  onSnapshot,
+} from "firebase/firestore";
+
+import { useEffect, useState } from "react";
+
+import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +16,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { auth, db } from "../services/firebase";
+
+type SavedLocation = {
+  id: string;
+  label?: string;
+  address?: string;
+};
 
 export default function ServiceLocationScreen() {
   const params = useLocalSearchParams();
@@ -48,21 +63,104 @@ export default function ServiceLocationScreen() {
       ? params.description
       : "";
 
-  const [selectedLocation, setSelectedLocation] =
-    useState("home");
+  /*
+    Real Cloudinary image URL.
+    Example:
+    https://res.cloudinary.com/.../image/upload/...
+  */
+  const imageUrl =
+    typeof params.imageUrl === "string"
+      ? params.imageUrl
+      : "";
 
-  const [address, setAddress] = useState(
-    "45, Main Street, Colombo 03"
-  );
+  const [savedLocations, setSavedLocations] =
+    useState<SavedLocation[]>([]);
+
+  const [selectedLocation, setSelectedLocation] =
+    useState("");
+
+  const [address, setAddress] =
+    useState("");
+
+  const [loadingLocations, setLoadingLocations] =
+    useState(true);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      router.replace("/customer-login");
+      return;
+    }
+
+    const locationsRef = collection(
+      db,
+      "users",
+      user.uid,
+      "locations"
+    );
+
+    const unsubscribe = onSnapshot(
+      locationsRef,
+      (snapshot) => {
+        const locations: SavedLocation[] =
+          snapshot.docs.map((locationDoc) => ({
+            id: locationDoc.id,
+            ...locationDoc.data(),
+          })) as SavedLocation[];
+
+        setSavedLocations(locations);
+
+        if (
+          locations.length > 0 &&
+          !selectedLocation
+        ) {
+          setSelectedLocation(
+            locations[0].id
+          );
+
+          setAddress(
+            locations[0].address || ""
+          );
+        }
+
+        setLoadingLocations(false);
+      },
+      (error) => {
+        console.log(
+          "Saved locations error:",
+          error
+        );
+
+        setLoadingLocations(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const selectSavedLocation = (
+    location: SavedLocation
+  ) => {
+    setSelectedLocation(location.id);
+
+    setAddress(
+      location.address || ""
+    );
+  };
 
   const handleContinue = () => {
     if (!address.trim()) {
-      alert("Please enter a service address.");
+      alert(
+        "Please enter a service address."
+      );
+
       return;
     }
 
     router.push({
       pathname: "/booking-summary",
+
       params: {
         providerId,
         name,
@@ -72,15 +170,39 @@ export default function ServiceLocationScreen() {
         time,
         description,
         address: address.trim(),
+
+        /*
+          Pass Cloudinary URL forward.
+        */
+        imageUrl,
       },
     });
+  };
+
+  const getLocationIcon = (
+    label?: string
+  ) => {
+    const value =
+      label?.toLowerCase() || "";
+
+    if (value.includes("work")) {
+      return "🏢";
+    }
+
+    if (value.includes("home")) {
+      return "🏠";
+    }
+
+    return "📍";
   };
 
   return (
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
         <Text style={styles.title}>
           Where do you need the service?
@@ -90,121 +212,148 @@ export default function ServiceLocationScreen() {
           Select a saved location or enter a new address.
         </Text>
 
-        <Text style={styles.sectionTitle}>
-          Saved Locations
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.locationCard,
-            selectedLocation === "home" &&
-              styles.selectedCard,
-          ]}
-          onPress={() => {
-            setSelectedLocation("home");
-            setAddress(
-              "45, Main Street, Colombo 03"
-            );
-          }}
-        >
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>
-              🏠
-            </Text>
-          </View>
-
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>
-              Home
-            </Text>
-
-            <Text style={styles.locationAddress}>
-              45, Main Street, Colombo 03
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.radio,
-              selectedLocation === "home" &&
-                styles.radioSelected,
-            ]}
-          >
-            {selectedLocation === "home" && (
-              <View style={styles.radioDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.locationCard,
-            selectedLocation === "work" &&
-              styles.selectedCard,
-          ]}
-          onPress={() => {
-            setSelectedLocation("work");
-            setAddress(
-              "22, Galle Road, Colombo 04"
-            );
-          }}
-        >
-          <View style={styles.iconBox}>
-            <Text style={styles.icon}>
-              🏢
-            </Text>
-          </View>
-
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationTitle}>
-              Work
-            </Text>
-
-            <Text style={styles.locationAddress}>
-              22, Galle Road, Colombo 04
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.radio,
-              selectedLocation === "work" &&
-                styles.radioSelected,
-            ]}
-          >
-            {selectedLocation === "work" && (
-              <View style={styles.radioDot} />
-            )}
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.currentLocationButton}
-          onPress={() => {
-            setSelectedLocation("current");
-            setAddress(
-              "Current device location"
-            );
-          }}
-        >
-          <Text style={styles.currentLocationIcon}>
-            📍
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            Saved Locations
           </Text>
 
-          <View style={styles.currentLocationContent}>
-            <Text style={styles.currentLocationTitle}>
-              Use Current Location
+          <TouchableOpacity
+            onPress={() =>
+              router.push(
+                "/saved-locations"
+              )
+            }
+          >
+            <Text style={styles.manageLink}>
+              Manage
             </Text>
+          </TouchableOpacity>
+        </View>
 
-            <Text style={styles.currentLocationText}>
-              Automatically detect your current location
+        {loadingLocations ? (
+          <View
+            style={styles.loadingContainer}
+          >
+            <ActivityIndicator
+              size="small"
+              color="#2563EB"
+            />
+
+            <Text
+              style={styles.loadingText}
+            >
+              Loading saved locations...
             </Text>
           </View>
+        ) : savedLocations.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>
+              📍
+            </Text>
 
-          <Text style={styles.arrow}>
-            ›
-          </Text>
-        </TouchableOpacity>
+            <Text style={styles.emptyTitle}>
+              No saved locations
+            </Text>
+
+            <Text style={styles.emptyText}>
+              You can enter an address below or
+              add a saved location.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.addLocationButton}
+              onPress={() =>
+                router.push(
+                  "/saved-locations"
+                )
+              }
+            >
+              <Text
+                style={
+                  styles.addLocationButtonText
+                }
+              >
+                Add Saved Location
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          savedLocations.map(
+            (location) => {
+              const selected =
+                selectedLocation ===
+                location.id;
+
+              return (
+                <TouchableOpacity
+                  key={location.id}
+                  style={[
+                    styles.locationCard,
+                    selected &&
+                      styles.selectedCard,
+                  ]}
+                  onPress={() =>
+                    selectSavedLocation(
+                      location
+                    )
+                  }
+                >
+                  <View
+                    style={styles.iconBox}
+                  >
+                    <Text
+                      style={styles.icon}
+                    >
+                      {getLocationIcon(
+                        location.label
+                      )}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={
+                      styles.locationInfo
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.locationTitle
+                      }
+                    >
+                      {location.label ||
+                        "Saved Location"}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.locationAddress
+                      }
+                    >
+                      {location.address ||
+                        "Address not added"}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.radio,
+                      selected &&
+                        styles.radioSelected,
+                    ]}
+                  >
+                    {selected && (
+                      <View
+                        style={
+                          styles.radioDot
+                        }
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            }
+          )
+        )}
 
         <Text style={styles.sectionTitle}>
           Service Address
@@ -219,7 +368,10 @@ export default function ServiceLocationScreen() {
           placeholderTextColor="#94A3B8"
           value={address}
           onChangeText={(value) => {
-            setSelectedLocation("custom");
+            setSelectedLocation(
+              "custom"
+            );
+
             setAddress(value);
           }}
         />
@@ -230,7 +382,9 @@ export default function ServiceLocationScreen() {
           </Text>
 
           <Text style={styles.noteText}>
-            Your exact location will only be used for this booking.
+            Your service address will only
+            be shared with the assigned
+            provider for this booking.
           </Text>
         </View>
       </ScrollView>
@@ -240,7 +394,11 @@ export default function ServiceLocationScreen() {
           style={styles.continueButton}
           onPress={handleContinue}
         >
-          <Text style={styles.continueButtonText}>
+          <Text
+            style={
+              styles.continueButtonText
+            }
+          >
             Continue to Summary
           </Text>
         </TouchableOpacity>
@@ -273,12 +431,81 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
 
-  sectionTitle: {
+  sectionHeader: {
     marginTop: 28,
     marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
     color: "#0F172A",
+  },
+
+  manageLink: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+
+  loadingContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  loadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 22,
+    alignItems: "center",
+  },
+
+  emptyIcon: {
+    fontSize: 32,
+  },
+
+  emptyTitle: {
+    marginTop: 8,
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  emptyText: {
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#64748B",
+    textAlign: "center",
+  },
+
+  addLocationButton: {
+    marginTop: 14,
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  addLocationButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   locationCard: {
@@ -347,43 +574,6 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: "#2563EB",
-  },
-
-  currentLocationButton: {
-    marginTop: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 16,
-    padding: 15,
-  },
-
-  currentLocationIcon: {
-    fontSize: 24,
-  },
-
-  currentLocationContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  currentLocationTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-
-  currentLocationText: {
-    marginTop: 3,
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  arrow: {
-    fontSize: 28,
-    color: "#94A3B8",
   },
 
   addressInput: {

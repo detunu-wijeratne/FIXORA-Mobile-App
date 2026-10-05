@@ -253,6 +253,20 @@ export default function RootLayout() {
           title: "Edit Profile",
         }}
       />
+
+      <Stack.Screen
+        name="saved-locations"
+        options={{
+          title: "Saved Locations",
+        }}
+      />
+
+      <Stack.Screen
+        name="provider/services-pricing"
+        options={{
+          title: "Services & Pricing",
+        }}
+      />
     </Stack>
   );
 }

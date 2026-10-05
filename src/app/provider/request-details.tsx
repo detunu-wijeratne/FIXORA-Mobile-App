@@ -1,14 +1,17 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 
 import {
   doc,
+  getDoc,
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 
 import {
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -82,11 +85,80 @@ export default function ProviderRequestDetailsScreen() {
       : "pending"
   );
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
+  /*
+    Real Cloudinary image URL
+    loaded directly from the booking document.
+  */
+  const [imageUrl, setImageUrl] =
+    useState("");
+
+  const [loadingImage, setLoadingImage] =
+    useState(true);
+
+  /*
+    LOAD BOOKING PHOTO FROM FIRESTORE
+  */
+  useEffect(() => {
+    const loadBookingPhoto = async () => {
+      if (!bookingId) {
+        setLoadingImage(false);
+        return;
+      }
+
+      try {
+        const bookingSnapshot =
+          await getDoc(
+            doc(
+              db,
+              "bookings",
+              bookingId
+            )
+          );
+
+        if (bookingSnapshot.exists()) {
+          const data =
+            bookingSnapshot.data();
+
+          const storedImageUrl =
+            typeof data.imageUrl === "string"
+              ? data.imageUrl
+              : "";
+
+          setImageUrl(
+            storedImageUrl
+          );
+
+          console.log(
+            "Provider booking image:",
+            storedImageUrl
+          );
+        }
+      } catch (error) {
+        console.log(
+          "Load booking image error:",
+          error
+        );
+      } finally {
+        setLoadingImage(false);
+      }
+    };
+
+    loadBookingPhoto();
+  }, [bookingId]);
+
+  /*
+    ACCEPT BOOKING
+  */
   const handleAccept = async () => {
     if (!bookingId) {
-      Alert.alert("Error", "Booking ID not found.");
+      Alert.alert(
+        "Error",
+        "Booking ID not found."
+      );
+
       return;
     }
 
@@ -94,11 +166,17 @@ export default function ProviderRequestDetailsScreen() {
       setLoading(true);
 
       await updateDoc(
-        doc(db, "bookings", bookingId),
+        doc(
+          db,
+          "bookings",
+          bookingId
+        ),
         {
           status: "confirmed",
-          acceptedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          acceptedAt:
+            serverTimestamp(),
+          updatedAt:
+            serverTimestamp(),
         }
       );
 
@@ -111,25 +189,38 @@ export default function ProviderRequestDetailsScreen() {
           {
             text: "View Jobs",
             onPress: () =>
-              router.replace("/provider/jobs"),
+              router.replace(
+                "/provider/jobs"
+              ),
           },
         ]
       );
     } catch (error: any) {
-      console.log("Accept booking error:", error);
+      console.log(
+        "Accept booking error:",
+        error
+      );
 
       Alert.alert(
         "Error",
-        error.message || "Unable to accept booking."
+        error.message ||
+          "Unable to accept booking."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  /*
+    DECLINE BOOKING
+  */
   const handleDecline = async () => {
     if (!bookingId) {
-      Alert.alert("Error", "Booking ID not found.");
+      Alert.alert(
+        "Error",
+        "Booking ID not found."
+      );
+
       return;
     }
 
@@ -137,11 +228,17 @@ export default function ProviderRequestDetailsScreen() {
       setLoading(true);
 
       await updateDoc(
-        doc(db, "bookings", bookingId),
+        doc(
+          db,
+          "bookings",
+          bookingId
+        ),
         {
           status: "declined",
-          declinedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          declinedAt:
+            serverTimestamp(),
+          updatedAt:
+            serverTimestamp(),
         }
       );
 
@@ -154,16 +251,22 @@ export default function ProviderRequestDetailsScreen() {
           {
             text: "Back to Requests",
             onPress: () =>
-              router.replace("/provider/requests"),
+              router.replace(
+                "/provider/requests"
+              ),
           },
         ]
       );
     } catch (error: any) {
-      console.log("Decline booking error:", error);
+      console.log(
+        "Decline booking error:",
+        error
+      );
 
       Alert.alert(
         "Error",
-        error.message || "Unable to decline booking."
+        error.message ||
+          "Unable to decline booking."
       );
     } finally {
       setLoading(false);
@@ -173,9 +276,15 @@ export default function ProviderRequestDetailsScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={
+          false
+        }
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
+        {/* STATUS */}
+
         <View style={styles.statusRow}>
           <Text style={styles.requestId}>
             Booking Request
@@ -184,18 +293,26 @@ export default function ProviderRequestDetailsScreen() {
           <View
             style={[
               styles.statusBadge,
-              status === "confirmed" &&
+
+              status ===
+                "confirmed" &&
                 styles.confirmedBadge,
-              status === "declined" &&
+
+              status ===
+                "declined" &&
                 styles.declinedBadge,
             ]}
           >
             <Text
               style={[
                 styles.statusText,
-                status === "confirmed" &&
+
+                status ===
+                  "confirmed" &&
                   styles.confirmedText,
-                status === "declined" &&
+
+                status ===
+                  "declined" &&
                   styles.declinedText,
               ]}
             >
@@ -204,34 +321,55 @@ export default function ProviderRequestDetailsScreen() {
           </View>
         </View>
 
+        {/* SERVICE DETAILS */}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text
+            style={styles.sectionTitle}
+          >
             Service Details
           </Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Service</Text>
-            <Text style={styles.value}>{service}</Text>
+            <Text style={styles.label}>
+              Service
+            </Text>
+
+            <Text style={styles.value}>
+              {service}
+            </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Date</Text>
+            <Text style={styles.label}>
+              Date
+            </Text>
+
             <Text style={styles.value}>
               October {date}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Time</Text>
-            <Text style={styles.value}>{time}</Text>
+            <Text style={styles.label}>
+              Time
+            </Text>
+
+            <Text style={styles.value}>
+              {time}
+            </Text>
           </View>
 
           <View style={styles.row}>
             <Text style={styles.label}>
               Estimated Service
             </Text>
+
             <Text style={styles.value}>
-              Rs. {Number(price).toLocaleString()}
+              Rs.{" "}
+              {Number(
+                price
+              ).toLocaleString()}
             </Text>
           </View>
 
@@ -239,42 +377,75 @@ export default function ProviderRequestDetailsScreen() {
             <Text style={styles.label}>
               Customer Total
             </Text>
-            <Text style={styles.totalValue}>
-              Rs. {Number(totalAmount).toLocaleString()}
+
+            <Text
+              style={
+                styles.totalValue
+              }
+            >
+              Rs.{" "}
+              {Number(
+                totalAmount
+              ).toLocaleString()}
             </Text>
           </View>
         </View>
 
+        {/* CUSTOMER */}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text
+            style={styles.sectionTitle}
+          >
             Customer
           </Text>
 
-          <View style={styles.customerRow}>
+          <View
+            style={styles.customerRow}
+          >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
+              <Text
+                style={styles.avatarText}
+              >
                 {customer
                   .split(" ")
-                  .map((word) => word[0])
+                  .map(
+                    (word) =>
+                      word[0]
+                  )
                   .join("")
                   .slice(0, 2)
                   .toUpperCase()}
               </Text>
             </View>
 
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>
+            <View
+              style={styles.customerInfo}
+            >
+              <Text
+                style={
+                  styles.customerName
+                }
+              >
                 {customer}
               </Text>
 
               {phone ? (
-                <Text style={styles.customerDetail}>
+                <Text
+                  style={
+                    styles.customerDetail
+                  }
+                >
                   📞 {phone}
                 </Text>
               ) : null}
 
               {email ? (
-                <Text style={styles.customerDetail}>
+                <Text
+                  style={
+                    styles.customerDetail
+                  }
+                >
                   ✉️ {email}
                 </Text>
               ) : null}
@@ -282,105 +453,229 @@ export default function ProviderRequestDetailsScreen() {
           </View>
         </View>
 
+        {/* LOCATION */}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text
+            style={styles.sectionTitle}
+          >
             Service Location
           </Text>
 
-          <Text style={styles.description}>
-            📍 {location || "Location not provided"}
+          <Text
+            style={styles.description}
+          >
+            📍{" "}
+            {location ||
+              "Location not provided"}
           </Text>
         </View>
 
+        {/* DESCRIPTION */}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text
+            style={styles.sectionTitle}
+          >
             Problem Description
           </Text>
 
-          <View style={styles.descriptionBox}>
-            <Text style={styles.description}>
+          <View
+            style={styles.descriptionBox}
+          >
+            <Text
+              style={styles.description}
+            >
               {description}
             </Text>
           </View>
         </View>
 
+        {/* CUSTOMER PHOTO */}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Customer Photos
+          <Text
+            style={styles.sectionTitle}
+          >
+            Customer Photo
           </Text>
 
-          <View style={styles.photoRow}>
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoIcon}>🖼️</Text>
-              <Text style={styles.photoText}>
-                Photo 1
+          {loadingImage ? (
+            <View
+              style={
+                styles.photoPlaceholder
+              }
+            >
+              <Text
+                style={styles.photoIcon}
+              >
+                🖼️
               </Text>
-            </View>
 
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoIcon}>🖼️</Text>
-              <Text style={styles.photoText}>
-                Photo 2
+              <Text
+                style={styles.photoText}
+              >
+                Loading photo...
               </Text>
             </View>
-          </View>
+          ) : imageUrl ? (
+            <>
+              <Image
+                source={{
+                  uri: imageUrl,
+                }}
+                style={
+                  styles.customerPhoto
+                }
+                resizeMode="cover"
+                onLoad={() => {
+                  console.log(
+                    "Provider image loaded successfully"
+                  );
+                }}
+                onError={(event) => {
+                  console.log(
+                    "Provider image error:",
+                    event.nativeEvent
+                      .error
+                  );
+                }}
+              />
+
+              <View
+                style={
+                  styles.photoSuccess
+                }
+              >
+                <Text
+                  style={
+                    styles.photoSuccessIcon
+                  }
+                >
+                  ✓
+                </Text>
+
+                <Text
+                  style={
+                    styles.photoSuccessText
+                  }
+                >
+                  Customer attachment
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View
+              style={
+                styles.photoPlaceholder
+              }
+            >
+              <Text
+                style={styles.photoIcon}
+              >
+                📷
+              </Text>
+
+              <Text
+                style={styles.photoText}
+              >
+                No photo attached
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* PENDING */}
 
       {status === "pending" && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={[
               styles.declineButton,
-              loading && styles.disabledButton,
+              loading &&
+                styles.disabledButton,
             ]}
             disabled={loading}
-            onPress={handleDecline}
+            onPress={
+              handleDecline
+            }
           >
-            <Text style={styles.declineText}>
-              {loading ? "Please wait..." : "Decline"}
+            <Text
+              style={
+                styles.declineText
+              }
+            >
+              {loading
+                ? "Please wait..."
+                : "Decline"}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.acceptButton,
-              loading && styles.disabledButton,
+              loading &&
+                styles.disabledButton,
             ]}
             disabled={loading}
-            onPress={handleAccept}
+            onPress={
+              handleAccept
+            }
           >
-            <Text style={styles.acceptText}>
-              {loading ? "Please wait..." : "Accept Request"}
+            <Text
+              style={
+                styles.acceptText
+              }
+            >
+              {loading
+                ? "Please wait..."
+                : "Accept Request"}
             </Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* CONFIRMED */}
 
       {status === "confirmed" && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={styles.fullButton}
             onPress={() =>
-              router.replace("/provider/jobs")
+              router.replace(
+                "/provider/jobs"
+              )
             }
           >
-            <Text style={styles.acceptText}>
+            <Text
+              style={
+                styles.acceptText
+              }
+            >
               View My Jobs
             </Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* DECLINED */}
+
       {status === "declined" && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={styles.fullButton}
             onPress={() =>
-              router.replace("/provider/requests")
+              router.replace(
+                "/provider/requests"
+              )
             }
           >
-            <Text style={styles.acceptText}>
+            <Text
+              style={
+                styles.acceptText
+              }
+            >
               Back to Requests
             </Text>
           </TouchableOpacity>
@@ -532,14 +827,16 @@ const styles = StyleSheet.create({
     color: "#475569",
   },
 
-  photoRow: {
-    flexDirection: "row",
-    gap: 10,
+  customerPhoto: {
+    width: "100%",
+    height: 230,
+    borderRadius: 14,
+    backgroundColor: "#E2E8F0",
   },
 
   photoPlaceholder: {
-    flex: 1,
-    height: 100,
+    width: "100%",
+    height: 140,
     borderRadius: 12,
     borderWidth: 1,
     borderStyle: "dashed",
@@ -550,13 +847,38 @@ const styles = StyleSheet.create({
   },
 
   photoIcon: {
-    fontSize: 25,
+    fontSize: 28,
   },
 
   photoText: {
-    marginTop: 4,
-    fontSize: 10,
+    marginTop: 6,
+    fontSize: 11,
     color: "#64748B",
+  },
+
+  photoSuccess: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  photoSuccessIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#DCFCE7",
+    color: "#16A34A",
+    textAlign: "center",
+    lineHeight: 20,
+    fontSize: 11,
+    fontWeight: "800",
+    marginRight: 7,
+  },
+
+  photoSuccessText: {
+    fontSize: 12,
+    color: "#16A34A",
+    fontWeight: "700",
   },
 
   bottomBar: {

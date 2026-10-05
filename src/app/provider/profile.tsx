@@ -389,8 +389,8 @@ export default function ProviderProfileScreen() {
           <TouchableOpacity
             style={styles.item}
             onPress={() =>
-              alert(
-                "Services & Pricing can be connected next."
+              router.push(
+                "/provider/services-pricing"
               )
             }
           >

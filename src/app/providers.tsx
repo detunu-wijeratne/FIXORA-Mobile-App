@@ -37,6 +37,11 @@ type Provider = {
   price?: number;
 };
 
+type ReviewStats = {
+  rating: number;
+  count: number;
+};
+
 export default function ProvidersScreen() {
   const { service } = useLocalSearchParams();
 
@@ -45,17 +50,26 @@ export default function ProvidersScreen() {
       ? service
       : "Service Providers";
 
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [providers, setProviders] =
+    useState<Provider[]>([]);
+
+  const [reviewStats, setReviewStats] =
+    useState<Record<string, ReviewStats>>({});
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    /*
+      LOAD PROVIDERS
+    */
+
     const providersQuery = query(
       collection(db, "users"),
       where("role", "==", "provider")
     );
 
-    const unsubscribe = onSnapshot(
+    const unsubscribeProviders = onSnapshot(
       providersQuery,
       (snapshot) => {
         const loadedProviders: Provider[] =
@@ -66,7 +80,8 @@ export default function ProvidersScreen() {
             }))
             .filter(
               (provider: any) =>
-                provider.accountStatus !== "disabled"
+                provider.accountStatus !==
+                "disabled"
             ) as Provider[];
 
         console.log(
@@ -92,32 +107,139 @@ export default function ProvidersScreen() {
       }
     );
 
-    return () => unsubscribe();
+    /*
+      LOAD REAL REVIEWS
+
+      This calculates:
+      - average rating
+      - number of reviews
+
+      directly from Firestore reviews.
+    */
+
+    const unsubscribeReviews = onSnapshot(
+      collection(db, "reviews"),
+      (snapshot) => {
+        const totals: Record<
+          string,
+          {
+            total: number;
+            count: number;
+          }
+        > = {};
+
+        snapshot.docs.forEach(
+          (reviewDoc) => {
+            const data = reviewDoc.data();
+
+            const providerId =
+              data.providerId;
+
+            if (!providerId) {
+              return;
+            }
+
+            if (!totals[providerId]) {
+              totals[providerId] = {
+                total: 0,
+                count: 0,
+              };
+            }
+
+            totals[providerId].total +=
+              Number(data.rating || 0);
+
+            totals[providerId].count += 1;
+          }
+        );
+
+        const calculatedStats: Record<
+          string,
+          ReviewStats
+        > = {};
+
+        Object.keys(totals).forEach(
+          (providerId) => {
+            const data =
+              totals[providerId];
+
+            calculatedStats[
+              providerId
+            ] = {
+              rating:
+                data.count > 0
+                  ? data.total /
+                    data.count
+                  : 0,
+
+              count: data.count,
+            };
+          }
+        );
+
+        setReviewStats(
+          calculatedStats
+        );
+      },
+      (error) => {
+        console.log(
+          "Provider reviews error:",
+          error
+        );
+      }
+    );
+
+    return () => {
+      unsubscribeProviders();
+      unsubscribeReviews();
+    };
   }, []);
 
-  const filteredProviders = providers.filter(
-    (provider) => {
-      const searchText = search
-        .trim()
-        .toLowerCase();
+  /*
+    FILTER PROVIDERS
+  */
 
-      if (!searchText) {
-        return true;
-      }
+  const filteredProviders =
+    providers
+      .filter((provider) => {
+        const searchText = search
+          .trim()
+          .toLowerCase();
 
-      return (
-        provider.name
-          ?.toLowerCase()
-          .includes(searchText) ||
-        provider.category
-          ?.toLowerCase()
-          .includes(searchText) ||
-        provider.district
-          ?.toLowerCase()
-          .includes(searchText)
-      );
-    }
-  );
+        if (!searchText) {
+          return true;
+        }
+
+        return (
+          provider.name
+            ?.toLowerCase()
+            .includes(searchText) ||
+          provider.category
+            ?.toLowerCase()
+            .includes(searchText) ||
+          provider.district
+            ?.toLowerCase()
+            .includes(searchText)
+        );
+      })
+
+      /*
+        SORT USING REAL RATINGS
+      */
+
+      .sort((a, b) => {
+        const ratingA =
+          reviewStats[a.id]?.rating ??
+          a.rating ??
+          0;
+
+        const ratingB =
+          reviewStats[b.id]?.rating ??
+          b.rating ??
+          0;
+
+        return ratingB - ratingA;
+      });
 
   return (
     <View style={styles.container}>
@@ -137,7 +259,9 @@ export default function ProvidersScreen() {
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Text style={styles.searchIcon}>
+            <Text
+              style={styles.searchIcon}
+            >
               🔍
             </Text>
 
@@ -153,81 +277,144 @@ export default function ProvidersScreen() {
           <TouchableOpacity
             style={styles.filterButton}
           >
-            <Text style={styles.filterIcon}>
+            <Text
+              style={styles.filterIcon}
+            >
               ⚙️
             </Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
+          <View
+            style={
+              styles.loadingContainer
+            }
+          >
             <ActivityIndicator
               size="large"
               color="#2563EB"
             />
 
-            <Text style={styles.loadingText}>
+            <Text
+              style={
+                styles.loadingText
+              }
+            >
               Loading providers...
             </Text>
           </View>
         ) : (
           <>
-            <View style={styles.resultsHeader}>
-              <Text style={styles.resultsText}>
+            <View
+              style={
+                styles.resultsHeader
+              }
+            >
+              <Text
+                style={
+                  styles.resultsText
+                }
+              >
                 {filteredProviders.length}{" "}
-                {filteredProviders.length === 1
+                {filteredProviders.length ===
+                1
                   ? "provider"
                   : "providers"}{" "}
                 found
               </Text>
 
               <TouchableOpacity>
-                <Text style={styles.sortText}>
+                <Text
+                  style={
+                    styles.sortText
+                  }
+                >
                   Sort ▾
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {filteredProviders.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyIcon}>
+            {filteredProviders.length ===
+            0 ? (
+              <View
+                style={
+                  styles.emptyCard
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyIcon
+                  }
+                >
                   👨‍🔧
                 </Text>
 
-                <Text style={styles.emptyTitle}>
+                <Text
+                  style={
+                    styles.emptyTitle
+                  }
+                >
                   No providers found
                 </Text>
 
-                <Text style={styles.emptyText}>
+                <Text
+                  style={
+                    styles.emptyText
+                  }
+                >
                   Try another search.
                 </Text>
               </View>
             ) : (
-              <View style={styles.providerList}>
+              <View
+                style={
+                  styles.providerList
+                }
+              >
                 {filteredProviders.map(
                   (provider) => {
                     const verified =
                       provider.verificationStatus ===
                       "approved";
 
+                    /*
+                      REAL REVIEW VALUES
+                    */
+
                     const rating =
-                      provider.rating ?? 0;
+                      reviewStats[
+                        provider.id
+                      ]?.rating ??
+                      provider.rating ??
+                      0;
 
                     const reviewCount =
-                      provider.reviewCount ?? 0;
+                      reviewStats[
+                        provider.id
+                      ]?.count ??
+                      provider.reviewCount ??
+                      0;
 
                     const experience =
                       provider.experience ||
                       "New provider";
 
                     const price =
-                      provider.price ?? 2500;
+                      provider.price ??
+                      2500;
 
                     return (
                       <TouchableOpacity
-                        key={provider.id}
-                        style={styles.card}
-                        activeOpacity={0.7}
+                        key={
+                          provider.id
+                        }
+                        style={
+                          styles.card
+                        }
+                        activeOpacity={
+                          0.7
+                        }
                         onPress={() =>
                           router.push({
                             pathname:
@@ -262,7 +449,9 @@ export default function ProvidersScreen() {
                                 "",
 
                               rating:
-                                String(rating),
+                                String(
+                                  rating
+                                ),
 
                               reviews:
                                 String(
@@ -271,9 +460,10 @@ export default function ProvidersScreen() {
 
                               experience,
 
-                              price: String(
-                                price
-                              ),
+                              price:
+                                String(
+                                  price
+                                ),
 
                               verified:
                                 verified
@@ -284,7 +474,9 @@ export default function ProvidersScreen() {
                         }
                       >
                         <View
-                          style={styles.avatar}
+                          style={
+                            styles.avatar
+                          }
                         >
                           <Text
                             style={
@@ -301,7 +493,9 @@ export default function ProvidersScreen() {
                           }
                         >
                           <View
-                            style={styles.nameRow}
+                            style={
+                              styles.nameRow
+                            }
                           >
                             <Text
                               style={
@@ -343,7 +537,8 @@ export default function ProvidersScreen() {
                               }
                             >
                               ⭐{" "}
-                              {rating > 0
+                              {rating >
+                              0
                                 ? rating.toFixed(
                                     1
                                   )
@@ -355,10 +550,15 @@ export default function ProvidersScreen() {
                                 styles.reviews
                               }
                             >
-                              ({reviewCount}{" "}
-                              {reviewCount === 1
+                              (
+                              {
+                                reviewCount
+                              }{" "}
+                              {reviewCount ===
+                              1
                                 ? "review"
-                                : "reviews"})
+                                : "reviews"}
+                              )
                             </Text>
                           </View>
 
@@ -388,7 +588,10 @@ export default function ProvidersScreen() {
                                 styles.detail
                               }
                             >
-                              🧰 {experience}
+                              🧰{" "}
+                              {
+                                experience
+                              }
                             </Text>
                           </View>
 

@@ -172,9 +172,7 @@ export default function CustomerProfileScreen() {
           <TouchableOpacity
             style={styles.item}
             onPress={() =>
-              alert(
-                "Saved Locations can be connected next."
-              )
+              router.push("/saved-locations")
             }
           >
             <Text
