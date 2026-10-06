@@ -1,20 +1,21 @@
 import { router } from "expo-router";
 import {
-    doc,
-    getDoc,
-    serverTimestamp,
-    updateDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import CustomerBottomNav from "../components/CustomerBottomNav";
 
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { auth, db } from "../services/firebase";
@@ -208,6 +209,7 @@ export default function CustomerEditProfileScreen() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+      <CustomerBottomNav />
     </View>
   );
 }

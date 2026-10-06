@@ -1,5 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import CustomerBottomNav from "../components/CustomerBottomNav";
+
 
 import {
   addDoc,
@@ -263,6 +265,7 @@ export default function CustomerChatScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      <CustomerBottomNav />
     </KeyboardAvoidingView>
   );
 }

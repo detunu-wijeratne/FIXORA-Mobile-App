@@ -1,5 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
+import CustomerBottomNav from "../components/CustomerBottomNav";
+
 
 import {
   doc,
@@ -545,6 +547,7 @@ export default function BookingDetailsScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <CustomerBottomNav />
     </View>
   );
 }

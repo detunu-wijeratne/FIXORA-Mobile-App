@@ -1,4 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
+import CustomerBottomNav from "../components/CustomerBottomNav";
+
 
 import {
   Image,
@@ -165,6 +167,7 @@ export default function BookingConfirmationScreen() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+      <CustomerBottomNav />
     </View>
   );
 }

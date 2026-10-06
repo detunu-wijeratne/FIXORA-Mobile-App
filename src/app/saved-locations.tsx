@@ -1,24 +1,26 @@
 import { router } from "expo-router";
+import CustomerBottomNav from "../components/CustomerBottomNav";
+
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    serverTimestamp,
-    updateDoc,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { auth, db } from "../services/firebase";
@@ -389,6 +391,7 @@ export default function SavedLocationsScreen() {
           </View>
         )}
       </ScrollView>
+      <CustomerBottomNav />
     </View>
   );
 }
