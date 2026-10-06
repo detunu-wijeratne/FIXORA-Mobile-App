@@ -4,14 +4,18 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useState } from "react";
 
 import {
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
 } from "react-native";
 
+import AppTextInput from "../components/AppTextInput";
+import PrimaryButton from "../components/PrimaryButton";
+import ScreenHeader from "../components/ScreenHeader";
 import { auth, db } from "../services/firebase";
+import { colors, spacing } from "../theme";
 
 export default function CustomerSignupScreen() {
   const [name, setName] = useState("");
@@ -79,159 +83,97 @@ export default function CustomerSignupScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.brand}>FIXORA</Text>
-
-      <Text style={styles.title}>Create Account</Text>
-
-      <Text style={styles.subtitle}>
-        Create your Fixora customer account.
-      </Text>
-
-      <Text style={styles.label}>Full Name</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your name"
-        value={name}
-        onChangeText={setName}
-      />
-
-      <Text style={styles.label}>Mobile Number</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your mobile number"
-        keyboardType="phone-pad"
-        value={phone}
-        onChangeText={setPhone}
-      />
-
-      <Text style={styles.label}>Email Address</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <Text style={styles.label}>Password</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Create password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <Text style={styles.label}>Confirm Password</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm password"
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-      />
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleSignup}
-        disabled={loading}
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Creating Account..." : "Create Account"}
-        </Text>
-      </TouchableOpacity>
+        <ScreenHeader
+          eyebrow="FIXORA"
+          title="Create Account"
+          subtitle="Create your Fixora customer account."
+        />
 
-      <TouchableOpacity
-        onPress={() => router.replace("/customer-login")}
-      >
-        <Text style={styles.loginText}>
-          Already have an account?{" "}
-          <Text style={styles.loginLink}>Log In</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <AppTextInput
+          label="Full Name"
+          placeholder="Enter your name"
+          value={name}
+          onChangeText={setName}
+        />
+
+        <AppTextInput
+          label="Mobile Number"
+          placeholder="Enter your mobile number"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
+        />
+
+        <AppTextInput
+          label="Email Address"
+          placeholder="Enter your email"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        <AppTextInput
+          label="Password"
+          placeholder="Create password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <AppTextInput
+          label="Confirm Password"
+          placeholder="Confirm password"
+          secureTextEntry
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+        />
+
+        <PrimaryButton
+          title={loading ? "Creating Account..." : "Create Account"}
+          onPress={handleSignup}
+          loading={loading}
+          style={styles.submitButton}
+        />
+
+        <TouchableOpacity onPress={() => router.replace("/customer-login")}>
+          <Text style={styles.loginText}>
+            Already have an account? <Text style={styles.loginLink}>Log In</Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 24,
-    paddingTop: 50,
+    backgroundColor: colors.background,
   },
 
-  brand: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#2563EB",
+  scrollContent: {
+    padding: spacing.xxl,
+    paddingBottom: spacing.xxxl + 8,
   },
 
-  title: {
-    marginTop: 28,
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 6,
-    marginBottom: 24,
-    color: "#64748B",
-  },
-
-  label: {
-    marginBottom: 7,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#334155",
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    marginBottom: 16,
-  },
-
-  button: {
-    marginTop: 8,
-    backgroundColor: "#2563EB",
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  buttonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
+  submitButton: {
+    marginTop: spacing.xs,
   },
 
   loginText: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   loginLink: {
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "700",
   },
 });

@@ -4,20 +4,20 @@ import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import AppTextInput from "../components/AppTextInput";
+import PrimaryButton from "../components/PrimaryButton";
+import ScreenHeader from "../components/ScreenHeader";
+import SecondaryButton from "../components/SecondaryButton";
 import { auth, db } from "../services/firebase";
+import { colors, spacing, typography } from "../theme";
 
 export default function CustomerLoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [quickLoading, setQuickLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -69,7 +69,7 @@ export default function CustomerLoginScreen() {
 
   const handleQuickCustomerLogin = async () => {
     try {
-      setLoading(true);
+      setQuickLoading(true);
 
       const userCredential =
         await signInWithEmailAndPassword(
@@ -106,24 +106,20 @@ export default function CustomerLoginScreen() {
         alert(error.message || "Quick login failed.");
       }
     } finally {
-      setLoading(false);
+      setQuickLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.brand}>FIXORA</Text>
+    <SafeAreaView style={styles.container}>
+      <ScreenHeader
+        eyebrow="FIXORA"
+        title="Customer Login"
+        subtitle="Log in to book and manage home services."
+      />
 
-      <Text style={styles.title}>Customer Login</Text>
-
-      <Text style={styles.subtitle}>
-        Log in to book and manage home services.
-      </Text>
-
-      <Text style={styles.label}>Email Address</Text>
-
-      <TextInput
-        style={styles.input}
+      <AppTextInput
+        label="Email Address"
         placeholder="Enter your email"
         keyboardType="email-address"
         autoCapitalize="none"
@@ -131,141 +127,72 @@ export default function CustomerLoginScreen() {
         onChangeText={setEmail}
       />
 
-      <Text style={styles.label}>Password</Text>
-
-      <TextInput
-        style={styles.input}
+      <AppTextInput
+        label="Password"
         placeholder="Enter your password"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          loading && styles.disabledButton,
-        ]}
+      <PrimaryButton
+        title={loading ? "Logging In..." : "Log In"}
         onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Logging In..." : "Log In"}
-        </Text>
-      </TouchableOpacity>
+        loading={loading}
+        disabled={quickLoading}
+        style={styles.loginButton}
+      />
 
-      <TouchableOpacity
-        style={[
-          styles.quickLoginButton,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleQuickCustomerLogin}
-        disabled={loading}
-      >
-        <Text style={styles.quickLoginText}>
-          Quick Customer Login
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.devSection}>
+        <Text style={styles.devCaption}>For development &amp; testing only</Text>
+        <SecondaryButton
+          title="Quick Customer Login"
+          onPress={handleQuickCustomerLogin}
+          loading={quickLoading}
+          disabled={loading}
+          variant="ghost"
+        />
+      </View>
 
-      <TouchableOpacity
-        onPress={() => router.push("/customer-signup")}
-      >
+      <TouchableOpacity onPress={() => router.push("/customer-signup")}>
         <Text style={styles.signupText}>
           Don't have an account?{" "}
-          <Text style={styles.signupLink}>
-            Create Account
-          </Text>
+          <Text style={styles.signupLink}>Create Account</Text>
         </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 24,
-    paddingTop: 50,
+    backgroundColor: colors.background,
+    padding: spacing.xxl,
   },
 
-  brand: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#2563EB",
+  loginButton: {
+    marginTop: spacing.xs,
   },
 
-  title: {
-    marginTop: 40,
-    fontSize: 30,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 34,
-    color: "#64748B",
-  },
-
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 8,
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 18,
-  },
-
-  button: {
-    marginTop: 6,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
+  devSection: {
+    marginTop: spacing.lg,
     alignItems: "center",
   },
 
-  quickLoginButton: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#EFF6FF",
-  },
-
-  quickLoginText: {
-    color: "#2563EB",
-    fontWeight: "700",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+  devCaption: {
+    ...typography.caption,
+    marginBottom: spacing.xs,
   },
 
   signupText: {
-    marginTop: 24,
+    marginTop: spacing.xxl,
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   signupLink: {
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "700",
   },
 });

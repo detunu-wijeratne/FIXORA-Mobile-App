@@ -1,15 +1,19 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
   Alert,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import PrimaryButton from "../../components/PrimaryButton";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 export default function ProviderVerificationScreen() {
   const [frontNIC, setFrontNIC] = useState(true);
@@ -73,13 +77,13 @@ export default function ProviderVerificationScreen() {
 };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.progressHeader}>
-          <Text style={styles.stepText}>🛡 Step 2 of 2: Verification</Text>
+          <Text style={styles.stepText}>Step 2 of 2: Verification</Text>
           <Text style={styles.progressText}>75% Completed</Text>
         </View>
 
@@ -94,7 +98,11 @@ export default function ProviderVerificationScreen() {
         </Text>
 
         <View style={styles.securityCard}>
-          <Text style={styles.securityIcon}>🛡️</Text>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={22}
+            color={colors.primary}
+          />
 
           <View style={styles.securityInfo}>
             <Text style={styles.securityTitle}>Secure 24-Hour Review</Text>
@@ -116,7 +124,11 @@ export default function ProviderVerificationScreen() {
 
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👨‍🔧</Text>
+              <Ionicons
+                name="person-circle-outline"
+                size={34}
+                color={colors.primary}
+              />
             </View>
 
             <Text style={styles.profileText}>
@@ -146,9 +158,11 @@ export default function ProviderVerificationScreen() {
               ]}
               onPress={() => setFrontNIC(!frontNIC)}
             >
-              <Text style={styles.uploadIcon}>
-                {frontNIC ? "✓" : "📷"}
-              </Text>
+              <Ionicons
+                name={frontNIC ? "checkmark-circle" : "camera-outline"}
+                size={26}
+                color={frontNIC ? colors.success : colors.textSecondary}
+              />
               <Text style={styles.uploadTitle}>Front Side</Text>
               <Text style={styles.uploadStatus}>
                 {frontNIC ? "Uploaded" : "Tap to upload"}
@@ -162,9 +176,11 @@ export default function ProviderVerificationScreen() {
               ]}
               onPress={() => setBackNIC(!backNIC)}
             >
-              <Text style={styles.uploadIcon}>
-                {backNIC ? "✓" : "📷"}
-              </Text>
+              <Ionicons
+                name={backNIC ? "checkmark-circle" : "camera-outline"}
+                size={26}
+                color={backNIC ? colors.success : colors.textSecondary}
+              />
               <Text style={styles.uploadTitle}>Back Side</Text>
               <Text style={styles.uploadStatus}>
                 {backNIC ? "Uploaded" : "Tap to upload"}
@@ -193,9 +209,11 @@ export default function ProviderVerificationScreen() {
             ]}
             onPress={() => setCertificate(!certificate)}
           >
-            <Text style={styles.largeUploadIcon}>
-              {certificate ? "✓" : "📄"}
-            </Text>
+            <Ionicons
+              name={certificate ? "checkmark-circle" : "document-text-outline"}
+              size={30}
+              color={certificate ? colors.success : colors.textSecondary}
+            />
 
             <Text style={styles.largeUploadTitle}>
               {certificate
@@ -203,9 +221,7 @@ export default function ProviderVerificationScreen() {
                 : "Upload Trade Credential"}
             </Text>
 
-            <Text style={styles.uploadStatus}>
-              PDF, PNG or JPG
-            </Text>
+            <Text style={styles.uploadStatus}>PDF, PNG or JPG</Text>
           </TouchableOpacity>
         </View>
 
@@ -234,14 +250,16 @@ export default function ProviderVerificationScreen() {
               </Text>
             </View>
 
-            <Text style={styles.addIcon}>
-              {businessDoc ? "✓" : "+"}
-            </Text>
+            <Ionicons
+              name={businessDoc ? "checkmark-circle" : "add-circle-outline"}
+              size={22}
+              color={colors.primary}
+            />
           </TouchableOpacity>
         </View>
 
         <View style={styles.privacyRow}>
-          <Text style={styles.privacyIcon}>🔒</Text>
+          <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
           <Text style={styles.privacyText}>
             Your documents are kept private and used only for verification.
           </Text>
@@ -254,27 +272,24 @@ export default function ProviderVerificationScreen() {
           <Text style={styles.slaValue}>Under 24h</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.submitButton}
+        <PrimaryButton
+          title="Submit for Verification"
           onPress={submitVerification}
-        >
-          <Text style={styles.submitText}>
-            Submit for Verification →
-          </Text>
-        </TouchableOpacity>
+          icon="arrow-forward"
+        />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7FC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 18,
+    padding: spacing.lg + 2,
     paddingBottom: 130,
   },
 
@@ -286,80 +301,75 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: colors.primary,
   },
 
   progressText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: colors.primary,
   },
 
   progressTrack: {
-    marginTop: 10,
+    marginTop: spacing.sm + 2,
     height: 5,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: colors.borderStrong,
     borderRadius: 5,
   },
 
   progressFill: {
     width: "75%",
     height: "100%",
-    backgroundColor: "#1D4ED8",
+    backgroundColor: colors.primary,
     borderRadius: 5,
   },
 
   title: {
-    marginTop: 20,
+    ...typography.pageTitle,
+    marginTop: spacing.xl,
     fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
   },
 
   subtitle: {
-    marginTop: 6,
+    ...typography.secondary,
+    marginTop: spacing.xs + 2,
     fontSize: 13,
-    lineHeight: 20,
-    color: "#64748B",
   },
 
   securityCard: {
-    marginTop: 18,
+    marginTop: spacing.lg + 2,
     flexDirection: "row",
-    backgroundColor: "#EEF2FF",
-    borderRadius: 16,
-    padding: 15,
-  },
-
-  securityIcon: {
-    fontSize: 22,
+    alignItems: "flex-start",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    padding: spacing.lg - 1,
+    gap: spacing.md,
   },
 
   securityInfo: {
     flex: 1,
-    marginLeft: 12,
   },
 
   securityTitle: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   securityText: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 11,
     lineHeight: 17,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   section: {
-    marginTop: 14,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    marginTop: spacing.md + 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
   sectionTitleRow: {
@@ -370,31 +380,31 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   verifiedBadge: {
-    marginLeft: 8,
-    backgroundColor: "#BBF7D0",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
+    marginLeft: spacing.sm,
+    backgroundColor: colors.successLight,
+    paddingHorizontal: spacing.sm - 1,
+    paddingVertical: spacing.xs - 1,
+    borderRadius: radius.sm,
   },
 
   verifiedText: {
     fontSize: 9,
     fontWeight: "800",
-    color: "#047857",
+    color: colors.success,
   },
 
   helperText: {
-    marginTop: 3,
+    marginTop: spacing.xs - 1,
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   profileRow: {
-    marginTop: 12,
+    marginTop: spacing.md,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -403,147 +413,125 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: "#E0E7FF",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 26,
-  },
-
   profileText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
     fontSize: 12,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   changeButton: {
-    backgroundColor: "#EEF2FF",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 3,
+    borderRadius: radius.sm,
   },
 
   changeText: {
-    color: "#1D4ED8",
+    color: colors.primary,
     fontSize: 11,
     fontWeight: "700",
   },
 
   uploadRow: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     flexDirection: "row",
-    gap: 10,
+    gap: spacing.sm + 2,
   },
 
   uploadBox: {
     flex: 1,
     minHeight: 120,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 14,
+    backgroundColor: colors.background,
+    borderRadius: radius.lg - 2,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
   },
 
   uploadedBox: {
-    borderColor: "#10B981",
-    backgroundColor: "#ECFDF5",
-  },
-
-  uploadIcon: {
-    fontSize: 27,
+    borderColor: colors.success,
+    backgroundColor: colors.successLight,
   },
 
   uploadTitle: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   uploadStatus: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 10,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   note: {
-    marginTop: 12,
+    marginTop: spacing.md,
     fontSize: 10,
     lineHeight: 16,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   largeUploadBox: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     minHeight: 140,
-    borderRadius: 14,
-    backgroundColor: "#F8FAFC",
+    borderRadius: radius.lg - 2,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  largeUploadIcon: {
-    fontSize: 30,
-  },
-
   largeUploadTitle: {
-    marginTop: 9,
+    marginTop: spacing.sm + 1,
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   optionalRow: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: colors.background,
+    padding: spacing.md + 2,
+    borderRadius: radius.md,
   },
 
   optionalTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   optionalText: {
-    marginTop: 3,
+    marginTop: spacing.xs - 1,
     fontSize: 10,
-    color: "#64748B",
-  },
-
-  addIcon: {
-    fontSize: 22,
-    color: "#1D4ED8",
-    fontWeight: "700",
+    color: colors.textSecondary,
   },
 
   privacyRow: {
-    marginTop: 18,
+    marginTop: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-  },
-
-  privacyIcon: {
-    fontSize: 16,
+    gap: spacing.sm,
   },
 
   privacyText: {
     flex: 1,
-    marginLeft: 8,
     fontSize: 10,
     lineHeight: 16,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   bottomBar: {
@@ -551,39 +539,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    padding: 14,
+    borderTopColor: colors.border,
+    padding: spacing.md + 2,
   },
 
   slaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: spacing.sm + 2,
   },
 
   slaLabel: {
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   slaValue: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#1D4ED8",
-  },
-
-  submitButton: {
-    backgroundColor: "#1D4ED8",
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-
-  submitText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
+    color: colors.primary,
   },
 });

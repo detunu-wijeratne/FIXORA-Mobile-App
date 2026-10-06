@@ -1,16 +1,20 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useState } from "react";
 import {
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import AppTextInput from "../../components/AppTextInput";
+import PrimaryButton from "../../components/PrimaryButton";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 export default function ProviderCreateAccountScreen() {
   const [name, setName] = useState("Ahmad Rasheed");
@@ -99,14 +103,16 @@ export default function ProviderCreateAccountScreen() {
 };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.progressRow}>
-          <Text style={styles.stepBadge}>● Step 1 of 2</Text>
-          <Text style={styles.proBadge}>PRO</Text>
+          <Text style={styles.stepBadge}>Step 1 of 2</Text>
+          <View style={styles.proBadge}>
+            <Text style={styles.proBadgeText}>PRO</Text>
+          </View>
         </View>
 
         <View style={styles.heroCard}>
@@ -127,9 +133,8 @@ export default function ProviderCreateAccountScreen() {
         </View>
 
         <View style={styles.formCard}>
-          <Text style={styles.label}>Full Legal Name</Text>
-          <TextInput
-            style={styles.input}
+          <AppTextInput
+            label="Full Legal Name"
             value={name}
             onChangeText={setName}
             placeholder="Full legal name"
@@ -141,17 +146,18 @@ export default function ProviderCreateAccountScreen() {
               <Text style={styles.countryCodeText}>+94</Text>
             </View>
 
-            <TextInput
-              style={styles.phoneInput}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
+            <View style={styles.phoneInputWrapper}>
+              <AppTextInput
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                style={styles.phoneInputInner}
+              />
+            </View>
           </View>
 
-          <Text style={styles.label}>Email Address</Text>
-          <TextInput
-            style={styles.input}
+          <AppTextInput
+            label="Email Address"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -160,19 +166,30 @@ export default function ProviderCreateAccountScreen() {
 
           <Text style={styles.label}>Primary Trade Category</Text>
           <TouchableOpacity style={styles.selectInput}>
-            <Text style={styles.selectText}>🔧 {category}</Text>
-            <Text style={styles.chevron}>⌄</Text>
+            <Ionicons
+              name="construct-outline"
+              size={16}
+              color={colors.textSecondary}
+              style={styles.selectLeadingIcon}
+            />
+            <Text style={styles.selectText}>{category}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <Text style={styles.label}>Service Coverage District</Text>
           <TouchableOpacity style={styles.selectInput}>
-            <Text style={styles.selectText}>📍 {district}</Text>
-            <Text style={styles.chevron}>⌄</Text>
+            <Ionicons
+              name="location-outline"
+              size={16}
+              color={colors.textSecondary}
+              style={styles.selectLeadingIcon}
+            />
+            <Text style={styles.selectText}>{district}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
-          <Text style={styles.label}>Create Password</Text>
-          <TextInput
-            style={styles.input}
+          <AppTextInput
+            label="Create Password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -180,16 +197,20 @@ export default function ProviderCreateAccountScreen() {
 
           <Text style={styles.passwordStatus}>Strong</Text>
 
-          <Text style={styles.label}>Confirm Password</Text>
-          <TextInput
-            style={styles.input}
+          <AppTextInput
+            label="Confirm Password"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
           />
 
-          <Text style={styles.passwordStatus}>
-            {password === confirmPassword ? "✓ Match" : "Passwords do not match"}
+          <Text
+            style={[
+              styles.passwordStatus,
+              password !== confirmPassword && styles.passwordStatusError,
+            ]}
+          >
+            {password === confirmPassword ? "Match" : "Passwords do not match"}
           </Text>
 
           <View style={styles.infoCard}>
@@ -204,7 +225,9 @@ export default function ProviderCreateAccountScreen() {
             onPress={() => setAgreed(!agreed)}
           >
             <View style={[styles.checkbox, agreed && styles.checkboxActive]}>
-              {agreed && <Text style={styles.check}>✓</Text>}
+              {agreed && (
+                <Ionicons name="checkmark" size={14} color={colors.white} />
+              )}
             </View>
 
             <Text style={styles.agreementText}>
@@ -212,27 +235,18 @@ export default function ProviderCreateAccountScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.continueButton,
-              (!agreed ||
-                password !== confirmPassword ||
-                loading) &&
-                styles.disabledButton,
-            ]}
-            disabled={
-              !agreed ||
-              password !== confirmPassword ||
+          <PrimaryButton
+            title={
               loading
+                ? "Creating Account..."
+                : "Continue to Document Verification"
             }
             onPress={continueToVerification}
-          >
-            <Text style={styles.continueText}>
-              {loading
-                ? "Creating Account..."
-                : "Continue to Document Verification →"}
-            </Text>
-          </TouchableOpacity>
+            loading={loading}
+            disabled={!agreed || password !== confirmPassword}
+            icon="arrow-forward"
+            style={styles.continueButton}
+          />
 
           <TouchableOpacity onPress={() => router.replace("/provider/login")}>
             <Text style={styles.loginText}>
@@ -242,19 +256,19 @@ export default function ProviderCreateAccountScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7FC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 40,
+    padding: spacing.lg + 2,
+    paddingBottom: spacing.xxxl + 8,
   },
 
   progressRow: {
@@ -266,47 +280,50 @@ const styles = StyleSheet.create({
   stepBadge: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: colors.primary,
   },
 
   proBadge: {
-    backgroundColor: "#1D4ED8",
-    color: "#FFFFFF",
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs - 1,
+    borderRadius: radius.sm - 2,
+  },
+
+  proBadgeText: {
+    color: colors.white,
     fontSize: 10,
     fontWeight: "800",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
   },
 
   heroCard: {
-    marginTop: 16,
-    borderRadius: 18,
-    padding: 18,
-    backgroundColor: "#0F214A",
+    marginTop: spacing.lg,
+    borderRadius: radius.xl,
+    padding: spacing.lg + 2,
+    backgroundColor: colors.textPrimary,
   },
 
   networkText: {
-    color: "#CBD5E1",
+    color: colors.borderStrong,
     fontSize: 12,
   },
 
   heroTitle: {
-    marginTop: 12,
+    marginTop: spacing.md,
     fontSize: 22,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: colors.white,
   },
 
   heroText: {
-    marginTop: 6,
+    marginTop: spacing.xs + 2,
     fontSize: 13,
     lineHeight: 20,
-    color: "#CBD5E1",
+    color: colors.borderStrong,
   },
 
   progressBar: {
-    marginTop: 16,
+    marginTop: spacing.lg,
     height: 5,
     borderRadius: 5,
     backgroundColor: "#334155",
@@ -316,80 +333,65 @@ const styles = StyleSheet.create({
     width: "50%",
     height: "100%",
     borderRadius: 5,
-    backgroundColor: "#93C5FD",
+    backgroundColor: colors.primarySoft,
   },
 
   progressLabels: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     flexDirection: "row",
     justifyContent: "space-between",
   },
 
   activeStep: {
-    color: "#FFFFFF",
+    color: colors.white,
     fontSize: 11,
     fontWeight: "700",
   },
 
   inactiveStep: {
-    color: "#94A3B8",
+    color: colors.textMuted,
     fontSize: 11,
   },
 
   formCard: {
-    marginTop: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
   },
 
   label: {
-    marginTop: 14,
-    marginBottom: 7,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  input: {
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 14,
-    color: "#0F172A",
+    ...typography.label,
+    marginTop: spacing.md + 2,
+    marginBottom: spacing.sm - 1,
   },
 
   phoneRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.sm,
   },
 
   countryCode: {
     width: 70,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 13,
-    backgroundColor: "#F8FAFC",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md + 1,
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
 
   countryCodeText: {
-    color: "#1D4ED8",
+    color: colors.primary,
     fontWeight: "700",
   },
 
-  phoneInput: {
+  phoneInputWrapper: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 13,
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+  },
+
+  phoneInputInner: {
+    marginBottom: 0,
   },
 
   selectInput: {
@@ -397,52 +399,57 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 13,
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md + 1,
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg - 2,
+    marginBottom: spacing.lg,
+  },
+
+  selectLeadingIcon: {
+    marginRight: spacing.sm,
   },
 
   selectText: {
     flex: 1,
     fontSize: 13,
-    color: "#0F172A",
-  },
-
-  chevron: {
-    color: "#64748B",
+    color: colors.textPrimary,
   },
 
   passwordStatus: {
-    marginTop: 5,
+    marginTop: spacing.xs,
     textAlign: "right",
-    color: "#059669",
+    color: colors.success,
     fontSize: 11,
     fontWeight: "700",
   },
 
+  passwordStatusError: {
+    color: colors.error,
+  },
+
   infoCard: {
-    marginTop: 18,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 14,
-    padding: 14,
+    marginTop: spacing.lg + 2,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
   },
 
   infoTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   infoText: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 11,
     lineHeight: 17,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   agreementRow: {
-    marginTop: 18,
+    marginTop: spacing.lg + 2,
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -450,58 +457,39 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: radius.sm - 2,
     borderWidth: 1,
-    borderColor: "#94A3B8",
+    borderColor: colors.textMuted,
     alignItems: "center",
     justifyContent: "center",
   },
 
   checkboxActive: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1D4ED8",
-  },
-
-  check: {
-    color: "#FFFFFF",
-    fontWeight: "800",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   agreementText: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: spacing.sm + 2,
     fontSize: 12,
     lineHeight: 18,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   continueButton: {
-    marginTop: 22,
-    backgroundColor: "#1D4ED8",
-    borderRadius: 13,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  disabledButton: {
-    backgroundColor: "#94A3B8",
-  },
-
-  continueText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
+    marginTop: spacing.xl + 2,
   },
 
   loginText: {
-    marginTop: 18,
+    marginTop: spacing.lg + 2,
     textAlign: "center",
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   loginLink: {
-    color: "#1D4ED8",
+    color: colors.primary,
     fontWeight: "700",
   },
 });

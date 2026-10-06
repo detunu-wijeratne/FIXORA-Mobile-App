@@ -1,30 +1,26 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import {
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import ScreenHeader from "../components/ScreenHeader";
+import { colors, radius, spacing, typography } from "../theme";
 
 export default function RoleSelectionScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <View>
-        <Text style={styles.title}>How would you like to continue?</Text>
-
-        <Text style={styles.subtitle}>
-          Choose your role to continue with FIXORA.
-        </Text>
-      </View>
+      <ScreenHeader
+        title="How would you like to continue?"
+        subtitle="Choose your role to continue with FIXORA."
+      />
 
       <View style={styles.options}>
         <TouchableOpacity
           style={styles.card}
           onPress={() => router.push("/customer-login")}
+          activeOpacity={0.8}
         >
           <View style={styles.iconCircle}>
-            <Text style={styles.icon}>👤</Text>
+            <Ionicons name="person-outline" size={26} color={colors.primary} />
           </View>
 
           <View style={styles.cardContent}>
@@ -33,14 +29,17 @@ export default function RoleSelectionScreen() {
               Find and book trusted home service professionals.
             </Text>
           </View>
+
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.card}
           onPress={() => router.push("/provider/login")}
+          activeOpacity={0.8}
         >
           <View style={styles.iconCircle}>
-            <Text style={styles.icon}>🛠️</Text>
+            <Ionicons name="briefcase-outline" size={26} color={colors.primary} />
           </View>
 
           <View style={styles.cardContent}>
@@ -49,6 +48,8 @@ export default function RoleSelectionScreen() {
               Manage jobs, requests and your service availability.
             </Text>
           </View>
+
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -58,68 +59,50 @@ export default function RoleSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 24,
-  },
-
-  title: {
-    marginTop: 40,
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 10,
-    color: "#64748B",
-    fontSize: 15,
-    lineHeight: 22,
+    backgroundColor: colors.background,
+    padding: spacing.xxl,
   },
 
   options: {
-    marginTop: 40,
-    gap: 18,
+    marginTop: spacing.lg,
+    gap: spacing.lg + 2,
   },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 18,
-    padding: 20,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
     flexDirection: "row",
     alignItems: "center",
+    minHeight: 88,
   },
 
   iconCircle: {
     width: 58,
     height: 58,
-    borderRadius: 18,
-    backgroundColor: "#DBEAFE",
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
-  },
-
-  icon: {
-    fontSize: 26,
+    marginRight: spacing.lg,
   },
 
   cardContent: {
     flex: 1,
+    marginRight: spacing.sm,
   },
 
   cardTitle: {
+    ...typography.cardTitle,
     fontSize: 17,
-    fontWeight: "700",
-    color: "#0F172A",
   },
 
   cardDescription: {
-    marginTop: 5,
+    ...typography.secondary,
+    marginTop: spacing.xs + 1,
     fontSize: 13,
     lineHeight: 19,
-    color: "#64748B",
   },
 });
