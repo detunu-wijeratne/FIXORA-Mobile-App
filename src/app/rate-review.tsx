@@ -3,9 +3,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 
 import {
-  addDoc,
   collection,
-  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -14,6 +12,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 
 import {
@@ -59,14 +58,23 @@ export default function RateReviewScreen() {
   const reviewId =
     typeof params.reviewId === "string" ? params.reviewId : "";
 
-  const isEditing = Boolean(reviewId);
+  const hasReviewIdParam = Boolean(reviewId);
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [loadingExisting, setLoadingExisting] = useState(isEditing);
+  const [loadingExisting, setLoadingExisting] = useState(hasReviewIdParam);
   const [blocked, setBlocked] = useState(false);
+
+  /*
+    isEditing starts true whenever a reviewId was passed in, but can
+    fall back to false if that reviewId turns out to be orphaned
+    (points at a review that no longer exists) - see the self-heal
+    branch below. This is state rather than a plain derived const
+    specifically so that fallback can happen mid-screen-life.
+  */
+  const [isEditing, setIsEditing] = useState(hasReviewIdParam);
 
   /*
     READ (edit mode): load the existing review so the customer
@@ -89,8 +97,29 @@ export default function RateReviewScreen() {
         const reviewSnapshot = await getDoc(doc(db, "reviews", reviewId));
 
         if (!reviewSnapshot.exists()) {
-          Alert.alert("Review Not Found", "This review no longer exists.");
-          setBlocked(true);
+          /*
+            Orphaned reference: the booking still points at a review
+            that no longer exists (e.g. it was deleted but, due to
+            the non-atomic write this fix replaces, the booking's
+            link to it never got cleared). Self-heal by clearing the
+            stale link and falling back to Create mode instead of
+            dead-ending the screen.
+          */
+          if (bookingId) {
+            try {
+              await updateDoc(doc(db, "bookings", bookingId), {
+                reviewId: deleteField(),
+                reviewed: false,
+                rating: deleteField(),
+                updatedAt: serverTimestamp(),
+              });
+            } catch (cleanupError) {
+              console.log("Stale review link cleanup error:", cleanupError);
+            }
+          }
+
+          setIsEditing(false);
+          setLoadingExisting(false);
           return;
         }
 
@@ -215,7 +244,15 @@ export default function RateReviewScreen() {
         return;
       }
 
-      const reviewRef = await addDoc(collection(db, "reviews"), {
+      /*
+        Create the review and link it to the booking in a single
+        atomic batch, so the booking can never end up "reviewed"
+        without a matching review document actually existing.
+      */
+      const reviewRef = doc(collection(db, "reviews"));
+      const batch = writeBatch(db);
+
+      batch.set(reviewRef, {
         bookingId,
 
         customerId: user.uid,
@@ -233,12 +270,14 @@ export default function RateReviewScreen() {
         updatedAt: serverTimestamp(),
       });
 
-      await updateDoc(doc(db, "bookings", bookingId), {
+      batch.update(doc(db, "bookings", bookingId), {
         reviewId: reviewRef.id,
         reviewed: true,
         rating,
         updatedAt: serverTimestamp(),
       });
+
+      await batch.commit();
 
       /*
         Recalculate provider rating
@@ -304,18 +343,26 @@ export default function RateReviewScreen() {
         return;
       }
 
-      await updateDoc(reviewRef, {
+      /*
+        Update the review and its mirrored rating on the booking in
+        a single atomic batch.
+      */
+      const batch = writeBatch(db);
+
+      batch.update(reviewRef, {
         rating,
         review: review.trim(),
         updatedAt: serverTimestamp(),
       });
 
       if (bookingId) {
-        await updateDoc(doc(db, "bookings", bookingId), {
+        batch.update(doc(db, "bookings", bookingId), {
           rating,
           updatedAt: serverTimestamp(),
         });
       }
+
+      await batch.commit();
 
       /*
         Recalculate provider rating now that this
@@ -382,22 +429,32 @@ export default function RateReviewScreen() {
                 return;
               }
 
-              await deleteDoc(reviewRef);
-
               /*
-                Let the customer submit a new review again:
-                clear the booking's review link and reset
-                the reviewed flag so booking-details.tsx goes
-                back to showing "Rate & Review".
+                Delete the review and clear the booking's review link
+                in a single atomic batch. This is the fix for the
+                Create -> Delete -> Create bug: previously these were
+                two separate writes, so if the second one ever failed
+                to apply, the review would be gone but the booking
+                would be left pointing at a reviewId that no longer
+                existed, permanently routing "Rate & Review" into a
+                dead-end edit screen instead of a fresh Create. With
+                a batch, both writes succeed or fail together, so
+                that inconsistent state can no longer occur.
               */
+              const batch = writeBatch(db);
+
+              batch.delete(reviewRef);
+
               if (bookingId) {
-                await updateDoc(doc(db, "bookings", bookingId), {
+                batch.update(doc(db, "bookings", bookingId), {
                   reviewId: deleteField(),
                   reviewed: false,
                   rating: deleteField(),
                   updatedAt: serverTimestamp(),
                 });
               }
+
+              await batch.commit();
 
               /*
                 Recalculate provider rating now that

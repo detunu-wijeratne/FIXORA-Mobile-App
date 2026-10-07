@@ -356,7 +356,7 @@ export default function BookingDetailsScreen() {
 
         {canReview && (
           <PrimaryButton
-            title="Rate & Review"
+            title={booking.reviewed ? "View / Edit Review" : "Rate & Review"}
             icon="star"
             style={styles.reviewButton}
             onPress={() =>
