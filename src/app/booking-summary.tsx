@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   addDoc,
@@ -11,6 +11,8 @@ import {
 } from "firebase/firestore";
 
 import {
+  AccessibilityInfo,
+  Animated,
   Image,
   ScrollView,
   StyleSheet,
@@ -28,6 +30,82 @@ export default function BookingSummaryScreen() {
   const params = useLocalSearchParams();
 
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const circleScale = useRef(new Animated.Value(0)).current;
+  const circleOpacity = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+
+  const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /*
+    Plays the success animation (or, with reduced motion enabled,
+    a brief static pause instead) and then calls onDone. Only ever
+    invoked AFTER Firestore has confirmed the booking was created.
+  */
+  const playSuccessAnimation = async (onDone: () => void) => {
+    let reduceMotionEnabled = false;
+
+    try {
+      reduceMotionEnabled = await AccessibilityInfo.isReduceMotionEnabled();
+    } catch (error) {
+      console.log("Reduce motion check failed:", error);
+    }
+
+    if (reduceMotionEnabled) {
+      circleOpacity.setValue(1);
+      circleScale.setValue(1);
+      checkScale.setValue(1);
+      textOpacity.setValue(1);
+
+      navigationTimeoutRef.current = setTimeout(onDone, 500);
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(circleOpacity, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.spring(circleScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.sequence([
+      Animated.delay(200),
+      Animated.spring(checkScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    Animated.sequence([
+      Animated.delay(450),
+      Animated.timing(textOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    navigationTimeoutRef.current = setTimeout(onDone, 1300);
+  };
 
   const providerId =
     typeof params.providerId === "string" ? params.providerId : "";
@@ -135,24 +213,33 @@ export default function BookingSummaryScreen() {
       /*
         Pass image URL to confirmation too.
       */
-      router.replace({
-        pathname: "/booking-confirmation",
-        params: {
-          bookingId: bookingRef.id,
-          name,
-          service,
-          price,
-          date,
-          time,
-          description,
-          address,
-          imageUrl,
-        },
-      });
+      const goToConfirmation = () => {
+        router.replace({
+          pathname: "/booking-confirmation",
+          params: {
+            bookingId: bookingRef.id,
+            name,
+            service,
+            price,
+            date,
+            time,
+            description,
+            address,
+            imageUrl,
+          },
+        });
+      };
+
+      /*
+        Firestore has confirmed the booking exists at this point.
+        Show the success animation, then continue to the existing
+        booking confirmation destination.
+      */
+      setShowSuccess(true);
+      playSuccessAnimation(goToConfirmation);
     } catch (error: any) {
       console.log("Booking creation error:", error);
       alert(error.message || "Unable to create booking.");
-    } finally {
       setLoading(false);
     }
   };
@@ -313,6 +400,31 @@ export default function BookingSummaryScreen() {
           loading={loading}
         />
       </View>
+
+      {showSuccess && (
+        <View style={styles.successOverlay}>
+          <Animated.View
+            style={[
+              styles.successCircle,
+              {
+                opacity: circleOpacity,
+                transform: [{ scale: circleScale }],
+              },
+            ]}
+          >
+            <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+              <Ionicons name="checkmark" size={46} color={colors.white} />
+            </Animated.View>
+          </Animated.View>
+
+          <Animated.View style={{ opacity: textOpacity, alignItems: "center" }}>
+            <Text style={styles.successTitle}>Booking Confirmed!</Text>
+            <Text style={styles.successSubtitle}>
+              Your service request has been sent to the provider.
+            </Text>
+          </Animated.View>
+        </View>
+      )}
       </SafeAreaView>
     </>
   );
@@ -513,5 +625,39 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     padding: spacing.lg,
+  },
+
+  successOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxl,
+  },
+
+  successCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xl,
+  },
+
+  successTitle: {
+    ...typography.pageTitle,
+    fontSize: 22,
+    textAlign: "center",
+  },
+
+  successSubtitle: {
+    ...typography.secondary,
+    marginTop: spacing.sm,
+    textAlign: "center",
   },
 });
