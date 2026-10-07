@@ -565,8 +565,14 @@ export default function ProviderProfileScreen() {
               style={styles.divider}
             />
 
-            <View
+            <TouchableOpacity
               style={styles.statItem}
+              activeOpacity={0.7}
+              onPress={() =>
+                router.push(
+                  "/provider/my-reviews"
+                )
+              }
             >
               <Text
                 style={styles.statValue}
@@ -579,7 +585,7 @@ export default function ProviderProfileScreen() {
               >
                 Reviews
               </Text>
-            </View>
+            </TouchableOpacity>
 
             <View
               style={styles.divider}

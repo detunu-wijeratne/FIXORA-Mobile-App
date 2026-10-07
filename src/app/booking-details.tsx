@@ -40,6 +40,9 @@ type Booking = {
   totalAmount?: number;
 
   status?: string;
+
+  reviewId?: string;
+  reviewed?: boolean;
 };
 
 export default function BookingDetailsScreen() {
@@ -520,12 +523,15 @@ export default function BookingDetailsScreen() {
                   service:
                     booking.service ||
                     "Home Service",
+                  reviewId: booking.reviewId || "",
                 },
               })
             }
           >
             <Text style={styles.reviewButtonText}>
-              ⭐ Rate & Review
+              {booking.reviewed
+                ? "⭐ View / Edit Review"
+                : "⭐ Rate & Review"}
             </Text>
           </TouchableOpacity>
         )}
