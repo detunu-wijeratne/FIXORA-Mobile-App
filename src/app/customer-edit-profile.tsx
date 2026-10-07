@@ -6,6 +6,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import CustomerBottomNav from "../components/CustomerBottomNav";
 
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -161,6 +162,8 @@ export default function CustomerEditProfileScreen() {
           style={styles.saveButton}
         />
       </ScrollView>
+
+      <CustomerBottomNav />
       </SafeAreaView>
     </>
   );

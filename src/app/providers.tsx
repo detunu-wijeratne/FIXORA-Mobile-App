@@ -1,5 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
+import CustomerBottomNav from "../components/CustomerBottomNav";
+
 
 import {
   collection,
@@ -272,6 +274,8 @@ export default function ProvidersScreen() {
           </>
         )}
       </ScrollView>
+
+      <CustomerBottomNav />
       </SafeAreaView>
     </>
   );
