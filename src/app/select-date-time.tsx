@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 
@@ -8,29 +9,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import BookingProgress from "../components/BookingProgress";
+import PrimaryButton from "../components/PrimaryButton";
+import { colors, radius, spacing, typography } from "../theme";
 
 export default function SelectDateTimeScreen() {
   const params = useLocalSearchParams();
 
   const providerId =
-    typeof params.providerId === "string"
-      ? params.providerId
-      : "";
+    typeof params.providerId === "string" ? params.providerId : "";
 
   const name =
-    typeof params.name === "string"
-      ? params.name
-      : "Service Provider";
+    typeof params.name === "string" ? params.name : "Service Provider";
 
   const service =
-    typeof params.service === "string"
-      ? params.service
-      : "Home Service";
+    typeof params.service === "string" ? params.service : "Home Service";
 
-  const price =
-    typeof params.price === "string"
-      ? params.price
-      : "2500";
+  const price = typeof params.price === "string" ? params.price : "2500";
 
   const dates = [
     { day: "Mon", date: "5" },
@@ -50,46 +47,34 @@ export default function SelectDateTimeScreen() {
     "4:00 PM",
   ];
 
-  const [selectedDate, setSelectedDate] =
-    useState("5");
-
-  const [selectedTime, setSelectedTime] =
-    useState("9:30 AM");
+  const [selectedDate, setSelectedDate] = useState("5");
+  const [selectedTime, setSelectedTime] = useState("9:30 AM");
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        contentContainerStyle={styles.scrollContent}
       >
+        <Text style={styles.title}>Book a Service</Text>
+
+        <BookingProgress currentStep={1} />
+
         <View style={styles.providerCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              👨‍🔧
-            </Text>
+            <Ionicons name="person" size={26} color={colors.primary} />
           </View>
 
           <View>
-            <Text style={styles.providerName}>
-              {name}
-            </Text>
-
-            <Text style={styles.providerService}>
-              {service}
-            </Text>
-
+            <Text style={styles.providerName}>{name}</Text>
+            <Text style={styles.providerService}>{service}</Text>
             <Text style={styles.price}>
-              From Rs.{" "}
-              {Number(price).toLocaleString()}
+              From Rs. {Number(price).toLocaleString()}
             </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>
-          Select a date
-        </Text>
+        <Text style={styles.sectionTitle}>Choose a date</Text>
 
         <ScrollView
           horizontal
@@ -97,38 +82,19 @@ export default function SelectDateTimeScreen() {
           contentContainerStyle={styles.dateRow}
         >
           {dates.map((item) => {
-            const selected =
-              selectedDate === item.date;
+            const selected = selectedDate === item.date;
 
             return (
               <TouchableOpacity
                 key={item.date}
-                style={[
-                  styles.dateCard,
-                  selected &&
-                    styles.selectedDateCard,
-                ]}
-                onPress={() =>
-                  setSelectedDate(item.date)
-                }
+                style={[styles.dateCard, selected && styles.selectedDateCard]}
+                onPress={() => setSelectedDate(item.date)}
               >
-                <Text
-                  style={[
-                    styles.dayText,
-                    selected &&
-                      styles.selectedText,
-                  ]}
-                >
+                <Text style={[styles.dayText, selected && styles.selectedText]}>
                   {item.day}
                 </Text>
 
-                <Text
-                  style={[
-                    styles.dateText,
-                    selected &&
-                      styles.selectedText,
-                  ]}
-                >
+                <Text style={[styles.dateText, selected && styles.selectedText]}>
                   {item.date}
                 </Text>
               </TouchableOpacity>
@@ -136,34 +102,19 @@ export default function SelectDateTimeScreen() {
           })}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>
-          Available time slots
-        </Text>
+        <Text style={styles.sectionTitle}>Available times</Text>
 
         <View style={styles.timeGrid}>
           {timeSlots.map((time) => {
-            const selected =
-              selectedTime === time;
+            const selected = selectedTime === time;
 
             return (
               <TouchableOpacity
                 key={time}
-                style={[
-                  styles.timeCard,
-                  selected &&
-                    styles.selectedTimeCard,
-                ]}
-                onPress={() =>
-                  setSelectedTime(time)
-                }
+                style={[styles.timeCard, selected && styles.selectedTimeCard]}
+                onPress={() => setSelectedTime(time)}
               >
-                <Text
-                  style={[
-                    styles.timeText,
-                    selected &&
-                      styles.selectedText,
-                  ]}
-                >
+                <Text style={[styles.timeText, selected && styles.selectedText]}>
                   {time}
                 </Text>
               </TouchableOpacity>
@@ -172,35 +123,24 @@ export default function SelectDateTimeScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>
-            Your selection
-          </Text>
+          <Text style={styles.summaryTitle}>Your selection</Text>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>
-              Date
-            </Text>
-
-            <Text style={styles.summaryValue}>
-              October {selectedDate}
-            </Text>
+            <Text style={styles.summaryLabel}>Date</Text>
+            <Text style={styles.summaryValue}>October {selectedDate}</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>
-              Time
-            </Text>
-
-            <Text style={styles.summaryValue}>
-              {selectedTime}
-            </Text>
+            <Text style={styles.summaryLabel}>Time</Text>
+            <Text style={styles.summaryValue}>{selectedTime}</Text>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.continueButton}
+        <PrimaryButton
+          title="Continue"
+          icon="arrow-forward"
           onPress={() =>
             router.push({
               pathname: "/job-details",
@@ -214,197 +154,176 @@ export default function SelectDateTimeScreen() {
               },
             })
           }
-        >
-          <Text style={styles.continueButtonText}>
-            Continue
-          </Text>
-        </TouchableOpacity>
+        />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 120,
   },
 
+  title: {
+    ...typography.pageTitle,
+    fontSize: 24,
+  },
+
   providerCard: {
+    marginTop: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 28,
-  },
-
   providerName: {
-    marginLeft: 14,
-    fontSize: 17,
+    marginLeft: spacing.md + 2,
+    fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   providerService: {
-    marginLeft: 14,
+    marginLeft: spacing.md + 2,
     marginTop: 3,
     fontSize: 13,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   price: {
-    marginLeft: 14,
-    marginTop: 5,
+    marginLeft: spacing.md + 2,
+    marginTop: spacing.xs + 1,
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563EB",
+    color: colors.primary,
   },
 
   sectionTitle: {
-    marginTop: 28,
-    marginBottom: 14,
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0F172A",
+    ...typography.sectionHeading,
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md + 2,
   },
 
   dateRow: {
-    gap: 10,
+    gap: spacing.sm + 2,
   },
 
   dateCard: {
     width: 62,
     height: 78,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
 
   selectedDateCard: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   dayText: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   dateText: {
-    marginTop: 6,
+    marginTop: spacing.xs + 2,
     fontSize: 20,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   selectedText: {
-    color: "#FFFFFF",
+    color: colors.white,
   },
 
   timeGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: spacing.md,
   },
 
   timeCard: {
     width: "47%",
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: spacing.md + 2,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     alignItems: "center",
   },
 
   selectedTimeCard: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   timeText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   summaryCard: {
-    marginTop: 30,
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: "#FFFFFF",
+    marginTop: spacing.xxl,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
   },
 
   summaryTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 12,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
 
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: spacing.sm + 2,
   },
 
   summaryLabel: {
     fontSize: 14,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   summaryValue: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    padding: 16,
-  },
-
-  continueButton: {
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  continueButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+    borderTopColor: colors.border,
+    padding: spacing.lg,
   },
 });

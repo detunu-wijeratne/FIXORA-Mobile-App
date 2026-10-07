@@ -1,33 +1,40 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import { colors, spacing } from "../theme";
 
 export default function CustomerBottomNav() {
   const pathname = usePathname();
 
-  const navItems = [
+  const navItems: {
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    activeIcon: keyof typeof Ionicons.glyphMap;
+    route: string;
+  }[] = [
     {
       label: "Home",
-      icon: "🏠",
+      icon: "home-outline",
+      activeIcon: "home",
       route: "/customer-home",
     },
     {
       label: "Services",
-      icon: "🛠️",
+      icon: "construct-outline",
+      activeIcon: "construct",
       route: "/services",
     },
     {
       label: "Bookings",
-      icon: "📅",
+      icon: "calendar-outline",
+      activeIcon: "calendar",
       route: "/my-bookings",
     },
     {
       label: "Profile",
-      icon: "👤",
+      icon: "person-outline",
+      activeIcon: "person",
       route: "/customer-profile",
     },
   ];
@@ -43,14 +50,13 @@ export default function CustomerBottomNav() {
             style={styles.navItem}
             onPress={() => router.replace(item.route)}
           >
-            <Text style={styles.navIcon}>{item.icon}</Text>
+            <Ionicons
+              name={isActive ? item.activeIcon : item.icon}
+              size={22}
+              color={isActive ? colors.primary : colors.textMuted}
+            />
 
-            <Text
-              style={[
-                styles.navText,
-                isActive && styles.navActive,
-              ]}
-            >
+            <Text style={[styles.navText, isActive && styles.navActive]}>
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -63,11 +69,11 @@ export default function CustomerBottomNav() {
 const styles = StyleSheet.create({
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    paddingTop: 10,
-    paddingBottom: 12,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm + 2,
+    paddingBottom: spacing.md,
     justifyContent: "space-around",
   },
 
@@ -76,18 +82,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  navIcon: {
-    fontSize: 20,
-  },
-
   navText: {
-    marginTop: 3,
+    marginTop: spacing.xs,
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textMuted,
   },
 
   navActive: {
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "700",
   },
 });

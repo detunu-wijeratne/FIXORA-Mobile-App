@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,8 +21,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type ChatMessage = {
   id: string;
@@ -34,14 +37,10 @@ export default function CustomerChatScreen() {
   const params = useLocalSearchParams();
 
   const bookingId =
-    typeof params.bookingId === "string"
-      ? params.bookingId
-      : "";
+    typeof params.bookingId === "string" ? params.bookingId : "";
 
   const provider =
-    typeof params.provider === "string"
-      ? params.provider
-      : "Service Provider";
+    typeof params.provider === "string" ? params.provider : "Service Provider";
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,37 +54,28 @@ export default function CustomerChatScreen() {
     }
 
     const messagesQuery = query(
-      collection(
-        db,
-        "chats",
-        bookingId,
-        "messages"
-      ),
+      collection(db, "chats", bookingId, "messages"),
       orderBy("createdAt", "asc")
     );
 
     const unsubscribe = onSnapshot(
       messagesQuery,
       (snapshot) => {
-        const loadedMessages: ChatMessage[] =
-          snapshot.docs.map((messageDoc) => ({
+        const loadedMessages: ChatMessage[] = snapshot.docs.map(
+          (messageDoc) => ({
             id: messageDoc.id,
             ...messageDoc.data(),
-          })) as ChatMessage[];
+          })
+        ) as ChatMessage[];
 
         setMessages(loadedMessages);
 
         setTimeout(() => {
-          flatListRef.current?.scrollToEnd({
-            animated: true,
-          });
+          flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       },
       (error) => {
-        console.log(
-          "Customer chat listener error:",
-          error
-        );
+        console.log("Customer chat listener error:", error);
       }
     );
 
@@ -112,206 +102,161 @@ export default function CustomerChatScreen() {
     try {
       setSending(true);
 
-      await addDoc(
-        collection(
-          db,
-          "chats",
-          bookingId,
-          "messages"
-        ),
-        {
-          text: message.trim(),
-          sender: "customer",
-          senderId: user.uid,
-          createdAt: serverTimestamp(),
-        }
-      );
+      await addDoc(collection(db, "chats", bookingId, "messages"), {
+        text: message.trim(),
+        sender: "customer",
+        senderId: user.uid,
+        createdAt: serverTimestamp(),
+      });
 
       setMessage("");
     } catch (error: any) {
-      console.log(
-        "Send customer message error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to send message."
-      );
+      console.log("Send customer message error:", error);
+      alert(error.message || "Unable to send message.");
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={
-        Platform.OS === "ios"
-          ? "padding"
-          : undefined
-      }
-    >
-      <View style={styles.providerHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            👨‍🔧
-          </Text>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={styles.providerHeader}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={20} color={colors.primary} />
+          </View>
+
+          <View>
+            <Text style={styles.providerName}>{provider}</Text>
+            <Text style={styles.onlineText}>Booking Chat</Text>
+          </View>
         </View>
 
-        <View>
-          <Text style={styles.providerName}>
-            {provider}
-          </Text>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.messageList,
+            messages.length === 0 && styles.emptyMessageList,
+          ]}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+          renderItem={({ item }) => {
+            const isCustomer = item.sender === "customer";
 
-          <Text style={styles.onlineText}>
-            Booking Chat
-          </Text>
-        </View>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.messageList,
-          messages.length === 0 &&
-            styles.emptyMessageList,
-        ]}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({
-            animated: true,
-          })
-        }
-        renderItem={({ item }) => {
-          const isCustomer =
-            item.sender === "customer";
-
-          return (
-            <View
-              style={[
-                styles.messageRow,
-                isCustomer
-                  ? styles.customerMessageRow
-                  : styles.providerMessageRow,
-              ]}
-            >
+            return (
               <View
                 style={[
-                  styles.messageBubble,
-                  isCustomer
-                    ? styles.customerBubble
-                    : styles.providerBubble,
+                  styles.messageRow,
+                  isCustomer ? styles.customerMessageRow : styles.providerMessageRow,
                 ]}
               >
-                <Text
+                <View
                   style={[
-                    styles.messageText,
-                    isCustomer
-                      ? styles.customerMessageText
-                      : styles.providerMessageText,
+                    styles.messageBubble,
+                    isCustomer ? styles.customerBubble : styles.providerBubble,
                   ]}
                 >
-                  {item.text}
-                </Text>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isCustomer
+                        ? styles.customerMessageText
+                        : styles.providerMessageText,
+                    ]}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
               </View>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubble-outline" size={36} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyText}>
+                Send a message to start the conversation.
+              </Text>
             </View>
-          );
-        }}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>
-              💬
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              No messages yet
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Send a message to start the
-              conversation.
-            </Text>
-          </View>
-        }
-      />
-
-      <View style={styles.inputArea}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#94A3B8"
-          value={message}
-          onChangeText={setMessage}
-          multiline
+          }
         />
 
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!message.trim() || sending) &&
-              styles.disabledButton,
-          ]}
-          onPress={sendMessage}
-          disabled={
-            !message.trim() || sending
-          }
-        >
-          <Text style={styles.sendText}>
-            {sending ? "..." : "Send"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        <View style={styles.inputArea}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type a message..."
+            placeholderTextColor={colors.textMuted}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!message.trim() || sending) && styles.disabledButton,
+            ]}
+            onPress={sendMessage}
+            disabled={!message.trim() || sending}
+          >
+            <Ionicons name="send" size={17} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
+  },
+
+  flex: {
+    flex: 1,
   },
 
   providerHeader: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 14,
+    backgroundColor: colors.surface,
+    padding: spacing.md + 2,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: colors.border,
+    gap: spacing.md,
   },
 
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EFF6FF",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 22,
-  },
-
   providerName: {
-    marginLeft: 12,
     fontSize: 15,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   onlineText: {
-    marginLeft: 12,
     marginTop: 2,
     fontSize: 11,
-    color: "#16A34A",
+    color: colors.success,
   },
 
   messageList: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
   },
 
   emptyMessageList: {
@@ -322,29 +267,25 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 30,
-  },
-
-  emptyIcon: {
-    fontSize: 36,
+    paddingHorizontal: spacing.xxl,
   },
 
   emptyTitle: {
-    marginTop: 10,
+    marginTop: spacing.md,
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   emptyText: {
-    marginTop: 5,
+    marginTop: spacing.xs + 1,
     fontSize: 12,
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   messageRow: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
     flexDirection: "row",
   },
 
@@ -358,20 +299,20 @@ const styles = StyleSheet.create({
 
   messageBubble: {
     maxWidth: "78%",
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
   },
 
   customerBubble: {
-    backgroundColor: "#2563EB",
+    backgroundColor: colors.primary,
     borderBottomRightRadius: 4,
   },
 
   providerBubble: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
     borderBottomLeftRadius: 4,
   },
 
@@ -381,46 +322,42 @@ const styles = StyleSheet.create({
   },
 
   customerMessageText: {
-    color: "#FFFFFF",
+    color: colors.white,
   },
 
   providerMessageText: {
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   inputArea: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 10,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
+    gap: spacing.sm + 2,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: colors.border,
   },
 
   input: {
     flex: 1,
     maxHeight: 110,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: "#0F172A",
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
+    color: colors.textPrimary,
   },
 
   sendButton: {
-    backgroundColor: "#2563EB",
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-  },
-
-  sendText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 14,
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   disabledButton: {

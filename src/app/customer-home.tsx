@@ -1,7 +1,4 @@
-import {
-  Ionicons,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 
 import { router } from "expo-router";
 
@@ -18,6 +15,7 @@ import { useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
+  Image,
   ImageBackground,
   ScrollView,
   StyleSheet,
@@ -29,8 +27,12 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import BookingCard from "../components/BookingCard";
 import CustomerBottomNav from "../components/CustomerBottomNav";
+import ProviderCard from "../components/ProviderCard";
+import ServiceCard from "../components/ServiceCard";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type Provider = {
   id: string;
@@ -45,6 +47,7 @@ type Provider = {
   reviewCount?: number;
   experience?: string;
   price?: number;
+  profileImageUrl?: string;
 };
 
 type Booking = {
@@ -62,80 +65,64 @@ type ReviewStats = {
   count: number;
 };
 
+const POPULAR_SERVICES = [
+  {
+    name: "Plumbing",
+    description: "Leaks, Taps, Pipe Fitting",
+    price: "From LKR 2,500",
+    image: require("../../assets/images/services/plumbing.png"),
+  },
+  {
+    name: "Electrical",
+    description: "Wiring, Fans, Breakers",
+    price: "From LKR 3,000",
+    image: require("../../assets/images/services/electrical.png"),
+  },
+  {
+    name: "AC Service",
+    description: "Gas Refill, Overhaul",
+    price: "From LKR 3,500",
+    image: require("../../assets/images/services/ac-service.png"),
+  },
+  {
+    name: "Cleaning",
+    description: "Deep, Sofa, Water Tank",
+    price: "From LKR 4,500",
+    image: require("../../assets/images/services/cleaning.png"),
+  },
+  {
+    name: "Painting",
+    description: "Interior, Waterproofing",
+    price: "From LKR 2,500",
+    image: require("../../assets/images/services/painting.png"),
+  },
+  {
+    name: "Carpentry",
+    description: "Repairs, Furniture & More",
+    price: "From LKR 2,500",
+    image: require("../../assets/images/services/carpentry.png"),
+  },
+  {
+    name: "Appliance Repair",
+    description: "Fridges, Washers & More",
+    image: require("../../assets/images/services/appliance-repair.png"),
+  },
+  {
+    name: "Gardening",
+    description: "Lawns, Trimming & Upkeep",
+    image: require("../../assets/images/services/gardening.png"),
+  },
+];
+
 export default function CustomerHomeScreen() {
-  const [providers, setProviders] =
-    useState<Provider[]>([]);
-
-  const [loadingProviders, setLoadingProviders] =
-    useState(true);
-
-  const [reviewStats, setReviewStats] =
-    useState<Record<string, ReviewStats>>({});
-
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+  const [reviewStats, setReviewStats] = useState<Record<string, ReviewStats>>({});
   const [search, setSearch] = useState("");
+  const [customerName, setCustomerName] = useState("Customer");
+  const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
 
-  const [customerName, setCustomerName] =
-    useState("Customer");
-
-  const [activeBooking, setActiveBooking] =
-    useState<Booking | null>(null);
-
-  const services = [
-    {
-      name: "Plumbing",
-      icon: "wrench",
-      description: "Leaks, Taps, Pipe Fitting",
-      price: "From LKR 2,500",
-      iconBackground: "#E0E7FF",
-      iconColor: "#2563EB",
-    },
-    {
-      name: "Electrical",
-      icon: "flash",
-      description: "Wiring, Fans, Breakers",
-      price: "From LKR 3,000",
-      iconBackground: "#FFEDD5",
-      iconColor: "#B45309",
-    },
-    {
-      name: "Cleaning",
-      icon: "broom",
-      description: "Deep, Sofa, Water Tank",
-      price: "From LKR 4,500",
-      iconBackground: "#D1FAE5",
-      iconColor: "#059669",
-    },
-    {
-      name: "AC Service",
-      icon: "fan",
-      description: "Gas Refill, Overhaul",
-      price: "From LKR 3,500",
-      iconBackground: "#DBEAFE",
-      iconColor: "#2563EB",
-    },
-    {
-      name: "Painting",
-      icon: "format-paint",
-      description: "Interior, Waterproofing",
-      price: "From LKR 2,500",
-      iconBackground: "#EDE9FE",
-      iconColor: "#4338CA",
-    },
-    {
-      name: "Carpentry",
-      icon: "hammer-wrench",
-      description: "Repairs, Furniture & More",
-      price: "From LKR 2,500",
-      iconBackground: "#E2E8F0",
-      iconColor: "#475569",
-    },
-  ];
-
-  const popular = [
-    "Emergency Leak",
-    "AC Service",
-    "Deep Cleaning",
-  ];
+  const popular = ["Emergency Leak", "AC Service", "Deep Cleaning"];
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -147,22 +134,14 @@ export default function CustomerHomeScreen() {
 
     const loadCustomer = async () => {
       try {
-        const customerDoc = await getDoc(
-          doc(db, "users", user.uid)
-        );
+        const customerDoc = await getDoc(doc(db, "users", user.uid));
 
         if (customerDoc.exists()) {
           const data = customerDoc.data();
-
-          setCustomerName(
-            data.name || "Customer"
-          );
+          setCustomerName(data.name || "Customer");
         }
       } catch (error) {
-        console.log(
-          "Customer profile load error:",
-          error
-        );
+        console.log("Customer profile load error:", error);
       }
     };
 
@@ -171,166 +150,107 @@ export default function CustomerHomeScreen() {
     /*
       PROVIDERS
     */
-
     const providersQuery = query(
       collection(db, "users"),
       where("role", "==", "provider")
     );
 
-    const unsubscribeProviders =
-      onSnapshot(
-        providersQuery,
-        (snapshot) => {
-          const loaded: Provider[] =
-            snapshot.docs
-              .map((providerDoc) => ({
-                id: providerDoc.id,
-                ...providerDoc.data(),
-              }))
-              .filter(
-                (provider: any) =>
-                  provider.accountStatus !==
-                  "disabled"
-              ) as Provider[];
+    const unsubscribeProviders = onSnapshot(
+      providersQuery,
+      (snapshot) => {
+        const loaded: Provider[] = snapshot.docs
+          .map((providerDoc) => ({
+            id: providerDoc.id,
+            ...providerDoc.data(),
+          }))
+          .filter(
+            (provider: any) => provider.accountStatus !== "disabled"
+          ) as Provider[];
 
-          setProviders(loaded);
-          setLoadingProviders(false);
-        },
-        (error) => {
-          console.log(
-            "Providers loading error:",
-            error
-          );
-
-          setLoadingProviders(false);
-        }
-      );
+        setProviders(loaded);
+        setLoadingProviders(false);
+      },
+      (error) => {
+        console.log("Providers loading error:", error);
+        setLoadingProviders(false);
+      }
+    );
 
     /*
       REAL REVIEWS
-      Calculate rating + review count
-      directly from reviews collection.
+      Calculate rating + review count directly from reviews collection.
     */
+    const unsubscribeReviews = onSnapshot(
+      collection(db, "reviews"),
+      (snapshot) => {
+        const totals: Record<string, { total: number; count: number }> = {};
 
-    const unsubscribeReviews =
-      onSnapshot(
-        collection(db, "reviews"),
-        (snapshot) => {
-          const totals: Record<
-            string,
-            {
-              total: number;
-              count: number;
-            }
-          > = {};
+        snapshot.docs.forEach((reviewDoc) => {
+          const data = reviewDoc.data();
+          const providerId = data.providerId;
 
-          snapshot.docs.forEach(
-            (reviewDoc) => {
-              const data =
-                reviewDoc.data();
+          if (!providerId) {
+            return;
+          }
 
-              const providerId =
-                data.providerId;
+          if (!totals[providerId]) {
+            totals[providerId] = { total: 0, count: 0 };
+          }
 
-              if (!providerId) {
-                return;
-              }
+          totals[providerId].total += Number(data.rating || 0);
+          totals[providerId].count += 1;
+        });
 
-              if (!totals[providerId]) {
-                totals[providerId] = {
-                  total: 0,
-                  count: 0,
-                };
-              }
+        const calculatedStats: Record<string, ReviewStats> = {};
 
-              totals[providerId].total +=
-                Number(data.rating || 0);
+        Object.keys(totals).forEach((providerId) => {
+          const providerTotal = totals[providerId];
 
-              totals[providerId].count += 1;
-            }
-          );
+          calculatedStats[providerId] = {
+            rating:
+              providerTotal.count > 0
+                ? providerTotal.total / providerTotal.count
+                : 0,
+            count: providerTotal.count,
+          };
+        });
 
-          const calculatedStats: Record<
-            string,
-            ReviewStats
-          > = {};
-
-          Object.keys(totals).forEach(
-            (providerId) => {
-              const providerTotal =
-                totals[providerId];
-
-              calculatedStats[
-                providerId
-              ] = {
-                rating:
-                  providerTotal.count >
-                  0
-                    ? providerTotal.total /
-                      providerTotal.count
-                    : 0,
-
-                count:
-                  providerTotal.count,
-              };
-            }
-          );
-
-          setReviewStats(
-            calculatedStats
-          );
-        },
-        (error) => {
-          console.log(
-            "Home reviews loading error:",
-            error
-          );
-        }
-      );
+        setReviewStats(calculatedStats);
+      },
+      (error) => {
+        console.log("Home reviews loading error:", error);
+      }
+    );
 
     /*
       CUSTOMER ACTIVE BOOKING
     */
-
     const bookingQuery = query(
       collection(db, "bookings"),
-      where(
-        "customerId",
-        "==",
-        user.uid
-      )
+      where("customerId", "==", user.uid)
     );
 
-    const unsubscribeBookings =
-      onSnapshot(
-        bookingQuery,
-        (snapshot) => {
-          const bookings: Booking[] =
-            snapshot.docs.map(
-              (bookingDoc) => ({
-                id: bookingDoc.id,
-                ...bookingDoc.data(),
-              })
-            ) as Booking[];
+    const unsubscribeBookings = onSnapshot(
+      bookingQuery,
+      (snapshot) => {
+        const bookings: Booking[] = snapshot.docs.map((bookingDoc) => ({
+          id: bookingDoc.id,
+          ...bookingDoc.data(),
+        })) as Booking[];
 
-          const current =
-            bookings.find(
-              (booking) =>
-                booking.status ===
-                  "confirmed" ||
-                booking.status ===
-                  "in_progress"
-            ) || null;
+        const current =
+          bookings.find(
+            (booking) =>
+              booking.status === "confirmed" ||
+              booking.status === "in_progress"
+          ) || null;
 
-          setActiveBooking(current);
-        },
-        (error) => {
-          console.log(
-            "Home active booking error:",
-            error
-          );
-        }
-      );
+        setActiveBooking(current);
+      },
+      (error) => {
+        console.log("Home active booking error:", error);
+      }
+    );
 
     return () => {
       unsubscribeProviders();
@@ -342,66 +262,28 @@ export default function CustomerHomeScreen() {
   /*
     OPEN PROVIDER
   */
-
-  const openProvider = (
-    provider: Provider
-  ) => {
-    const rating =
-      reviewStats[provider.id]
-        ?.rating ??
-      provider.rating ??
-      0;
-
-    const reviews =
-      reviewStats[provider.id]
-        ?.count ??
-      provider.reviewCount ??
-      0;
-
-    const price =
-      provider.price ?? 2500;
+  const openProvider = (provider: Provider) => {
+    const rating = reviewStats[provider.id]?.rating ?? provider.rating ?? 0;
+    const reviews = reviewStats[provider.id]?.count ?? provider.reviewCount ?? 0;
+    const price = provider.price ?? 2500;
 
     router.push({
       pathname: "/provider-profile",
-
       params: {
         providerId: provider.id,
-
-        name:
-          provider.name ||
-          "Service Provider",
-
-        service:
-          provider.category ||
-          "Home Service",
-
-        category:
-          provider.category || "",
-
-        district:
-          provider.district || "",
-
-        email:
-          provider.email || "",
-
-        phone:
-          provider.phone || "",
-
+        name: provider.name || "Service Provider",
+        service: provider.category || "Home Service",
+        category: provider.category || "",
+        district: provider.district || "",
+        email: provider.email || "",
+        phone: provider.phone || "",
         rating: String(rating),
-
         reviews: String(reviews),
-
-        experience:
-          provider.experience ||
-          "New provider",
-
+        experience: provider.experience || "New provider",
         price: String(price),
-
         verified:
-          provider.verificationStatus ===
-          "approved"
-            ? "true"
-            : "false",
+          provider.verificationStatus === "approved" ? "true" : "false",
+        profileImageUrl: provider.profileImageUrl || "",
       },
     });
   };
@@ -411,292 +293,108 @@ export default function CustomerHomeScreen() {
 
     router.push({
       pathname: "/providers",
-
       params: {
-        service:
-          value ||
-          "Service Providers",
+        service: value || "Service Providers",
       },
     });
   };
 
   /*
-    SORT TOP PROVIDERS USING
-    REAL REVIEW RATINGS
+    SORT TOP PROVIDERS USING REAL REVIEW RATINGS
   */
-
-  const topProviders = [
-    ...providers,
-  ]
+  const topProviders = [...providers]
     .sort((a, b) => {
-      const ratingA =
-        reviewStats[a.id]?.rating ??
-        a.rating ??
-        0;
-
-      const ratingB =
-        reviewStats[b.id]?.rating ??
-        b.rating ??
-        0;
-
+      const ratingA = reviewStats[a.id]?.rating ?? a.rating ?? 0;
+      const ratingB = reviewStats[b.id]?.rating ?? b.rating ?? 0;
       return ratingB - ratingA;
     })
     .slice(0, 2);
 
+  const greetingName =
+    customerName && customerName !== "Customer" ? customerName : "there";
+
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={["top"]}
-    >
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* HEADER */}
+        {/* HERO */}
 
-        <View style={styles.header}>
-          <View
-            style={styles.brandArea}
-          >
-            <View
-              style={styles.logoBox}
-            >
-              <Text
-                style={styles.logoLetter}
-              >
-                F
-              </Text>
+        <ImageBackground
+          source={require("../../assets/images/customer-home-hero.png")}
+          style={styles.hero}
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay} />
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.locationPill}>
+              <Ionicons name="location" size={14} color={colors.white} />
+              <Text style={styles.locationText}>Colombo</Text>
+              <Ionicons name="chevron-down" size={13} color={colors.white} />
             </View>
 
-            <Text
-              style={styles.logoText}
-            >
-              FIXORA
-            </Text>
+            <View style={styles.heroActions}>
+              <TouchableOpacity style={styles.notificationButton}>
+                <Ionicons name="notifications-outline" size={20} color={colors.white} />
+                <View style={styles.notificationDot} />
+              </TouchableOpacity>
 
-            <View
-              style={styles.logoDot}
-            />
-          </View>
-
-          <View
-            style={
-              styles.headerLocation
-            }
-          >
-            <View
-              style={styles.locationTop}
-            >
-              <Ionicons
-                name="location"
-                size={16}
-                color="#0D47C7"
-              />
-
-              <Text
-                style={
-                  styles.headerLocationText
-                }
+              <TouchableOpacity
+                style={styles.profileCircle}
+                onPress={() => router.push("/customer-profile")}
               >
-                Service Area
-              </Text>
-
-              <Ionicons
-                name="chevron-down"
-                size={14}
-                color="#475569"
-              />
+                <Ionicons name="person" size={18} color={colors.white} />
+              </TouchableOpacity>
             </View>
-
-            <Text
-              style={styles.activePros}
-            >
-              ● Pros Active
-            </Text>
           </View>
 
-          <View
-            style={
-              styles.headerActions
-            }
-          >
-            <TouchableOpacity
-              style={
-                styles.notificationButton
-              }
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color="#0F172A"
-              />
-
-              <View
-                style={
-                  styles.notificationDot
-                }
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={
-                styles.profileCircle
-              }
-              onPress={() =>
-                router.push(
-                  "/customer-profile"
-                )
-              }
-            >
-              <Text
-                style={
-                  styles.profileEmoji
-                }
-              >
-                👤
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* AREA */}
-
-        <View style={styles.areaRow}>
-          <TouchableOpacity
-            style={
-              styles.areaSelector
-            }
-          >
-            <Ionicons
-              name="navigate"
-              size={17}
-              color="#0D47C7"
-            />
-
-            <Text
-              style={styles.areaText}
-            >
-              Nearby Service Area
-            </Text>
-
-            <Ionicons
-              name="chevron-down"
-              size={15}
-              color="#475569"
-            />
-          </TouchableOpacity>
-
-          <View
-            style={
-              styles.dispatchBadge
-            }
-          >
-            <Ionicons
-              name="flash"
-              size={15}
-              color="#065F46"
-            />
-
-            <Text
-              style={
-                styles.dispatchText
-              }
-            >
-              Fast Dispatch
+          <View style={styles.heroTextBlock}>
+            <Text style={styles.greeting}>Hi {greetingName},</Text>
+            <Text style={styles.heroHeading}>
+              What do you need help with today?
             </Text>
           </View>
-        </View>
+        </ImageBackground>
 
         {/* SEARCH */}
 
-        <View
-          style={styles.searchBox}
-        >
-          <Ionicons
-            name="search"
-            size={21}
-            color="#64748B"
-          />
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
 
           <TextInput
-            style={
-              styles.searchInput
-            }
-            placeholder="Search plumbing, AC repair, cleaning..."
-            placeholderTextColor="#94A3B8"
+            style={styles.searchInput}
+            placeholder="Search for a service..."
+            placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
             returnKeyType="search"
-            onSubmitEditing={
-              handleSearch
-            }
+            onSubmitEditing={handleSearch}
           />
 
-          <Ionicons
-            name="mic-outline"
-            size={20}
-            color="#475569"
-          />
-
-          <TouchableOpacity
-            style={
-              styles.filterButton
-            }
-            onPress={handleSearch}
-          >
-            <Ionicons
-              name="options"
-              size={20}
-              color="#FFFFFF"
-            />
+          <TouchableOpacity style={styles.filterButton} onPress={handleSearch}>
+            <Ionicons name="options" size={18} color={colors.white} />
           </TouchableOpacity>
         </View>
 
-        <View
-          style={styles.popularRow}
-        >
-          <Text
-            style={
-              styles.popularLabel
-            }
-          >
-            Popular:
-          </Text>
+        <View style={styles.popularRow}>
+          <Text style={styles.popularLabel}>Popular:</Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {popular.map((item) => (
               <TouchableOpacity
                 key={item}
-                style={
-                  styles.popularChip
-                }
+                style={styles.popularChip}
                 onPress={() =>
                   router.push({
-                    pathname:
-                      "/providers",
-
-                    params: {
-                      service: item,
-                    },
+                    pathname: "/providers",
+                    params: { service: item },
                   })
                 }
               >
-                <Text
-                  style={
-                    styles.popularChipText
-                  }
-                >
-                  {item}
-                </Text>
+                <Text style={styles.popularChipText}>{item}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -705,110 +403,26 @@ export default function CustomerHomeScreen() {
         {/* ACTIVE BOOKING */}
 
         {activeBooking && (
-          <TouchableOpacity
-            style={
-              styles.activeBookingCard
-            }
-            onPress={() =>
-              router.push({
-                pathname:
-                  "/booking-details",
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionTitle}>Your active booking</Text>
 
-                params: {
-                  bookingId:
-                    activeBooking.id,
-                },
-              })
-            }
-          >
-            <View
-              style={
-                styles.activeBookingIcon
+            <BookingCard
+              service={activeBooking.service || "Home Service"}
+              providerName={activeBooking.providerName || "your provider"}
+              date={activeBooking.date}
+              status={
+                activeBooking.status === "in_progress"
+                  ? "in_progress"
+                  : "confirmed"
               }
-            >
-              <Text
-                style={
-                  styles.activeBookingEmoji
-                }
-              >
-                👨‍🔧
-              </Text>
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <View
-                style={
-                  styles.bookingMeta
-                }
-              >
-                <View
-                  style={
-                    styles.confirmedPill
-                  }
-                >
-                  <Text
-                    style={
-                      styles.confirmedPillText
-                    }
-                  >
-                    {activeBooking.status ===
-                    "in_progress"
-                      ? "IN PROGRESS"
-                      : "CONFIRMED"}
-                  </Text>
-                </View>
-
-                <Text
-                  style={
-                    styles.bookingDateText
-                  }
-                >
-                  {activeBooking.date
-                    ? `Oct ${activeBooking.date}`
-                    : ""}
-                </Text>
-              </View>
-
-              <Text
-                style={
-                  styles.activeBookingTitle
-                }
-              >
-                {activeBooking.service ||
-                  "Home Service"}
-              </Text>
-
-              <Text
-                style={
-                  styles.activeBookingProvider
-                }
-              >
-                with{" "}
-                {activeBooking.providerName ||
-                  "your provider"}
-              </Text>
-            </View>
-
-            <View
-              style={
-                styles.trackButton
+              onPress={() =>
+                router.push({
+                  pathname: "/booking-details",
+                  params: { bookingId: activeBooking.id },
+                })
               }
-            >
-              <Text
-                style={
-                  styles.trackButtonText
-                }
-              >
-                View
-              </Text>
-
-              <Ionicons
-                name="arrow-forward"
-                size={16}
-                color="#0D47C7"
-              />
-            </View>
-          </TouchableOpacity>
+            />
+          </View>
         )}
 
         {/* PROMO */}
@@ -816,626 +430,138 @@ export default function CustomerHomeScreen() {
         <ImageBackground
           source={require("../../assets/images/monsoon-banner.png")}
           style={styles.promoCard}
-          imageStyle={
-            styles.promoImage
-          }
+          imageStyle={styles.promoImage}
         >
-          <View
-            style={
-              styles.promoOverlay
-            }
-          >
-            <View
-              style={
-                styles.promoBadge
-              }
-            >
-              <Ionicons
-                name="flash"
-                size={14}
-                color="#78350F"
-              />
-
-              <Text
-                style={
-                  styles.promoBadgeText
-                }
-              >
-                Monsoon Special
-              </Text>
-            </View>
-
-            <Text
-              style={
-                styles.promoTitle
-              }
-            >
-              Monsoon Ready Homes 🌧️
+          <View style={styles.promoOverlay}>
+            <Text style={styles.promoTitle}>
+              Reliable home services{"\n"}for a better tomorrow.
             </Text>
 
-            <Text
-              style={
-                styles.promoText
-              }
+            <TouchableOpacity
+              style={styles.claimButton}
+              onPress={() => router.push("/services")}
             >
-              Get professional
-              waterproofing, plumbing and
-              home maintenance services.
-            </Text>
-
-            <View
-              style={
-                styles.promoBottom
-              }
-            >
-              <View
-                style={
-                  styles.verifiedPromo
-                }
-              >
-                <Ionicons
-                  name="shield-checkmark"
-                  size={17}
-                  color="#22C55E"
-                />
-
-                <Text
-                  style={
-                    styles.verifiedPromoText
-                  }
-                >
-                  Verified Fixora Pros
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={
-                  styles.claimButton
-                }
-                onPress={() =>
-                  router.push(
-                    "/services"
-                  )
-                }
-              >
-                <Text
-                  style={
-                    styles.claimButtonText
-                  }
-                >
-                  Explore
-                </Text>
-
-                <Ionicons
-                  name="arrow-forward"
-                  size={15}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.claimButtonText}>Book a Service</Text>
+              <Ionicons name="arrow-forward" size={15} color={colors.white} />
+            </TouchableOpacity>
           </View>
         </ImageBackground>
 
         {/* SERVICES */}
 
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <View>
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              Explore Services
-            </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Popular services</Text>
 
-            <Text
-              style={
-                styles.sectionSubtitle
-              }
-            >
-              Top-rated pros at upfront
-              LKR pricing
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={() =>
-              router.push("/services")
-            }
-          >
-            <Text
-              style={styles.viewAll}
-            >
-              View All ›
-            </Text>
+          <TouchableOpacity onPress={() => router.push("/services")}>
+            <Text style={styles.viewAll}>See all</Text>
           </TouchableOpacity>
         </View>
 
-        <View
-          style={
-            styles.servicesGrid
-          }
-        >
-          {services.map(
-            (service) => (
-              <TouchableOpacity
-                key={service.name}
-                style={
-                  styles.serviceCard
-                }
-                activeOpacity={0.8}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      "/providers",
-
-                    params: {
-                      service:
-                        service.name,
-                    },
-                  })
-                }
-              >
-                <View
-                  style={
-                    styles.serviceTop
-                  }
-                >
-                  <View
-                    style={[
-                      styles.serviceIconBox,
-                      {
-                        backgroundColor:
-                          service.iconBackground,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={
-                        service.icon as any
-                      }
-                      size={25}
-                      color={
-                        service.iconColor
-                      }
-                    />
-                  </View>
-
-                  <Ionicons
-                    name="arrow-up-outline"
-                    size={17}
-                    color="#64748B"
-                    style={{
-                      transform: [
-                        {
-                          rotate:
-                            "45deg",
-                        },
-                      ],
-                    }}
-                  />
-                </View>
-
-                <Text
-                  style={
-                    styles.serviceName
-                  }
-                >
-                  {service.name}
-                </Text>
-
-                <Text
-                  style={
-                    styles.serviceDescription
-                  }
-                >
-                  {service.description}
-                </Text>
-
-                <Text
-                  style={
-                    styles.servicePrice
-                  }
-                >
-                  {service.price}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+        <View style={styles.servicesGrid}>
+          {POPULAR_SERVICES.map((service) => (
+            <ServiceCard
+              key={service.name}
+              variant="grid"
+              name={service.name}
+              description={service.description}
+              price={service.price}
+              image={service.image}
+              style={styles.serviceCardWidth}
+              onPress={() =>
+                router.push({
+                  pathname: "/providers",
+                  params: { service: service.name },
+                })
+              }
+            />
+          ))}
         </View>
 
         {/* TRUST */}
 
-        <View
-          style={styles.trustStrip}
-        >
-          <View
-            style={styles.trustItem}
-          >
-            <Ionicons
-              name="shield-checkmark"
-              size={16}
-              color="#0D47C7"
-            />
-
-            <Text
-              style={
-                styles.trustText
-              }
-            >
-              Vetted
-            </Text>
+        <View style={styles.trustStrip}>
+          <View style={styles.trustItem}>
+            <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
+            <Text style={styles.trustText}>Vetted</Text>
           </View>
 
-          <View
-            style={
-              styles.trustDivider
-            }
-          />
+          <View style={styles.trustDivider} />
 
-          <View
-            style={styles.trustItem}
-          >
-            <Ionicons
-              name="flash"
-              size={16}
-              color="#D97706"
-            />
-
-            <Text
-              style={
-                styles.trustText
-              }
-            >
-              Transparent LKR
-            </Text>
+          <View style={styles.trustItem}>
+            <Ionicons name="flash" size={16} color={colors.warning} />
+            <Text style={styles.trustText}>Transparent LKR</Text>
           </View>
 
-          <View
-            style={
-              styles.trustDivider
-            }
-          />
+          <View style={styles.trustDivider} />
 
-          <View
-            style={styles.trustItem}
-          >
-            <Ionicons
-              name="shield"
-              size={16}
-              color="#047857"
-            />
-
-            <Text
-              style={
-                styles.trustText
-              }
-            >
-              Secure
-            </Text>
+          <View style={styles.trustItem}>
+            <Ionicons name="shield" size={16} color={colors.success} />
+            <Text style={styles.trustText}>Secure</Text>
           </View>
         </View>
 
         {/* PROVIDERS */}
 
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
+        <View style={styles.sectionHeader}>
           <View>
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              Top-Rated Pros Nearby
-            </Text>
-
-            <Text
-              style={
-                styles.sectionSubtitle
-              }
-            >
-              Available for service
-              bookings
+            <Text style={styles.sectionTitle}>Top-Rated Pros Nearby</Text>
+            <Text style={styles.sectionSubtitle}>
+              Available for service bookings
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                "/providers"
-              )
-            }
-          >
-            <Text
-              style={styles.viewAll}
-            >
-              Sort & Filter
-            </Text>
+          <TouchableOpacity onPress={() => router.push("/providers")}>
+            <Text style={styles.viewAll}>Sort & Filter</Text>
           </TouchableOpacity>
         </View>
 
         {loadingProviders ? (
-          <View
-            style={
-              styles.loadingProviders
-            }
-          >
-            <ActivityIndicator
-              color="#0D47C7"
-            />
+          <View style={styles.loadingProviders}>
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
-          <View
-            style={
-              styles.providerList
-            }
-          >
-            {topProviders.map(
-              (provider) => {
-                const price =
-                  provider.price ??
-                  2500;
+          <View style={styles.providerList}>
+            {topProviders.map((provider) => {
+              const price = provider.price ?? 2500;
+              const rating = reviewStats[provider.id]?.rating ?? provider.rating ?? 0;
+              const reviews =
+                reviewStats[provider.id]?.count ?? provider.reviewCount ?? 0;
 
-                const rating =
-                  reviewStats[
-                    provider.id
-                  ]?.rating ??
-                  provider.rating ??
-                  0;
-
-                const reviews =
-                  reviewStats[
-                    provider.id
-                  ]?.count ??
-                  provider.reviewCount ??
-                  0;
-
-                return (
-                  <TouchableOpacity
-                    key={
-                      provider.id
-                    }
-                    style={
-                      styles.providerCard
-                    }
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      openProvider(
-                        provider
-                      )
-                    }
-                  >
-                    <View
-                      style={
-                        styles.providerCardTop
-                      }
-                    >
-                      <View
-                        style={
-                          styles.providerAvatar
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.providerAvatarText
-                          }
-                        >
-                          👨‍🔧
-                        </Text>
-
-                        {provider.verificationStatus ===
-                          "approved" && (
-                          <View
-                            style={
-                              styles.providerVerified
-                            }
-                          >
-                            <Ionicons
-                              name="checkmark"
-                              size={
-                                10
-                              }
-                              color="#FFFFFF"
-                            />
-                          </View>
-                        )}
-                      </View>
-
-                      <View
-                        style={
-                          styles.providerDetails
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.providerName
-                          }
-                        >
-                          {provider.name ||
-                            "Service Provider"}
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.providerCategory
-                          }
-                        >
-                          {provider.category ||
-                            "Home Services"}
-                        </Text>
-
-                        <View
-                          style={
-                            styles.ratingRow
-                          }
-                        >
-                          <View
-                            style={
-                              styles.ratingBadge
-                            }
-                          >
-                            <Text
-                              style={
-                                styles.ratingText
-                              }
-                            >
-                              ⭐{" "}
-                              {rating >
-                              0
-                                ? rating.toFixed(
-                                    1
-                                  )
-                                : "New"}
-                            </Text>
-                          </View>
-
-                          <Text
-                            style={
-                              styles.reviewText
-                            }
-                          >
-                            (
-                            {
-                              reviews
-                            }{" "}
-                            reviews)
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View
-                        style={
-                          styles.distanceBadge
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.distanceText
-                          }
-                        >
-                          Nearby
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View
-                      style={
-                        styles.providerDivider
-                      }
-                    />
-
-                    <View
-                      style={
-                        styles.providerBottom
-                      }
-                    >
-                      <View>
-                        <Text
-                          style={
-                            styles.rateLabel
-                          }
-                        >
-                          Starting
-                          Rate
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.rateValue
-                          }
-                        >
-                          Rs.{" "}
-                          {Number(
-                            price
-                          ).toLocaleString()}
-                        </Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={
-                          styles.bookButton
-                        }
-                        onPress={() =>
-                          openProvider(
-                            provider
-                          )
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.bookButtonText
-                          }
-                        >
-                          Book Pro
-                        </Text>
-
-                        <Ionicons
-                          name="arrow-forward"
-                          size={17}
-                          color="#FFFFFF"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }
-            )}
+              return (
+                <ProviderCard
+                  key={provider.id}
+                  name={provider.name || "Service Provider"}
+                  category={provider.category || "Home Services"}
+                  district={provider.district}
+                  rating={rating}
+                  reviewCount={reviews}
+                  verified={provider.verificationStatus === "approved"}
+                  price={price}
+                  avatarUrl={provider.profileImageUrl}
+                  ctaLabel="Book Pro"
+                  onPress={() => openProvider(provider)}
+                />
+              );
+            })}
           </View>
         )}
 
         {/* COVERAGE */}
 
-        <View
-          style={
-            styles.coverageCard
-          }
-        >
+        <View style={styles.coverageCard}>
           <View style={{ flex: 1 }}>
-            <Text
-              style={
-                styles.coverageSmall
-              }
-            >
-              FAST DISPATCH NETWORK
-            </Text>
+            <Text style={styles.coverageSmall}>FAST DISPATCH NETWORK</Text>
 
-            <Text
-              style={
-                styles.coverageTitle
-              }
-            >
-              Fixora Service Network
-            </Text>
+            <Text style={styles.coverageTitle}>Fixora Service Network</Text>
 
-            <Text
-              style={
-                styles.coverageText
-              }
-            >
-              Find verified service
-              providers and book trusted
-              professionals through
-              Fixora.
+            <Text style={styles.coverageText}>
+              Find verified service providers and book trusted professionals
+              through Fixora.
             </Text>
           </View>
 
-          <View
-            style={
-              styles.coverageIconBox
-            }
-          >
-            <Ionicons
-              name="map-outline"
-              size={34}
-              color="#0D47C7"
-            />
+          <View style={styles.coverageIconBox}>
+            <Ionicons name="map-outline" size={34} color={colors.primary} />
           </View>
         </View>
       </ScrollView>
@@ -1448,83 +574,61 @@ export default function CustomerHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FF",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
     paddingBottom: 120,
   },
 
-  header: {
+  hero: {
+    height: 220,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+  },
+
+  heroImage: {
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+
+  heroOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(15,23,42,0.42)",
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
+  },
+
+  heroTopRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
   },
 
-  brandArea: {
+  locationPill: {
     flexDirection: "row",
     alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
   },
 
-  logoBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    backgroundColor: "#0D47C7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  logoLetter: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  logoText: {
-    marginLeft: 8,
-    fontSize: 17,
-    fontWeight: "900",
-    color: "#0F172A",
-  },
-
-  logoDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginLeft: 4,
-    backgroundColor: "#2563EB",
-  },
-
-  headerLocation: {
-    flex: 1,
-    marginLeft: 20,
-  },
-
-  locationTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  headerLocationText: {
+  locationText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.white,
   },
 
-  activePros: {
-    marginTop: 3,
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#047857",
-  },
-
-  headerActions: {
+  heroActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: spacing.sm + 2,
   },
 
   notificationButton: {
@@ -1534,380 +638,196 @@ const styles = StyleSheet.create({
   notificationDot: {
     position: "absolute",
     right: -1,
-    top: 0,
+    top: -1,
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: "#DC2626",
+    backgroundColor: colors.error,
   },
 
   profileCircle: {
-    width: 39,
-    height: 39,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#EFF6FF",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.22)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  profileEmoji: {
-    fontSize: 20,
+  heroTextBlock: {
+    marginTop: spacing.xxl,
   },
 
-  areaRow: {
-    marginTop: 16,
-    flexDirection: "row",
-    gap: 8,
+  greeting: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
   },
 
-  areaSelector: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 14,
-    backgroundColor: "#F1F5FF",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 13,
-    gap: 7,
-  },
-
-  areaText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#1E293B",
-  },
-
-  dispatchBadge: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#A7F3D0",
-  },
-
-  dispatchText: {
-    fontSize: 10,
+  heroHeading: {
+    marginTop: spacing.xs,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: "800",
-    color: "#065F46",
+    color: colors.white,
+    maxWidth: "88%",
   },
 
   searchBox: {
-    marginTop: 20,
+    marginTop: -26,
+    marginHorizontal: spacing.xl,
     minHeight: 54,
-    borderRadius: 17,
-    backgroundColor: "#FFFFFF",
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 15,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingLeft: spacing.lg - 1,
+    paddingRight: spacing.sm,
+    shadowColor: colors.textPrimary,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
   searchInput: {
     flex: 1,
-    marginLeft: 9,
-    paddingVertical: 14,
-    fontSize: 13,
-    color: "#0F172A",
+    marginLeft: spacing.sm + 1,
+    paddingVertical: spacing.md + 2,
+    fontSize: 14,
+    color: colors.textPrimary,
   },
 
   filterButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: "#0D47C7",
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 6,
   },
 
   popularRow: {
-    marginTop: 9,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xl,
     flexDirection: "row",
     alignItems: "center",
   },
 
   popularLabel: {
-    marginRight: 7,
-    fontSize: 10,
-    color: "#64748B",
+    marginRight: spacing.sm,
+    fontSize: 11,
+    color: colors.textSecondary,
   },
 
   popularChip: {
-    marginRight: 7,
-    backgroundColor: "#EEF2FF",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+    marginRight: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
   },
 
   popularChipText: {
-    fontSize: 9,
-    color: "#334155",
-  },
-
-  activeBookingCard: {
-    marginTop: 18,
-    padding: 15,
-    borderRadius: 19,
-    backgroundColor: "#1253D8",
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#0D47C7",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-
-  activeBookingIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    backgroundColor: "#E0E7FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 11,
-  },
-
-  activeBookingEmoji: {
-    fontSize: 27,
-  },
-
-  bookingMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  confirmedPill: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor:
-      "rgba(255,255,255,0.18)",
-  },
-
-  confirmedPillText: {
-    fontSize: 8,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-
-  bookingDateText: {
-    fontSize: 9,
-    color: "#DBEAFE",
-  },
-
-  activeBookingTitle: {
-    marginTop: 4,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-
-  activeBookingProvider: {
-    marginTop: 2,
     fontSize: 11,
-    color: "#DBEAFE",
+    color: colors.primary,
+    fontWeight: "600",
   },
 
-  trackButton: {
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    borderRadius: 13,
-    backgroundColor: "#FFFFFF",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  trackButtonText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#0D47C7",
+  sectionBlock: {
+    marginTop: spacing.xl,
+    marginHorizontal: spacing.xl,
   },
 
   promoCard: {
-    marginTop: 18,
-    height: 190,
-    borderRadius: 11,
+    marginTop: spacing.xl,
+    marginHorizontal: spacing.xl,
+    height: 150,
+    borderRadius: radius.lg,
     overflow: "hidden",
   },
 
   promoImage: {
-    borderRadius: 11,
+    borderRadius: radius.lg,
   },
 
   promoOverlay: {
     flex: 1,
-    padding: 18,
-    justifyContent: "flex-end",
-    backgroundColor:
-      "rgba(8, 18, 45, 0.38)",
-  },
-
-  promoBadge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: "#FBBF24",
-  },
-
-  promoBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#78350F",
+    padding: spacing.lg,
+    justifyContent: "space-between",
+    backgroundColor: "rgba(8, 18, 45, 0.45)",
   },
 
   promoTitle: {
-    marginTop: 15,
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-
-  promoText: {
-    marginTop: 5,
-    maxWidth: "90%",
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#CBD5E1",
-  },
-
-  promoBottom: {
-    marginTop: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  verifiedPromo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  verifiedPromoText: {
-    fontSize: 10,
-    color: "#E2E8F0",
+    fontSize: 19,
+    lineHeight: 25,
+    fontWeight: "800",
+    color: colors.white,
   },
 
   claimButton: {
-    backgroundColor: "#0D47C7",
-    borderRadius: 14,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
+    alignSelf: "flex-start",
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm + 3,
     flexDirection: "row",
-    gap: 4,
+    gap: spacing.xs,
     alignItems: "center",
   },
 
   claimButtonText: {
-    color: "#FFFFFF",
-    fontSize: 10,
+    color: colors.white,
+    fontSize: 12,
     fontWeight: "800",
   },
 
   sectionHeader: {
-    marginTop: 25,
-    marginBottom: 12,
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.xl,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
   },
 
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#172033",
+    ...typography.sectionHeading,
+    fontSize: 19,
   },
 
   sectionSubtitle: {
+    ...typography.caption,
     marginTop: 1,
-    fontSize: 10,
-    color: "#64748B",
   },
 
   viewAll: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#0D47C7",
+    color: colors.primary,
   },
 
   servicesGrid: {
+    marginHorizontal: spacing.xl,
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 12,
+    rowGap: spacing.md,
   },
 
-  serviceCard: {
+  serviceCardWidth: {
     width: "48.5%",
-    minHeight: 145,
-    borderRadius: 17,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 14,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.04,
-    shadowRadius: 7,
-    elevation: 1,
-  },
-
-  serviceTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  serviceIconBox: {
-    width: 45,
-    height: 45,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  serviceName: {
-    marginTop: 12,
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#172033",
-  },
-
-  serviceDescription: {
-    marginTop: 3,
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  servicePrice: {
-    marginTop: 8,
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#0D47C7",
   },
 
   trustStrip: {
-    marginTop: 15,
+    marginTop: spacing.lg,
+    marginHorizontal: spacing.xl,
     minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#F1F5FF",
-    paddingHorizontal: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1916,210 +836,71 @@ const styles = StyleSheet.create({
   trustItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
   },
 
   trustText: {
-    fontSize: 9,
-    color: "#334155",
+    fontSize: 10,
+    color: colors.textPrimary,
+    fontWeight: "600",
   },
 
   trustDivider: {
     height: 18,
     width: 1,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: colors.borderStrong,
   },
 
   loadingProviders: {
-    paddingVertical: 25,
+    marginHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
   },
 
   providerList: {
-    gap: 12,
-  },
-
-  providerCard: {
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 14,
-    shadowColor: "#0F172A",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  providerCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  providerAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: "#E0E7FF",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-
-  providerAvatarText: {
-    fontSize: 26,
-  },
-
-  providerVerified: {
-    position: "absolute",
-    right: -3,
-    bottom: -3,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#059669",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  providerDetails: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  providerName: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#172033",
-  },
-
-  providerCategory: {
-    marginTop: 2,
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  ratingRow: {
-    marginTop: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  ratingBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 7,
-  },
-
-  ratingText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#92400E",
-  },
-
-  reviewText: {
-    fontSize: 9,
-    color: "#64748B",
-  },
-
-  distanceBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#EEF2FF",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-
-  distanceText: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#1D4ED8",
-  },
-
-  providerDivider: {
-    height: 1,
-    backgroundColor: "#E2E8F0",
-    marginVertical: 12,
-  },
-
-  providerBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  rateLabel: {
-    fontSize: 9,
-    color: "#64748B",
-  },
-
-  rateValue: {
-    marginTop: 1,
-    fontSize: 16,
-    fontWeight: "900",
-    color: "#172033",
-  },
-
-  bookButton: {
-    minWidth: 105,
-    backgroundColor: "#0D47C7",
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-
-  bookButtonText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#FFFFFF",
+    marginHorizontal: spacing.xl,
+    gap: spacing.md,
   },
 
   coverageCard: {
-    marginTop: 24,
-    marginBottom: 5,
-    minHeight: 150,
-    borderRadius: 18,
-    padding: 18,
-    backgroundColor: "#E8EDFF",
+    marginTop: spacing.xxl,
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.xl,
+    minHeight: 140,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.primarySoft,
     flexDirection: "row",
     alignItems: "center",
   },
 
   coverageSmall: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "800",
-    color: "#0D47C7",
+    color: colors.primary,
   },
 
   coverageTitle: {
-    marginTop: 5,
+    marginTop: spacing.xs + 1,
     maxWidth: 190,
-    fontSize: 20,
+    fontSize: 19,
     lineHeight: 23,
     fontWeight: "800",
-    color: "#172033",
+    color: colors.textPrimary,
   },
 
   coverageText: {
-    marginTop: 6,
+    marginTop: spacing.xs + 2,
     maxWidth: 210,
-    fontSize: 10,
-    lineHeight: 15,
-    color: "#64748B",
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
 
   coverageIconBox: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: "#D5DEFF",
+    width: 60,
+    height: 60,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },

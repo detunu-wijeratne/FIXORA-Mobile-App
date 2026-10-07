@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 
@@ -14,37 +15,42 @@ import {
 
 import {
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import PrimaryButton from "../components/PrimaryButton";
+import ScreenHeader from "../components/ScreenHeader";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
+
+const RATING_LABELS: Record<number, string> = {
+  1: "Poor",
+  2: "Fair",
+  3: "Good",
+  4: "Very Good",
+  5: "Excellent",
+};
 
 export default function RateReviewScreen() {
   const params = useLocalSearchParams();
 
   const bookingId =
-    typeof params.bookingId === "string"
-      ? params.bookingId
-      : "";
+    typeof params.bookingId === "string" ? params.bookingId : "";
 
   const providerId =
-    typeof params.providerId === "string"
-      ? params.providerId
-      : "";
+    typeof params.providerId === "string" ? params.providerId : "";
 
   const provider =
-    typeof params.provider === "string"
-      ? params.provider
-      : "Provider";
+    typeof params.provider === "string" ? params.provider : "Provider";
 
   const service =
-    typeof params.service === "string"
-      ? params.service
-      : "Home Service";
+    typeof params.service === "string" ? params.service : "Home Service";
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
@@ -64,120 +70,82 @@ export default function RateReviewScreen() {
 
     const ratings = snapshot.docs.map((reviewDoc) => {
       const data = reviewDoc.data();
-
       return Number(data.rating || 0);
     });
 
     if (ratings.length === 0) {
-      await updateDoc(
-        doc(db, "users", providerId),
-        {
-          rating: 0,
-          reviewCount: 0,
-          updatedAt: serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, "users", providerId), {
+        rating: 0,
+        reviewCount: 0,
+        updatedAt: serverTimestamp(),
+      });
 
       return;
     }
 
-    const totalRating = ratings.reduce(
-      (total, value) => total + value,
-      0
-    );
+    const totalRating = ratings.reduce((total, value) => total + value, 0);
+    const averageRating = totalRating / ratings.length;
 
-    const averageRating =
-      totalRating / ratings.length;
+    await updateDoc(doc(db, "users", providerId), {
+      rating: averageRating,
+      reviewCount: ratings.length,
+      updatedAt: serverTimestamp(),
+    });
 
-    await updateDoc(
-      doc(db, "users", providerId),
-      {
-        rating: averageRating,
-        reviewCount: ratings.length,
-        updatedAt: serverTimestamp(),
-      }
-    );
-
-    console.log(
-      "Provider rating updated:",
-      averageRating,
-      ratings.length
-    );
+    console.log("Provider rating updated:", averageRating, ratings.length);
   };
 
   const handleSubmit = async () => {
     const user = auth.currentUser;
 
     if (!user) {
-      Alert.alert(
-        "Login Required",
-        "Please log in before submitting a review."
-      );
-
+      Alert.alert("Login Required", "Please log in before submitting a review.");
       router.replace("/customer-login");
       return;
     }
 
     if (!bookingId) {
-      Alert.alert(
-        "Error",
-        "Booking ID was not found."
-      );
-
+      Alert.alert("Error", "Booking ID was not found.");
       return;
     }
 
     if (!providerId) {
-      Alert.alert(
-        "Error",
-        "Provider ID was not found."
-      );
-
+      Alert.alert("Error", "Provider ID was not found.");
       return;
     }
 
     if (rating === 0) {
-      Alert.alert(
-        "Rating Required",
-        "Please select a star rating."
-      );
-
+      Alert.alert("Rating Required", "Please select a star rating.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const reviewRef = await addDoc(
-        collection(db, "reviews"),
-        {
-          bookingId,
+      const reviewRef = await addDoc(collection(db, "reviews"), {
+        bookingId,
 
-          customerId: user.uid,
-          customerEmail: user.email || "",
+        customerId: user.uid,
+        customerEmail: user.email || "",
 
-          providerId,
-          providerName: provider,
+        providerId,
+        providerName: provider,
 
-          service,
+        service,
 
-          rating,
-          review: review.trim(),
+        rating,
+        review: review.trim(),
 
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        }
-      );
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
-      await updateDoc(
-        doc(db, "bookings", bookingId),
-        {
-          reviewId: reviewRef.id,
-          reviewed: true,
-          rating,
-          updatedAt: serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, "bookings", bookingId), {
+        reviewId: reviewRef.id,
+        reviewed: true,
+        rating,
+        updatedAt: serverTimestamp(),
+      });
 
       /*
         Recalculate provider rating
@@ -191,219 +159,148 @@ export default function RateReviewScreen() {
         [
           {
             text: "Done",
-            onPress: () =>
-              router.replace("/my-bookings"),
+            onPress: () => router.replace("/my-bookings"),
           },
         ]
       );
     } catch (error: any) {
-      console.log(
-        "Review submission error:",
-        error
-      );
-
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Unable to submit your review."
-      );
+      console.log("Review submission error:", error);
+      Alert.alert("Error", error.message || "Unable to submit your review.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
-        Rate & Review
-      </Text>
-
-      <Text style={styles.subtitle}>
-        How was your experience with {provider}?
-      </Text>
-
-      <View style={styles.serviceCard}>
-        <Text style={styles.serviceLabel}>
-          Service
-        </Text>
-
-        <Text style={styles.serviceName}>
-          {service}
-        </Text>
-      </View>
-
-      <Text style={styles.ratingTitle}>
-        Your Rating
-      </Text>
-
-      <View style={styles.stars}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => setRating(star)}
-          >
-            <Text
-              style={[
-                styles.star,
-                star <= rating &&
-                  styles.selectedStar,
-              ]}
-            >
-              ★
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.ratingText}>
-        {rating === 1 && "Poor"}
-        {rating === 2 && "Fair"}
-        {rating === 3 && "Good"}
-        {rating === 4 && "Very Good"}
-        {rating === 5 && "Excellent"}
-      </Text>
-
-      <Text style={styles.label}>
-        Write a Review
-      </Text>
-
-      <TextInput
-        style={styles.reviewInput}
-        placeholder="Tell us about your experience..."
-        placeholderTextColor="#94A3B8"
-        multiline
-        textAlignVertical="top"
-        value={review}
-        onChangeText={setReview}
-      />
-
-      <TouchableOpacity
-        style={[
-          styles.submitButton,
-          (rating === 0 || loading) &&
-            styles.disabledButton,
-        ]}
-        disabled={rating === 0 || loading}
-        onPress={handleSubmit}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.submitButtonText}>
-          {loading
-            ? "Submitting Review..."
-            : "Submit Review"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+        <ScreenHeader
+          title="Rate & Review"
+          subtitle={`How was your experience with ${provider}?`}
+        />
+
+        <View style={styles.serviceCard}>
+          <Text style={styles.serviceLabel}>Service</Text>
+          <Text style={styles.serviceName}>{service}</Text>
+        </View>
+
+        <Text style={styles.ratingTitle}>Your Rating</Text>
+
+        <View style={styles.stars}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity key={star} onPress={() => setRating(star)}>
+              <Ionicons
+                name={star <= rating ? "star" : "star-outline"}
+                size={38}
+                color={star <= rating ? colors.warning : colors.borderStrong}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.ratingText}>{RATING_LABELS[rating] || ""}</Text>
+
+        <Text style={styles.label}>Write a Review</Text>
+
+        <TextInput
+          style={styles.reviewInput}
+          placeholder="Tell us about your experience..."
+          placeholderTextColor={colors.textMuted}
+          multiline
+          textAlignVertical="top"
+          value={review}
+          onChangeText={setReview}
+        />
+
+        <PrimaryButton
+          title={loading ? "Submitting Review..." : "Submit Review"}
+          onPress={handleSubmit}
+          loading={loading}
+          disabled={rating === 0}
+          style={styles.submitButton}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 20,
+    backgroundColor: colors.background,
   },
 
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#64748B",
+  scrollContent: {
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
   },
 
   serviceCard: {
-    marginTop: 22,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
   serviceLabel: {
-    fontSize: 11,
-    color: "#64748B",
+    ...typography.caption,
   },
 
   serviceName: {
-    marginTop: 4,
+    marginTop: spacing.xs + 1,
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   ratingTitle: {
-    marginTop: 28,
+    marginTop: spacing.xxl,
     textAlign: "center",
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   stars: {
-    marginTop: 15,
+    marginTop: spacing.lg - 1,
     flexDirection: "row",
     justifyContent: "center",
-    gap: 9,
-  },
-
-  star: {
-    fontSize: 38,
-    color: "#CBD5E1",
-  },
-
-  selectedStar: {
-    color: "#F59E0B",
+    gap: spacing.sm + 1,
   },
 
   ratingText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     textAlign: "center",
     fontSize: 13,
     fontWeight: "700",
-    color: "#64748B",
+    color: colors.textSecondary,
     minHeight: 20,
   },
 
   label: {
-    marginTop: 26,
-    marginBottom: 8,
+    marginTop: spacing.xxl - 2,
+    marginBottom: spacing.sm,
     fontSize: 14,
     fontWeight: "700",
-    color: "#334155",
+    color: colors.textPrimary,
   },
 
   reviewInput: {
     minHeight: 140,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 14,
-    padding: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
     fontSize: 14,
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   submitButton: {
-    marginTop: 20,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.5,
-  },
-
-  submitButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
+    marginTop: spacing.xl,
   },
 });

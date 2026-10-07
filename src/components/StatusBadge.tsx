@@ -5,8 +5,8 @@ import { colors, radius, spacing } from "../theme";
 
 export type StatusType =
   | "pending"
-  | "accepted"
-  | "inProgress"
+  | "confirmed"
+  | "in_progress"
   | "completed"
   | "cancelled"
   | "declined";
@@ -26,13 +26,13 @@ const STATUS_CONFIG: Record<
     color: colors.warning,
     background: colors.warningLight,
   },
-  accepted: {
-    label: "Accepted",
+  confirmed: {
+    label: "Confirmed",
     icon: "checkmark-circle-outline",
     color: colors.primary,
     background: colors.primarySoft,
   },
-  inProgress: {
+  in_progress: {
     label: "In Progress",
     icon: "sync-outline",
     color: colors.primary,

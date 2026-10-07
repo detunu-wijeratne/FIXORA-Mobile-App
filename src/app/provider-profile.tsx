@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 
@@ -10,14 +11,17 @@ import {
 } from "firebase/firestore";
 
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import PrimaryButton from "../components/PrimaryButton";
 import { db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type Review = {
   id: string;
@@ -31,144 +35,97 @@ export default function ProviderProfileScreen() {
   const params = useLocalSearchParams();
 
   const providerId =
-    typeof params.providerId === "string"
-      ? params.providerId
-      : "";
+    typeof params.providerId === "string" ? params.providerId : "";
 
   const name =
-    typeof params.name === "string"
-      ? params.name
-      : "Service Provider";
+    typeof params.name === "string" ? params.name : "Service Provider";
 
   const service =
-    typeof params.service === "string"
-      ? params.service
-      : "Home Service";
+    typeof params.service === "string" ? params.service : "Home Service";
 
   const district =
-    typeof params.district === "string"
-      ? params.district
-      : "Location not set";
+    typeof params.district === "string" ? params.district : "Location not set";
 
   const experience =
-    typeof params.experience === "string"
-      ? params.experience
-      : "New provider";
+    typeof params.experience === "string" ? params.experience : "New provider";
 
-  const price =
-    typeof params.price === "string"
-      ? params.price
-      : "2500";
+  const price = typeof params.price === "string" ? params.price : "2500";
 
-  const verified =
-    params.verified === "true";
+  const verified = params.verified === "true";
+
+  const profileImageUrl =
+    typeof params.profileImageUrl === "string" ? params.profileImageUrl : "";
 
   const initialRating =
-    typeof params.rating === "string"
-      ? Number(params.rating)
-      : 0;
+    typeof params.rating === "string" ? Number(params.rating) : 0;
 
   const initialReviews =
-    typeof params.reviews === "string"
-      ? Number(params.reviews)
-      : 0;
+    typeof params.reviews === "string" ? Number(params.reviews) : 0;
 
-  const [rating, setRating] =
-    useState(initialRating);
-
-  const [reviewCount, setReviewCount] =
-    useState(initialReviews);
-
-  const [reviews, setReviews] =
-    useState<Review[]>([]);
+  const [rating, setRating] = useState(initialRating);
+  const [reviewCount, setReviewCount] = useState(initialReviews);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     if (!providerId) {
       return;
     }
 
-    const providerRef = doc(
-      db,
-      "users",
-      providerId
-    );
+    const providerRef = doc(db, "users", providerId);
 
-    const unsubscribeProvider =
-      onSnapshot(
-        providerRef,
-        (snapshot) => {
-          if (!snapshot.exists()) {
-            return;
-          }
-
-          const data = snapshot.data();
-
-          setRating(
-            Number(data.rating || 0)
-          );
-
-          setReviewCount(
-            Number(data.reviewCount || 0)
-          );
-        },
-        (error) => {
-          console.log(
-            "Provider profile error:",
-            error
-          );
+    const unsubscribeProvider = onSnapshot(
+      providerRef,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          return;
         }
-      );
+
+        const data = snapshot.data();
+
+        setRating(Number(data.rating || 0));
+        setReviewCount(Number(data.reviewCount || 0));
+      },
+      (error) => {
+        console.log("Provider profile error:", error);
+      }
+    );
 
     const reviewsQuery = query(
       collection(db, "reviews"),
-      where(
-        "providerId",
-        "==",
-        providerId
-      )
+      where("providerId", "==", providerId)
     );
 
-    const unsubscribeReviews =
-      onSnapshot(
-        reviewsQuery,
-        (snapshot) => {
-          const loadedReviews: Review[] =
-            snapshot.docs.map(
-              (reviewDoc) => ({
-                id: reviewDoc.id,
-                ...reviewDoc.data(),
-              })
-            ) as Review[];
+    const unsubscribeReviews = onSnapshot(
+      reviewsQuery,
+      (snapshot) => {
+        const loadedReviews: Review[] = snapshot.docs.map((reviewDoc) => ({
+          id: reviewDoc.id,
+          ...reviewDoc.data(),
+        })) as Review[];
 
-          setReviews(loadedReviews);
+        setReviews(loadedReviews);
 
-          // REAL REVIEW COUNT
-          setReviewCount(loadedReviews.length);
+        // REAL REVIEW COUNT
+        setReviewCount(loadedReviews.length);
 
-          // REAL AVERAGE RATING
-          if (loadedReviews.length > 0) {
-            const totalRating =
-              loadedReviews.reduce(
-                (total, item) =>
-                  total + Number(item.rating || 0),
-                0
-              );
-
-            const averageRating =
-              totalRating / loadedReviews.length;
-
-            setRating(averageRating);
-          } else {
-            setRating(0);
-          }
-        },
-        (error) => {
-          console.log(
-            "Reviews loading error:",
-            error
+        // REAL AVERAGE RATING
+        if (loadedReviews.length > 0) {
+          const totalRating = loadedReviews.reduce(
+            (total, item) => total + Number(item.rating || 0),
+            0
           );
+
+          const averageRating = totalRating / loadedReviews.length;
+
+          setRating(averageRating);
+        } else {
+          setRating(0);
         }
-      );
+      },
+      (error) => {
+        console.log("Reviews loading error:", error);
+      }
+    );
 
     return () => {
       unsubscribeProvider();
@@ -177,281 +134,151 @@ export default function ProviderProfileScreen() {
   }, [providerId]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.profileSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              👨‍🔧
-            </Text>
-          </View>
+          {profileImageUrl ? (
+            <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={44} color={colors.primary} />
+            </View>
+          )}
 
-          <Text style={styles.name}>
-            {name}
-          </Text>
-
-          <Text style={styles.service}>
-            {service}
-          </Text>
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.service}>{service}</Text>
 
           {verified && (
-            <View
-              style={
-                styles.verifiedBadge
-              }
-            >
-              <Text
-                style={
-                  styles.verifiedText
-                }
-              >
-                ✓ Verified Provider
-              </Text>
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+              <Text style={styles.verifiedText}>Verified Provider</Text>
             </View>
           )}
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text
-                style={styles.statValue}
-              >
-                ⭐{" "}
-                {rating > 0
-                  ? rating.toFixed(1)
-                  : "New"}
-              </Text>
+              <View style={styles.statValueRow}>
+                <Ionicons name="star" size={14} color={colors.warning} />
+                <Text style={styles.statValue}>
+                  {rating > 0 ? rating.toFixed(1) : "New"}
+                </Text>
+              </View>
 
-              <Text
-                style={styles.statLabel}
-              >
-                {reviewCount}{" "}
-                {reviewCount === 1
-                  ? "review"
-                  : "reviews"}
+              <Text style={styles.statLabel}>
+                {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
               </Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text
-                style={styles.statValue}
-              >
+              <Text style={styles.statValue} numberOfLines={1}>
                 {experience}
               </Text>
 
-              <Text
-                style={styles.statLabel}
-              >
-                Experience
-              </Text>
+              <Text style={styles.statLabel}>Experience</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.statItem}>
-              <Text
-                style={styles.statValue}
-                numberOfLines={2}
-              >
+              <Text style={styles.statValue} numberOfLines={2}>
                 {district}
               </Text>
 
-              <Text
-                style={styles.statLabel}
-              >
-                District
-              </Text>
+              <Text style={styles.statLabel}>District</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            About
-          </Text>
+          <Text style={styles.sectionTitle}>About</Text>
 
           <Text style={styles.description}>
-            Experienced and reliable
-            professional providing quality
-            home services. Available for
-            repairs, installations and
-            general service requests.
+            Experienced and reliable professional providing quality home
+            services. Available for repairs, installations and general
+            service requests.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Service Details
-          </Text>
+          <Text style={styles.sectionTitle}>Service Details</Text>
 
           <View style={styles.detailCard}>
             <View style={styles.detailRow}>
-              <Text
-                style={styles.detailLabel}
-              >
-                Service
-              </Text>
+              <Text style={styles.detailLabel}>Service</Text>
+              <Text style={styles.detailValue}>{service}</Text>
+            </View>
 
-              <Text
-                style={styles.detailValue}
-              >
-                {service}
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Starting price</Text>
+              <Text style={styles.detailValue}>
+                Rs. {Number(price).toLocaleString()}
               </Text>
             </View>
 
             <View style={styles.detailRow}>
-              <Text
-                style={styles.detailLabel}
-              >
-                Starting price
-              </Text>
-
-              <Text
-                style={styles.detailValue}
-              >
-                Rs.{" "}
-                {Number(
-                  price
-                ).toLocaleString()}
-              </Text>
+              <Text style={styles.detailLabel}>District</Text>
+              <Text style={styles.detailValue}>{district}</Text>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text
-                style={styles.detailLabel}
-              >
-                District
-              </Text>
+            <View style={[styles.detailRow, styles.detailRowLast]}>
+              <Text style={styles.detailLabel}>Availability</Text>
 
-              <Text
-                style={styles.detailValue}
-              >
-                {district}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text
-                style={styles.detailLabel}
-              >
-                Availability
-              </Text>
-
-              <Text
-                style={styles.available}
-              >
-                Available
-              </Text>
+              <View style={styles.availabilityPill}>
+                <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+                <Text style={styles.available}>Available</Text>
+              </View>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <View
-            style={styles.sectionHeader}
-          >
-            <Text
-              style={styles.sectionTitle}
-            >
-              Reviews
-            </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Reviews</Text>
 
             <Text style={styles.reviewCountText}>
-              {reviewCount}{" "}
-              {reviewCount === 1
-                ? "review"
-                : "reviews"}
+              {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
             </Text>
           </View>
 
           {reviews.length === 0 ? (
-            <View
-              style={styles.reviewCard}
-            >
-              <Text
-                style={
-                  styles.noReviewText
-                }
-              >
-                Reviews will appear here
-                after customers complete
-                services.
+            <View style={styles.reviewCard}>
+              <Text style={styles.noReviewText}>
+                Reviews will appear here after customers complete services.
               </Text>
             </View>
           ) : (
             reviews.map((item) => (
-              <View
-                key={item.id}
-                style={styles.reviewCard}
-              >
-                <View
-                  style={
-                    styles.reviewHeader
-                  }
-                >
+              <View key={item.id} style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
                   <View>
-                    <Text
-                      style={
-                        styles.reviewerName
-                      }
-                    >
-                      Customer
-                    </Text>
+                    <Text style={styles.reviewerName}>Customer</Text>
 
-                    <Text
-                      style={
-                        styles.reviewerEmail
-                      }
-                    >
-                      {item.customerEmail ||
-                        "Verified customer"}
+                    <Text style={styles.reviewerEmail}>
+                      {item.customerEmail || "Verified customer"}
                     </Text>
                   </View>
 
-                  <Text
-                    style={
-                      styles.reviewRating
-                    }
-                  >
-                    ⭐{" "}
-                    {Number(
-                      item.rating || 0
-                    ).toFixed(1)}
-                  </Text>
+                  <View style={styles.reviewRatingRow}>
+                    <Ionicons name="star" size={13} color={colors.warning} />
+                    <Text style={styles.reviewRating}>
+                      {Number(item.rating || 0).toFixed(1)}
+                    </Text>
+                  </View>
                 </View>
 
                 {item.review ? (
-                  <Text
-                    style={
-                      styles.reviewMessage
-                    }
-                  >
-                    {item.review}
-                  </Text>
+                  <Text style={styles.reviewMessage}>{item.review}</Text>
                 ) : (
-                  <Text
-                    style={
-                      styles.noWrittenReview
-                    }
-                  >
-                    No written review.
-                  </Text>
+                  <Text style={styles.noWrittenReview}>No written review.</Text>
                 )}
 
                 {item.service && (
-                  <Text
-                    style={
-                      styles.reviewService
-                    }
-                  >
-                    Service: {item.service}
-                  </Text>
+                  <Text style={styles.reviewService}>Service: {item.service}</Text>
                 )}
               </View>
             ))
@@ -461,26 +288,18 @@ export default function ProviderProfileScreen() {
 
       <View style={styles.bottomBar}>
         <View>
-          <Text style={styles.bottomLabel}>
-            Starting from
-          </Text>
-
+          <Text style={styles.bottomLabel}>Starting from</Text>
           <Text style={styles.bottomPrice}>
-            Rs.{" "}
-            {Number(
-              price
-            ).toLocaleString()}
+            Rs. {Number(price).toLocaleString()}
           </Text>
         </View>
 
-        <TouchableOpacity
+        <PrimaryButton
+          title="Book Service"
           style={styles.bookButton}
-          activeOpacity={0.8}
           onPress={() =>
             router.push({
-              pathname:
-                "/select-date-time",
-
+              pathname: "/select-date-time",
               params: {
                 providerId,
                 name,
@@ -489,24 +308,16 @@ export default function ProviderProfileScreen() {
               },
             })
           }
-        >
-          <Text
-            style={
-              styles.bookButtonText
-            }
-          >
-            Book Now
-          </Text>
-        </TouchableOpacity>
+        />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
@@ -514,55 +325,61 @@ const styles = StyleSheet.create({
   },
 
   profileSection: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 24,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl + 4,
+    paddingBottom: spacing.xl,
   },
 
   avatar: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 42,
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.primarySoft,
   },
 
   name: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     fontSize: 24,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   service: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 15,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   verifiedBadge: {
-    marginTop: 10,
-    backgroundColor: "#DBEAFE",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    marginTop: spacing.sm + 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
   },
 
   verifiedText: {
     fontSize: 12,
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "700",
   },
 
   statsRow: {
-    marginTop: 24,
+    marginTop: spacing.xl,
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
@@ -572,65 +389,73 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     alignItems: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xs,
+  },
+
+  statValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
 
   statValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
     textAlign: "center",
   },
 
   statLabel: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 11,
-    color: "#94A3B8",
+    color: colors.textMuted,
   },
 
   divider: {
     width: 1,
     height: 35,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.border,
   },
 
   section: {
-    marginTop: 12,
-    backgroundColor: "#FFFFFF",
-    padding: 20,
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    padding: spacing.xl,
   },
 
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0F172A",
+    ...typography.sectionHeading,
   },
 
   description: {
-    marginTop: 10,
+    marginTop: spacing.sm + 2,
     fontSize: 14,
     lineHeight: 22,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   detailCard: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
-    padding: 16,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
   },
 
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: spacing.md + 2,
+  },
+
+  detailRowLast: {
+    marginBottom: 0,
   },
 
   detailLabel: {
     fontSize: 14,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   detailValue: {
@@ -638,16 +463,22 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
+  },
+
+  availabilityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
 
   available: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#16A34A",
+    color: colors.success,
   },
 
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -656,22 +487,22 @@ const styles = StyleSheet.create({
   reviewCountText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563EB",
+    color: colors.primary,
   },
 
   reviewCard: {
-    marginTop: 14,
+    marginTop: spacing.md + 2,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
-    padding: 14,
-    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
+    backgroundColor: colors.surface,
   },
 
   noReviewText: {
     fontSize: 13,
     lineHeight: 20,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   reviewHeader: {
@@ -683,40 +514,46 @@ const styles = StyleSheet.create({
   reviewerName: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   reviewerEmail: {
     marginTop: 2,
     fontSize: 10,
-    color: "#94A3B8",
+    color: colors.textMuted,
+  },
+
+  reviewRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
 
   reviewRating: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: colors.textPrimary,
   },
 
   reviewMessage: {
-    marginTop: 12,
+    marginTop: spacing.md,
     fontSize: 13,
     lineHeight: 20,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   noWrittenReview: {
-    marginTop: 12,
+    marginTop: spacing.md,
     fontSize: 12,
     fontStyle: "italic",
-    color: "#94A3B8",
+    color: colors.textMuted,
   },
 
   reviewService: {
-    marginTop: 10,
+    marginTop: spacing.sm + 2,
     fontSize: 10,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   bottomBar: {
@@ -727,35 +564,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md + 2,
   },
 
   bottomLabel: {
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   bottomPrice: {
     marginTop: 2,
     fontSize: 17,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   bookButton: {
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 34,
-  },
-
-  bookButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
+    paddingHorizontal: spacing.xxl,
+    minHeight: 48,
   },
 });

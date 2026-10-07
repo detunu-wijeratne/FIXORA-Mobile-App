@@ -1,23 +1,21 @@
 import { router } from "expo-router";
 import {
-    doc,
-    getDoc,
-    serverTimestamp,
-    updateDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
-import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppTextInput from "../components/AppTextInput";
+import LoadingState from "../components/LoadingState";
+import PrimaryButton from "../components/PrimaryButton";
+import ScreenHeader from "../components/ScreenHeader";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 export default function CustomerEditProfileScreen() {
   const [name, setName] = useState("");
@@ -36,9 +34,7 @@ export default function CustomerEditProfileScreen() {
           return;
         }
 
-        const customerDoc = await getDoc(
-          doc(db, "users", user.uid)
-        );
+        const customerDoc = await getDoc(doc(db, "users", user.uid));
 
         if (!customerDoc.exists()) {
           alert("Customer profile not found.");
@@ -50,15 +46,8 @@ export default function CustomerEditProfileScreen() {
         setName(data.name || "");
         setPhone(data.phone || "");
       } catch (error: any) {
-        console.log(
-          "Error loading customer profile:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load profile."
-        );
+        console.log("Error loading customer profile:", error);
+        alert(error.message || "Unable to load profile.");
       } finally {
         setLoading(false);
       }
@@ -88,28 +77,17 @@ export default function CustomerEditProfileScreen() {
         return;
       }
 
-      await updateDoc(
-        doc(db, "users", user.uid),
-        {
-          name: name.trim(),
-          phone: phone.trim(),
-          updatedAt: serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, "users", user.uid), {
+        name: name.trim(),
+        phone: phone.trim(),
+        updatedAt: serverTimestamp(),
+      });
 
       alert("Profile updated successfully.");
-
       router.back();
     } catch (error: any) {
-      console.log(
-        "Customer profile update error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to update profile."
-      );
+      console.log("Customer profile update error:", error);
+      alert(error.message || "Unable to update profile.");
     } finally {
       setSaving(false);
     }
@@ -117,61 +95,39 @@ export default function CustomerEditProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text style={styles.loadingText}>
-          Loading profile...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <LoadingState label="Loading profile..." />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          Edit Profile
-        </Text>
+        <ScreenHeader
+          title="Edit Profile"
+          subtitle="Update your personal information."
+        />
 
-        <Text style={styles.subtitle}>
-          Update your personal information.
-        </Text>
-
-        <Text style={styles.label}>
-          Full Name
-        </Text>
-
-        <TextInput
-          style={styles.input}
+        <AppTextInput
+          label="Full Name"
           value={name}
           onChangeText={setName}
           placeholder="Enter your full name"
-          placeholderTextColor="#94A3B8"
         />
 
-        <Text style={styles.label}>
-          Phone Number
-        </Text>
-
-        <TextInput
-          style={styles.input}
+        <AppTextInput
+          label="Phone Number"
           value={phone}
           onChangeText={setPhone}
           placeholder="Enter phone number"
-          placeholderTextColor="#94A3B8"
           keyboardType="phone-pad"
         />
 
-        <Text style={styles.label}>
-          Email
-        </Text>
+        <Text style={styles.label}>Email</Text>
 
         <View style={styles.disabledInput}>
           <Text style={styles.disabledText}>
@@ -184,144 +140,82 @@ export default function CustomerEditProfileScreen() {
         </Text>
 
         <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>
-            Profile Information
-          </Text>
+          <Text style={styles.noteTitle}>Profile Information</Text>
 
           <Text style={styles.noteText}>
-            Your updated name and phone number will be used for future bookings.
+            Your updated name and phone number will be used for future
+            bookings.
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.saveButton,
-            saving && styles.disabledButton,
-          ]}
+        <PrimaryButton
+          title={saving ? "Saving..." : "Save Changes"}
           onPress={handleSave}
-          disabled={saving}
-        >
-          <Text style={styles.saveButtonText}>
-            {saving
-              ? "Saving..."
-              : "Save Changes"}
-          </Text>
-        </TouchableOpacity>
+          loading={saving}
+          style={styles.saveButton}
+        />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loadingText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: "#64748B",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 40,
   },
 
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#64748B",
-  },
-
   label: {
-    marginTop: 22,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#334155",
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 14,
-    color: "#0F172A",
+    ...typography.label,
+    marginBottom: spacing.sm,
   },
 
   disabledInput: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.border,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md + 2,
   },
 
   disabledText: {
     fontSize: 14,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   emailNote: {
-    marginTop: 6,
+    marginTop: spacing.xs + 2,
     fontSize: 11,
-    color: "#94A3B8",
+    color: colors.textMuted,
   },
 
   noteBox: {
-    marginTop: 24,
-    padding: 15,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 14,
+    marginTop: spacing.xl,
+    padding: spacing.lg - 1,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
   },
 
   noteTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: colors.primary,
   },
 
   noteText: {
-    marginTop: 5,
+    marginTop: spacing.xs + 1,
     fontSize: 12,
     lineHeight: 18,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   saveButton: {
-    marginTop: 28,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
+    marginTop: spacing.xxl,
   },
 });
