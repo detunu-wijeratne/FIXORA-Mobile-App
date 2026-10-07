@@ -1,14 +1,12 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 
-import {
-  collection,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 
 import { useEffect, useState } from "react";
 
 import {
-  ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,8 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import BookingProgress from "../components/BookingProgress";
+import EmptyState from "../components/EmptyState";
+import LoadingState from "../components/LoadingState";
+import PrimaryButton from "../components/PrimaryButton";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type SavedLocation = {
   id: string;
@@ -29,39 +33,22 @@ export default function ServiceLocationScreen() {
   const params = useLocalSearchParams();
 
   const providerId =
-    typeof params.providerId === "string"
-      ? params.providerId
-      : "";
+    typeof params.providerId === "string" ? params.providerId : "";
 
   const name =
-    typeof params.name === "string"
-      ? params.name
-      : "Service Provider";
+    typeof params.name === "string" ? params.name : "Service Provider";
 
   const service =
-    typeof params.service === "string"
-      ? params.service
-      : "Home Service";
+    typeof params.service === "string" ? params.service : "Home Service";
 
-  const price =
-    typeof params.price === "string"
-      ? params.price
-      : "2500";
+  const price = typeof params.price === "string" ? params.price : "2500";
 
-  const date =
-    typeof params.date === "string"
-      ? params.date
-      : "5";
+  const date = typeof params.date === "string" ? params.date : "5";
 
-  const time =
-    typeof params.time === "string"
-      ? params.time
-      : "9:30 AM";
+  const time = typeof params.time === "string" ? params.time : "9:30 AM";
 
   const description =
-    typeof params.description === "string"
-      ? params.description
-      : "";
+    typeof params.description === "string" ? params.description : "";
 
   /*
     Real Cloudinary image URL.
@@ -69,21 +56,12 @@ export default function ServiceLocationScreen() {
     https://res.cloudinary.com/.../image/upload/...
   */
   const imageUrl =
-    typeof params.imageUrl === "string"
-      ? params.imageUrl
-      : "";
+    typeof params.imageUrl === "string" ? params.imageUrl : "";
 
-  const [savedLocations, setSavedLocations] =
-    useState<SavedLocation[]>([]);
-
-  const [selectedLocation, setSelectedLocation] =
-    useState("");
-
-  const [address, setAddress] =
-    useState("");
-
-  const [loadingLocations, setLoadingLocations] =
-    useState(true);
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [address, setAddress] = useState("");
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -93,45 +71,29 @@ export default function ServiceLocationScreen() {
       return;
     }
 
-    const locationsRef = collection(
-      db,
-      "users",
-      user.uid,
-      "locations"
-    );
+    const locationsRef = collection(db, "users", user.uid, "locations");
 
     const unsubscribe = onSnapshot(
       locationsRef,
       (snapshot) => {
-        const locations: SavedLocation[] =
-          snapshot.docs.map((locationDoc) => ({
+        const locations: SavedLocation[] = snapshot.docs.map(
+          (locationDoc) => ({
             id: locationDoc.id,
             ...locationDoc.data(),
-          })) as SavedLocation[];
+          })
+        ) as SavedLocation[];
 
         setSavedLocations(locations);
 
-        if (
-          locations.length > 0 &&
-          !selectedLocation
-        ) {
-          setSelectedLocation(
-            locations[0].id
-          );
-
-          setAddress(
-            locations[0].address || ""
-          );
+        if (locations.length > 0 && !selectedLocation) {
+          setSelectedLocation(locations[0].id);
+          setAddress(locations[0].address || "");
         }
 
         setLoadingLocations(false);
       },
       (error) => {
-        console.log(
-          "Saved locations error:",
-          error
-        );
-
+        console.log("Saved locations error:", error);
         setLoadingLocations(false);
       }
     );
@@ -139,28 +101,19 @@ export default function ServiceLocationScreen() {
     return () => unsubscribe();
   }, []);
 
-  const selectSavedLocation = (
-    location: SavedLocation
-  ) => {
+  const selectSavedLocation = (location: SavedLocation) => {
     setSelectedLocation(location.id);
-
-    setAddress(
-      location.address || ""
-    );
+    setAddress(location.address || "");
   };
 
   const handleContinue = () => {
     if (!address.trim()) {
-      alert(
-        "Please enter a service address."
-      );
-
+      alert("Please enter a service address.");
       return;
     }
 
     router.push({
       pathname: "/booking-summary",
-
       params: {
         providerId,
         name,
@@ -179,185 +132,110 @@ export default function ServiceLocationScreen() {
     });
   };
 
-  const getLocationIcon = (
-    label?: string
-  ) => {
-    const value =
-      label?.toLowerCase() || "";
+  const getLocationIcon = (label?: string) => {
+    const value = label?.toLowerCase() || "";
 
     if (value.includes("work")) {
-      return "🏢";
+      return "business-outline" as const;
     }
 
     if (value.includes("home")) {
-      return "🏠";
+      return "home-outline" as const;
     }
 
-    return "📍";
+    return "location-outline" as const;
   };
 
   return (
-    <View style={styles.container}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          Where do you need the service?
-        </Text>
+        <BookingProgress currentStep={3} />
+
+        <Image
+          source={require("../../assets/images/booking-location-hero.png")}
+          style={styles.heroImage}
+          resizeMode="cover"
+        />
+
+        <Text style={styles.title}>Where do you need the service?</Text>
 
         <Text style={styles.subtitle}>
-          Select a saved location or enter a new address.
+          We'll match your booking with the selected location.
         </Text>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Saved Locations
-          </Text>
+          <Text style={styles.sectionTitle}>Saved Locations</Text>
 
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                "/saved-locations"
-              )
-            }
-          >
-            <Text style={styles.manageLink}>
-              Manage
-            </Text>
+          <TouchableOpacity onPress={() => router.push("/saved-locations")}>
+            <Text style={styles.manageLink}>Manage</Text>
           </TouchableOpacity>
         </View>
 
         {loadingLocations ? (
-          <View
-            style={styles.loadingContainer}
-          >
-            <ActivityIndicator
-              size="small"
-              color="#2563EB"
+          <LoadingState label="Loading saved locations..." />
+        ) : savedLocations.length === 0 ? (
+          <View style={styles.emptyWrapper}>
+            <EmptyState
+              icon="location-outline"
+              title="No saved locations"
+              description="You can enter an address below or add a saved location."
             />
 
-            <Text
-              style={styles.loadingText}
-            >
-              Loading saved locations...
-            </Text>
-          </View>
-        ) : savedLocations.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              📍
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              No saved locations
-            </Text>
-
-            <Text style={styles.emptyText}>
-              You can enter an address below or
-              add a saved location.
-            </Text>
-
-            <TouchableOpacity
+            <PrimaryButton
+              title="Add Saved Location"
+              onPress={() => router.push("/saved-locations")}
               style={styles.addLocationButton}
-              onPress={() =>
-                router.push(
-                  "/saved-locations"
-                )
-              }
-            >
-              <Text
-                style={
-                  styles.addLocationButtonText
-                }
-              >
-                Add Saved Location
-              </Text>
-            </TouchableOpacity>
+            />
           </View>
         ) : (
-          savedLocations.map(
-            (location) => {
-              const selected =
-                selectedLocation ===
-                location.id;
+          savedLocations.map((location) => {
+            const selected = selectedLocation === location.id;
 
-              return (
-                <TouchableOpacity
-                  key={location.id}
-                  style={[
-                    styles.locationCard,
-                    selected &&
-                      styles.selectedCard,
-                  ]}
-                  onPress={() =>
-                    selectSavedLocation(
-                      location
-                    )
-                  }
-                >
-                  <View
-                    style={styles.iconBox}
-                  >
-                    <Text
-                      style={styles.icon}
-                    >
-                      {getLocationIcon(
-                        location.label
-                      )}
-                    </Text>
-                  </View>
+            return (
+              <TouchableOpacity
+                key={location.id}
+                style={[styles.locationCard, selected && styles.selectedCard]}
+                onPress={() => selectSavedLocation(location)}
+              >
+                <View style={styles.iconBox}>
+                  <Ionicons
+                    name={getLocationIcon(location.label)}
+                    size={20}
+                    color={colors.primary}
+                  />
+                </View>
 
-                  <View
-                    style={
-                      styles.locationInfo
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.locationTitle
-                      }
-                    >
-                      {location.label ||
-                        "Saved Location"}
-                    </Text>
+                <View style={styles.locationInfo}>
+                  <Text style={styles.locationTitle}>
+                    {location.label || "Saved Location"}
+                  </Text>
 
-                    <Text
-                      style={
-                        styles.locationAddress
-                      }
-                    >
-                      {location.address ||
-                        "Address not added"}
-                    </Text>
-                  </View>
+                  <Text style={styles.locationAddress}>
+                    {location.address || "Address not added"}
+                  </Text>
+                </View>
 
-                  <View
-                    style={[
-                      styles.radio,
-                      selected &&
-                        styles.radioSelected,
-                    ]}
-                  >
-                    {selected && (
-                      <View
-                        style={
-                          styles.radioDot
-                        }
-                      />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            }
-          )
+                {selected ? (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                ) : (
+                  <View style={styles.radio} />
+                )}
+              </TouchableOpacity>
+            );
+          })
         )}
 
-        <Text style={styles.sectionTitle}>
-          Service Address
-        </Text>
+        <Text style={styles.sectionTitle}>Service Address</Text>
 
         <TextInput
           style={styles.addressInput}
@@ -365,194 +243,138 @@ export default function ServiceLocationScreen() {
           numberOfLines={4}
           textAlignVertical="top"
           placeholder="Enter the service address"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.textMuted}
           value={address}
           onChangeText={(value) => {
-            setSelectedLocation(
-              "custom"
-            );
-
+            setSelectedLocation("custom");
             setAddress(value);
           }}
         />
 
         <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>
-            Location privacy
-          </Text>
+          <Text style={styles.noteTitle}>Location privacy</Text>
 
           <Text style={styles.noteText}>
-            Your service address will only
-            be shared with the assigned
+            Your service address will only be shared with the assigned
             provider for this booking.
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.continueButton}
+        <PrimaryButton
+          title="Continue"
+          icon="arrow-forward"
           onPress={handleContinue}
-        >
-          <Text
-            style={
-              styles.continueButtonText
-            }
-          >
-            Continue to Summary
-          </Text>
-        </TouchableOpacity>
+        />
       </View>
-    </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 20,
+    padding: spacing.xl,
     paddingBottom: 120,
   },
 
+  heroImage: {
+    width: "100%",
+    height: 110,
+    borderRadius: radius.lg,
+    backgroundColor: colors.border,
+  },
+
   title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
+    ...typography.pageTitle,
+    fontSize: 24,
+    marginTop: spacing.lg,
   },
 
   subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#64748B",
+    ...typography.secondary,
+    marginTop: spacing.sm,
   },
 
   sectionHeader: {
-    marginTop: 28,
-    marginBottom: 12,
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
   sectionTitle: {
+    ...typography.sectionHeading,
     fontSize: 17,
-    fontWeight: "700",
-    color: "#0F172A",
+    marginTop: spacing.xxl,
   },
 
   manageLink: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#2563EB",
+    color: colors.primary,
   },
 
-  loadingContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
+  emptyWrapper: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  loadingText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 22,
-    alignItems: "center",
-  },
-
-  emptyIcon: {
-    fontSize: 32,
-  },
-
-  emptyTitle: {
-    marginTop: 8,
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  emptyText: {
-    marginTop: 5,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#64748B",
-    textAlign: "center",
+    borderColor: colors.border,
   },
 
   addLocationButton: {
-    marginTop: 14,
-    backgroundColor: "#2563EB",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-
-  addLocationButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
   },
 
   locationCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 16,
-    padding: 15,
-    marginBottom: 12,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md + 3,
+    marginBottom: spacing.md,
   },
 
   selectedCard: {
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
 
   iconBox: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: "#DBEAFE",
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  icon: {
-    fontSize: 22,
-  },
-
   locationInfo: {
     flex: 1,
-    marginLeft: 13,
+    marginLeft: spacing.md + 1,
   },
 
   locationTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   locationAddress: {
-    marginTop: 4,
+    marginTop: spacing.xs,
     fontSize: 12,
     lineHeight: 18,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   radio: {
@@ -560,74 +382,44 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: "#CBD5E1",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  radioSelected: {
-    borderColor: "#2563EB",
-  },
-
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#2563EB",
+    borderColor: colors.borderStrong,
   },
 
   addressInput: {
     minHeight: 110,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 14,
-    padding: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
     fontSize: 15,
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   noteBox: {
-    marginTop: 22,
-    padding: 15,
-    borderRadius: 14,
-    backgroundColor: "#EFF6FF",
+    marginTop: spacing.xl,
+    padding: spacing.lg - 1,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
   },
 
   noteTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: colors.primary,
   },
 
   noteText: {
-    marginTop: 4,
+    marginTop: spacing.xs + 1,
     fontSize: 13,
     lineHeight: 19,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    padding: 16,
-  },
-
-  continueButton: {
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  continueButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+    borderTopColor: colors.border,
+    padding: spacing.lg,
   },
 });

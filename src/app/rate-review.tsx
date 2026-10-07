@@ -17,7 +17,6 @@ import {
 } from "firebase/firestore";
 
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -28,7 +27,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import LoadingState from "../components/LoadingState";
+import PrimaryButton from "../components/PrimaryButton";
+import ScreenHeader from "../components/ScreenHeader";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 const RATING_LABELS: Record<number, string> = {
   1: "Poor",
@@ -429,8 +432,7 @@ export default function RateReviewScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={styles.loadingText}>Loading your review...</Text>
+          <LoadingState label="Loading your review..." />
         </SafeAreaView>
       </>
     );
@@ -441,15 +443,14 @@ export default function RateReviewScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-          <Ionicons name="alert-circle-outline" size={40} color="#94A3B8" />
+          <Ionicons name="alert-circle-outline" size={40} color={colors.textMuted} />
           <Text style={styles.blockedText}>Unable to open this review.</Text>
 
-          <TouchableOpacity
-            style={styles.blockedButton}
+          <PrimaryButton
+            title="Go Back"
             onPress={() => router.back()}
-          >
-            <Text style={styles.blockedButtonText}>Go Back</Text>
-          </TouchableOpacity>
+            style={styles.blockedButton}
+          />
         </SafeAreaView>
       </>
     );
@@ -464,15 +465,14 @@ export default function RateReviewScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          {isEditing ? "Edit Review" : "Rate & Review"}
-        </Text>
-
-        <Text style={styles.subtitle}>
-          {isEditing
-            ? `Update your review for ${provider}.`
-            : `How was your experience with ${provider}?`}
-        </Text>
+        <ScreenHeader
+          title={isEditing ? "Edit Review" : "Rate & Review"}
+          subtitle={
+            isEditing
+              ? `Update your review for ${provider}.`
+              : `How was your experience with ${provider}?`
+          }
+        />
 
         <View style={styles.serviceCard}>
           <Text style={styles.serviceLabel}>Service</Text>
@@ -487,7 +487,7 @@ export default function RateReviewScreen() {
               <Ionicons
                 name={star <= rating ? "star" : "star-outline"}
                 size={38}
-                color={star <= rating ? "#F59E0B" : "#CBD5E1"}
+                color={star <= rating ? colors.warning : colors.borderStrong}
               />
             </TouchableOpacity>
           ))}
@@ -500,31 +500,28 @@ export default function RateReviewScreen() {
         <TextInput
           style={styles.reviewInput}
           placeholder="Tell us about your experience..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.textMuted}
           multiline
           textAlignVertical="top"
           value={review}
           onChangeText={setReview}
         />
 
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (rating === 0 || loading || deleting) && styles.disabledButton,
-          ]}
-          disabled={rating === 0 || loading || deleting}
-          onPress={isEditing ? handleUpdate : handleCreate}
-        >
-          <Text style={styles.submitButtonText}>
-            {loading
+        <PrimaryButton
+          title={
+            loading
               ? isEditing
                 ? "Saving Changes..."
                 : "Submitting Review..."
               : isEditing
               ? "Save Changes"
-              : "Submit Review"}
-          </Text>
-        </TouchableOpacity>
+              : "Submit Review"
+          }
+          onPress={isEditing ? handleUpdate : handleCreate}
+          loading={loading}
+          disabled={rating === 0 || deleting}
+          style={styles.submitButton}
+        />
 
         {isEditing && (
           <TouchableOpacity
@@ -535,7 +532,7 @@ export default function RateReviewScreen() {
             onPress={handleDelete}
             disabled={deleting || loading}
           >
-            <Ionicons name="trash-outline" size={16} color="#DC2626" />
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
             <Text style={styles.deleteButtonText}>
               {deleting ? "Deleting..." : "Delete Review"}
             </Text>
@@ -550,155 +547,115 @@ export default function RateReviewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 20,
+    backgroundColor: colors.background,
   },
 
   centerContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 24,
-  },
-
-  loadingText: {
-    marginTop: 12,
-    color: "#64748B",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.xxl,
   },
 
   blockedText: {
-    marginTop: 12,
+    marginTop: spacing.md,
     fontSize: 15,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
     textAlign: "center",
   },
 
   blockedButton: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     width: "100%",
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  blockedButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
   },
 
   scrollContent: {
-    paddingBottom: 40,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#64748B",
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
   },
 
   serviceCard: {
-    marginTop: 22,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
   serviceLabel: {
-    fontSize: 11,
-    color: "#64748B",
+    ...typography.caption,
   },
 
   serviceName: {
-    marginTop: 4,
+    marginTop: spacing.xs + 1,
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   ratingTitle: {
-    marginTop: 28,
+    marginTop: spacing.xxl,
     textAlign: "center",
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   stars: {
-    marginTop: 15,
+    marginTop: spacing.lg - 1,
     flexDirection: "row",
     justifyContent: "center",
-    gap: 9,
+    gap: spacing.sm + 1,
   },
 
   ratingText: {
-    marginTop: 8,
+    marginTop: spacing.sm,
     textAlign: "center",
     fontSize: 13,
     fontWeight: "700",
-    color: "#64748B",
+    color: colors.textSecondary,
     minHeight: 20,
   },
 
   label: {
-    marginTop: 26,
-    marginBottom: 8,
+    marginTop: spacing.xxl - 2,
+    marginBottom: spacing.sm,
     fontSize: 14,
     fontWeight: "700",
-    color: "#334155",
+    color: colors.textPrimary,
   },
 
   reviewInput: {
     minHeight: 140,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 14,
-    padding: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
     fontSize: 14,
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   submitButton: {
-    marginTop: 20,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  submitButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
+    marginTop: spacing.xl,
   },
 
   deleteButton: {
-    marginTop: 12,
+    marginTop: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: spacing.xs + 2,
     borderWidth: 1,
-    borderColor: "#DC2626",
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderColor: colors.error,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md + 2,
   },
 
   deleteButtonText: {
-    color: "#DC2626",
+    color: colors.error,
     fontWeight: "700",
   },
 

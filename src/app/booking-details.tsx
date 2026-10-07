@@ -1,4 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import CustomerBottomNav from "../components/CustomerBottomNav";
 
@@ -11,7 +12,6 @@ import {
 } from "firebase/firestore";
 
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -19,8 +19,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import LoadingState from "../components/LoadingState";
+import PrimaryButton from "../components/PrimaryButton";
+import StatusBadge, { StatusType } from "../components/StatusBadge";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type Booking = {
   id: string;
@@ -49,9 +54,7 @@ export default function BookingDetailsScreen() {
   const params = useLocalSearchParams();
 
   const bookingId =
-    typeof params.bookingId === "string"
-      ? params.bookingId
-      : "";
+    typeof params.bookingId === "string" ? params.bookingId : "";
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,42 +93,13 @@ export default function BookingDetailsScreen() {
       },
       (error) => {
         console.log("Booking details error:", error);
-
-        alert(
-          error.message ||
-            "Unable to load booking details."
-        );
-
+        alert(error.message || "Unable to load booking details.");
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, [bookingId]);
-
-  const getStatusLabel = (status?: string) => {
-    if (status === "in_progress") {
-      return "In Progress";
-    }
-
-    if (status === "completed") {
-      return "Completed";
-    }
-
-    if (status === "declined") {
-      return "Declined";
-    }
-
-    if (status === "cancelled") {
-      return "Cancelled";
-    }
-
-    if (status === "confirmed") {
-      return "Confirmed";
-    }
-
-    return "Pending";
-  };
 
   const handleCancelBooking = () => {
     if (!bookingId) return;
@@ -145,29 +119,19 @@ export default function BookingDetailsScreen() {
             try {
               setCancelling(true);
 
-              await updateDoc(
-                doc(db, "bookings", bookingId),
-                {
-                  status: "cancelled",
-                  cancelledAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                }
-              );
+              await updateDoc(doc(db, "bookings", bookingId), {
+                status: "cancelled",
+                cancelledAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              });
 
-              Alert.alert(
-                "Booking Cancelled",
-                "Your booking has been cancelled."
-              );
+              Alert.alert("Booking Cancelled", "Your booking has been cancelled.");
             } catch (error: any) {
-              console.log(
-                "Cancel booking error:",
-                error
-              );
+              console.log("Cancel booking error:", error);
 
               Alert.alert(
                 "Error",
-                error.message ||
-                  "Unable to cancel booking."
+                error.message || "Unable to cancel booking."
               );
             } finally {
               setCancelling(false);
@@ -180,236 +144,152 @@ export default function BookingDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text style={styles.loadingText}>
-          Loading booking...
-        </Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.centerContainer} edges={["top"]}>
+          <LoadingState label="Loading booking..." />
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!booking) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emptyIcon}>📭</Text>
-
-        <Text style={styles.emptyTitle}>
-          Booking not found
-        </Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.centerContainer} edges={["top"]}>
+          <Ionicons name="file-tray-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>Booking not found</Text>
+        </SafeAreaView>
+      </>
     );
   }
 
-  const status = booking.status || "pending";
+  const status = (booking.status || "pending") as StatusType;
 
   const canChat =
-    status === "confirmed" ||
-    status === "in_progress" ||
-    status === "completed";
+    status === "confirmed" || status === "in_progress" || status === "completed";
 
   const canReview = status === "completed";
 
   const canCancel = status === "pending";
+  const canEdit = status === "pending";
+
+  const stageActive = {
+    requested: true,
+    confirmed: status === "confirmed" || status === "in_progress" || status === "completed",
+    inProgress: status === "in_progress" || status === "completed",
+    completed: status === "completed",
+  };
 
   return (
-    <View style={styles.container}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.title}>
-            Booking Details
-          </Text>
-
-          <View
-            style={[
-              styles.statusBadge,
-
-              status === "confirmed" &&
-                styles.confirmedBadge,
-
-              status === "in_progress" &&
-                styles.progressBadge,
-
-              status === "completed" &&
-                styles.completedBadge,
-
-              (status === "declined" ||
-                status === "cancelled") &&
-                styles.declinedBadge,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-
-                status === "confirmed" &&
-                  styles.confirmedText,
-
-                status === "in_progress" &&
-                  styles.progressText,
-
-                status === "completed" &&
-                  styles.completedText,
-
-                (status === "declined" ||
-                  status === "cancelled") &&
-                  styles.declinedText,
-              ]}
-            >
-              {getStatusLabel(status)}
-            </Text>
-          </View>
+          <Text style={styles.title}>Booking Details</Text>
+          <StatusBadge status={status} />
         </View>
 
-        <Text style={styles.bookingId}>
-          Booking ID: {booking.id}
-        </Text>
+        <Text style={styles.bookingId}>Booking ID: {booking.id}</Text>
 
         <View style={styles.providerCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              👨‍🔧
-            </Text>
+            <Ionicons name="person" size={26} color={colors.primary} />
           </View>
 
           <View style={styles.providerInfo}>
             <Text style={styles.providerName}>
-              {booking.providerName ||
-                "Service Provider"}
+              {booking.providerName || "Service Provider"}
             </Text>
 
             <Text style={styles.providerService}>
               {booking.service || "Home Service"}
             </Text>
 
-            <Text style={styles.verified}>
-              ✓ Verified Provider
-            </Text>
+            <View style={styles.verifiedRow}>
+              <Ionicons name="shield-checkmark" size={13} color={colors.primary} />
+              <Text style={styles.verified}>Verified Provider</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Service Details
-          </Text>
+          <Text style={styles.sectionTitle}>Service Details</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>
-              Service
-            </Text>
+            <Text style={styles.label}>Service</Text>
+            <Text style={styles.value}>{booking.service || "-"}</Text>
+          </View>
 
+          <View style={styles.row}>
+            <Text style={styles.label}>Date</Text>
+            <Text style={styles.value}>October {booking.date || "-"}</Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text style={styles.label}>Time</Text>
+            <Text style={styles.value}>{booking.time || "-"}</Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text style={styles.label}>Service Price</Text>
             <Text style={styles.value}>
-              {booking.service || "-"}
+              Rs. {Number(booking.servicePrice || 0).toLocaleString()}
             </Text>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.label}>
-              Date
-            </Text>
-
+            <Text style={styles.label}>Platform Fee</Text>
             <Text style={styles.value}>
-              October {booking.date || "-"}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Time
-            </Text>
-
-            <Text style={styles.value}>
-              {booking.time || "-"}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Service Price
-            </Text>
-
-            <Text style={styles.value}>
-              Rs.{" "}
-              {Number(
-                booking.servicePrice || 0
-              ).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Platform Fee
-            </Text>
-
-            <Text style={styles.value}>
-              Rs.{" "}
-              {Number(
-                booking.platformFee || 0
-              ).toLocaleString()}
+              Rs. {Number(booking.platformFee || 0).toLocaleString()}
             </Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.row}>
-            <Text style={styles.totalLabel}>
-              Total
-            </Text>
-
+            <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>
-              Rs.{" "}
-              {Number(
-                booking.totalAmount || 0
-              ).toLocaleString()}
+              Rs. {Number(booking.totalAmount || 0).toLocaleString()}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Service Location
-          </Text>
+          <Text style={styles.sectionTitle}>Service Location</Text>
 
-          <Text style={styles.description}>
-            📍{" "}
-            {booking.address ||
-              "Location not provided"}
-          </Text>
+          <View style={styles.inlineRow}>
+            <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
+            <Text style={styles.description}>
+              {booking.address || "Location not provided"}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Problem Description
-          </Text>
+          <Text style={styles.sectionTitle}>Job Description</Text>
 
           <View style={styles.descriptionBox}>
             <Text style={styles.description}>
-              {booking.description ||
-                "No description provided"}
+              {booking.description || "No description provided"}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Booking Progress
-          </Text>
+          <Text style={styles.sectionTitle}>Booking Progress</Text>
 
           <View style={styles.progressItem}>
             <View style={styles.activeDot} />
 
             <View style={styles.progressInfo}>
-              <Text style={styles.progressTitle}>
-                Booking Requested
-              </Text>
-
+              <Text style={styles.progressTitle}>Booking Requested</Text>
               <Text style={styles.progressDescription}>
                 Your request was sent to the provider.
               </Text>
@@ -419,21 +299,10 @@ export default function BookingDetailsScreen() {
           <View style={styles.progressLine} />
 
           <View style={styles.progressItem}>
-            <View
-              style={
-                status === "confirmed" ||
-                status === "in_progress" ||
-                status === "completed"
-                  ? styles.activeDot
-                  : styles.inactiveDot
-              }
-            />
+            <View style={stageActive.confirmed ? styles.activeDot : styles.inactiveDot} />
 
             <View style={styles.progressInfo}>
-              <Text style={styles.progressTitle}>
-                Provider Confirmed
-              </Text>
-
+              <Text style={styles.progressTitle}>Provider Confirmed</Text>
               <Text style={styles.progressDescription}>
                 Your provider accepted the booking.
               </Text>
@@ -443,20 +312,10 @@ export default function BookingDetailsScreen() {
           <View style={styles.progressLine} />
 
           <View style={styles.progressItem}>
-            <View
-              style={
-                status === "in_progress" ||
-                status === "completed"
-                  ? styles.activeDot
-                  : styles.inactiveDot
-              }
-            />
+            <View style={stageActive.inProgress ? styles.activeDot : styles.inactiveDot} />
 
             <View style={styles.progressInfo}>
-              <Text style={styles.progressTitle}>
-                Service In Progress
-              </Text>
-
+              <Text style={styles.progressTitle}>Service In Progress</Text>
               <Text style={styles.progressDescription}>
                 The provider has started the job.
               </Text>
@@ -466,19 +325,10 @@ export default function BookingDetailsScreen() {
           <View style={styles.progressLine} />
 
           <View style={styles.progressItem}>
-            <View
-              style={
-                status === "completed"
-                  ? styles.activeDot
-                  : styles.inactiveDot
-              }
-            />
+            <View style={stageActive.completed ? styles.activeDot : styles.inactiveDot} />
 
             <View style={styles.progressInfo}>
-              <Text style={styles.progressTitle}>
-                Completed
-              </Text>
-
+              <Text style={styles.progressTitle}>Completed</Text>
               <Text style={styles.progressDescription}>
                 Service work has been completed.
               </Text>
@@ -494,101 +344,92 @@ export default function BookingDetailsScreen() {
                 pathname: "/customer-chat",
                 params: {
                   bookingId: booking.id,
-                  provider:
-                    booking.providerName ||
-                    "Provider",
+                  provider: booking.providerName || "Provider",
                 },
               })
             }
           >
-            <Text style={styles.chatButtonText}>
-              💬 Chat with Provider
-            </Text>
+            <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
+            <Text style={styles.chatButtonText}>Chat with Provider</Text>
           </TouchableOpacity>
         )}
 
         {canReview && (
-          <TouchableOpacity
+          <PrimaryButton
+            title="Rate & Review"
+            icon="star"
             style={styles.reviewButton}
             onPress={() =>
               router.push({
                 pathname: "/rate-review",
                 params: {
                   bookingId: booking.id,
-                  providerId:
-                    booking.providerId || "",
-                  provider:
-                    booking.providerName ||
-                    "Provider",
-                  service:
-                    booking.service ||
-                    "Home Service",
+                  providerId: booking.providerId || "",
+                  provider: booking.providerName || "Provider",
+                  service: booking.service || "Home Service",
                   reviewId: booking.reviewId || "",
                 },
               })
             }
+          />
+        )}
+
+        {canEdit && (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              router.push({
+                pathname: "/edit-booking",
+                params: { bookingId: booking.id },
+              })
+            }
           >
-            <Text style={styles.reviewButtonText}>
-              {booking.reviewed
-                ? "⭐ View / Edit Review"
-                : "⭐ Rate & Review"}
-            </Text>
+            <Ionicons name="pencil-outline" size={16} color={colors.primary} />
+            <Text style={styles.editButtonText}>Edit Booking</Text>
           </TouchableOpacity>
         )}
 
         {canCancel && (
           <TouchableOpacity
-            style={[
-              styles.cancelButton,
-              cancelling && styles.disabledButton,
-            ]}
+            style={[styles.cancelButton, cancelling && styles.disabledButton]}
             disabled={cancelling}
             onPress={handleCancelBooking}
           >
             <Text style={styles.cancelButtonText}>
-              {cancelling
-                ? "Cancelling..."
-                : "Cancel Booking"}
+              {cancelling ? "Cancelling..." : "Cancel Booking"}
             </Text>
           </TouchableOpacity>
         )}
       </ScrollView>
+
       <CustomerBottomNav />
-    </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7FC",
+    backgroundColor: colors.background,
   },
 
   centerContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F7F7FC",
-  },
-
-  loadingText: {
-    marginTop: 12,
-    color: "#64748B",
-  },
-
-  emptyIcon: {
-    fontSize: 40,
+    backgroundColor: colors.background,
   },
 
   emptyTitle: {
-    marginTop: 10,
+    marginTop: spacing.md,
     fontSize: 18,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   scrollContent: {
-    padding: 18,
+    padding: spacing.xl,
     paddingBottom: 40,
   },
 
@@ -599,134 +440,90 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0F172A",
+    ...typography.pageTitle,
+    fontSize: 22,
   },
 
   bookingId: {
-    marginTop: 6,
+    marginTop: spacing.xs + 2,
     fontSize: 10,
-    color: "#94A3B8",
-  },
-
-  statusBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-
-  statusText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#92400E",
-  },
-
-  confirmedBadge: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  confirmedText: {
-    color: "#166534",
-  },
-
-  progressBadge: {
-    backgroundColor: "#DBEAFE",
-  },
-
-  progressText: {
-    color: "#1D4ED8",
-  },
-
-  completedBadge: {
-    backgroundColor: "#E2E8F0",
-  },
-
-  completedText: {
-    color: "#475569",
-  },
-
-  declinedBadge: {
-    backgroundColor: "#FEE2E2",
-  },
-
-  declinedText: {
-    color: "#B91C1C",
+    color: colors.textMuted,
   },
 
   providerCard: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
     alignItems: "center",
   },
 
   avatar: {
-    width: 55,
-    height: 55,
-    borderRadius: 16,
-    backgroundColor: "#EFF6FF",
+    width: 54,
+    height: 54,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 27,
-  },
-
   providerInfo: {
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
 
   providerName: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   providerService: {
-    marginTop: 3,
+    marginTop: spacing.xs,
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
+  },
+
+  verifiedRow: {
+    marginTop: spacing.xs + 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
 
   verified: {
-    marginTop: 5,
     fontSize: 11,
     fontWeight: "700",
-    color: "#2563EB",
+    color: colors.primary,
   },
 
   section: {
-    marginTop: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    marginTop: spacing.md + 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
   },
 
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 10,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm + 2,
   },
 
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: spacing.sm + 2,
   },
 
   label: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   value: {
@@ -734,37 +531,44 @@ const styles = StyleSheet.create({
     textAlign: "right",
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   divider: {
-    marginTop: 14,
+    marginTop: spacing.md,
     height: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.border,
   },
 
   totalLabel: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   totalValue: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#2563EB",
+    color: colors.primary,
+  },
+
+  inlineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
   },
 
   descriptionBox: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    padding: spacing.md,
   },
 
   description: {
+    flex: 1,
     fontSize: 12,
     lineHeight: 19,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   progressItem: {
@@ -777,7 +581,7 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     marginTop: 2,
-    backgroundColor: "#2563EB",
+    backgroundColor: colors.primary,
   },
 
   inactiveDot: {
@@ -785,73 +589,84 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     marginTop: 2,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: "#CBD5E1",
+    borderColor: colors.borderStrong,
   },
 
   progressInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
   },
 
   progressTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   progressDescription: {
-    marginTop: 3,
+    marginTop: spacing.xs,
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   progressLine: {
     width: 2,
     height: 27,
     marginLeft: 6,
-    marginVertical: 4,
-    backgroundColor: "#CBD5E1",
+    marginVertical: spacing.xs,
+    backgroundColor: colors.borderStrong,
   },
 
   chatButton: {
-    marginTop: 16,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    paddingVertical: 14,
+    marginTop: spacing.md + 2,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 2,
   },
 
   chatButtonText: {
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "800",
   },
 
   reviewButton: {
-    marginTop: 12,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: "center",
+    marginTop: spacing.md,
   },
 
-  reviewButtonText: {
-    color: "#FFFFFF",
+  editButton: {
+    marginTop: spacing.md + 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 2,
+  },
+
+  editButtonText: {
+    color: colors.primary,
     fontWeight: "800",
   },
 
   cancelButton: {
-    marginTop: 12,
+    marginTop: spacing.md,
     borderWidth: 1,
-    borderColor: "#DC2626",
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 2,
     alignItems: "center",
   },
 
   cancelButtonText: {
-    color: "#DC2626",
+    color: colors.error,
     fontWeight: "800",
   },
 

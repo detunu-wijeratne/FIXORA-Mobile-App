@@ -1,23 +1,91 @@
-import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack } from "expo-router";
 import { useState } from "react";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 import {
+  ActivityIndicator,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TextInputProps,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import PrimaryButton from "../components/PrimaryButton";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
+
+function AuthFieldInput({
+  label,
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  secureTextEntry?: boolean;
+  keyboardType?: TextInputProps["keyboardType"];
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+}) {
+  const [hidden, setHidden] = useState(!!secureTextEntry);
+
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+
+      <View style={styles.fieldRow}>
+        <Ionicons name={icon} size={18} color={colors.textMuted} style={styles.fieldIcon} />
+
+        <TextInput
+          style={styles.fieldInput}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry ? hidden : false}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+        />
+
+        {secureTextEntry && (
+          <TouchableOpacity onPress={() => setHidden(!hidden)} style={styles.eyeButton}>
+            <Ionicons
+              name={hidden ? "eye-off-outline" : "eye-outline"}
+              size={19}
+              color={colors.textMuted}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
 
 export default function CustomerLoginScreen() {
+  const { height: windowHeight } = useWindowDimensions();
+  const heroHeight = Math.max(240, Math.round(windowHeight * 0.3));
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [quickLoading, setQuickLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -69,7 +137,7 @@ export default function CustomerLoginScreen() {
 
   const handleQuickCustomerLogin = async () => {
     try {
-      setLoading(true);
+      setQuickLoading(true);
 
       const userCredential =
         await signInWithEmailAndPassword(
@@ -106,166 +174,342 @@ export default function CustomerLoginScreen() {
         alert(error.message || "Quick login failed.");
       }
     } finally {
-      setLoading(false);
+      setQuickLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.brand}>FIXORA</Text>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <Text style={styles.title}>Customer Login</Text>
+      <SafeAreaView style={styles.root} edges={["bottom"]}>
+        <ImageBackground
+          source={require("../../assets/images/customer-login-bg.png")}
+          style={[styles.hero, { height: heroHeight }]}
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay} />
 
-      <Text style={styles.subtitle}>
-        Log in to book and manage home services.
-      </Text>
+          <SafeAreaView edges={["top"]} style={styles.heroContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+            </TouchableOpacity>
 
-      <Text style={styles.label}>Email Address</Text>
+            <View style={styles.heroBottomBlock}>
+              <View style={styles.brandRow}>
+                <View style={styles.logoCircle}>
+                  <Text style={styles.logoText}>F</Text>
+                </View>
+                <Text style={styles.brand}>FIXORA</Text>
+              </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
+              <Text style={styles.heroTitle}>Welcome back</Text>
+              <Text style={styles.heroSubtitle}>Your home, taken care of.</Text>
+            </View>
+          </SafeAreaView>
+        </ImageBackground>
 
-      <Text style={styles.label}>Password</Text>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.formCard}>
+              <AuthFieldInput
+                label="Email Address"
+                icon="mail-outline"
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+              <AuthFieldInput
+                label="Password"
+                icon="lock-closed-outline"
+                placeholder="Enter your password"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Logging In..." : "Log In"}
-        </Text>
-      </TouchableOpacity>
+              <PrimaryButton
+                title="Log In"
+                icon="arrow-forward"
+                onPress={handleLogin}
+                loading={loading}
+                disabled={quickLoading}
+                style={styles.loginButton}
+              />
 
-      <TouchableOpacity
-        style={[
-          styles.quickLoginButton,
-          loading && styles.disabledButton,
-        ]}
-        onPress={handleQuickCustomerLogin}
-        disabled={loading}
-      >
-        <Text style={styles.quickLoginText}>
-          Quick Customer Login
-        </Text>
-      </TouchableOpacity>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-      <TouchableOpacity
-        onPress={() => router.push("/customer-signup")}
-      >
-        <Text style={styles.signupText}>
-          Don't have an account?{" "}
-          <Text style={styles.signupLink}>
-            Create Account
-          </Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+              <TouchableOpacity
+                style={[styles.devCard, (loading || quickLoading) && styles.devCardDisabled]}
+                onPress={handleQuickCustomerLogin}
+                disabled={loading || quickLoading}
+                activeOpacity={0.8}
+              >
+                <View style={styles.devIconBox}>
+                  <Ionicons name="code-slash-outline" size={16} color={colors.primary} />
+                </View>
+
+                <View style={styles.devTextBlock}>
+                  <Text style={styles.devCaption}>Development access</Text>
+                  <Text style={styles.devTitle}>Quick Customer Login</Text>
+                </View>
+
+                {quickLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity onPress={() => router.push("/customer-signup")}>
+              <Text style={styles.signupText}>
+                Don't have an account?{" "}
+                <Text style={styles.signupLink}>Create Account</Text>
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    padding: 24,
-    paddingTop: 50,
+    backgroundColor: colors.background,
+  },
+
+  flex: {
+    flex: 1,
+  },
+
+  hero: {
+    width: "100%",
+  },
+
+  heroImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  heroOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(10,16,32,0.32)",
+  },
+
+  heroContent: {
+    flex: 1,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: colors.textPrimary,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+
+  heroBottomBlock: {
+    gap: spacing.xs + 2,
+  },
+
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+
+  logoCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm,
+  },
+
+  logoText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "800",
   },
 
   brand: {
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: "800",
-    color: "#2563EB",
+    letterSpacing: 1.2,
+    color: colors.white,
   },
 
-  title: {
-    marginTop: 40,
-    fontSize: 30,
+  heroTitle: {
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.white,
   },
 
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 34,
-    color: "#64748B",
-  },
-
-  label: {
+  heroSubtitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 8,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.88)",
   },
 
-  input: {
-    backgroundColor: "#FFFFFF",
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
+  },
+
+  formCard: {
+    marginHorizontal: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 18,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    shadowColor: colors.textPrimary,
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
 
-  button: {
-    marginTop: 6,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
+  fieldContainer: {
+    marginBottom: spacing.lg,
+  },
+
+  fieldLabel: {
+    ...typography.label,
+    marginBottom: spacing.sm,
+  },
+
+  fieldRow: {
+    flexDirection: "row",
     alignItems: "center",
-  },
-
-  quickLoginButton: {
-    marginTop: 12,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 14,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md + 2,
+  },
+
+  fieldIcon: {
+    marginRight: spacing.sm,
+  },
+
+  fieldInput: {
+    flex: 1,
+    paddingVertical: spacing.md + 4,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+
+  eyeButton: {
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
+  },
+
+  loginButton: {
+    marginTop: spacing.xs,
+  },
+
+  dividerRow: {
+    marginTop: spacing.xl,
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
+    gap: spacing.sm + 2,
   },
 
-  quickLoginText: {
-    color: "#2563EB",
-    fontWeight: "700",
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
   },
 
-  disabledButton: {
+  dividerText: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+
+  devCard: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
+    gap: spacing.sm + 2,
+  },
+
+  devCardDisabled: {
     opacity: 0.6,
   },
 
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  devIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  devTextBlock: {
+    flex: 1,
+  },
+
+  devCaption: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+
+  devTitle: {
+    marginTop: 1,
+    fontSize: 13,
     fontWeight: "700",
+    color: colors.textPrimary,
   },
 
   signupText: {
-    marginTop: 24,
+    marginTop: spacing.xl,
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   signupLink: {
-    color: "#2563EB",
+    color: colors.primary,
     fontWeight: "700",
   },
 });

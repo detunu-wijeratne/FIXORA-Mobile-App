@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 
 import {
@@ -8,17 +8,16 @@ import {
   where,
 } from "firebase/firestore";
 
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import BookingCard from "../components/BookingCard";
 import CustomerBottomNav from "../components/CustomerBottomNav";
+import EmptyState from "../components/EmptyState";
+import LoadingState from "../components/LoadingState";
+import { StatusType } from "../components/StatusBadge";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type Booking = {
   id: string;
@@ -61,26 +60,17 @@ export default function MyBookingsScreen() {
     const unsubscribe = onSnapshot(
       bookingsQuery,
       (snapshot) => {
-        const loadedBookings: Booking[] =
-          snapshot.docs.map((bookingDoc) => ({
-            id: bookingDoc.id,
-            ...bookingDoc.data(),
-          })) as Booking[];
+        const loadedBookings: Booking[] = snapshot.docs.map((bookingDoc) => ({
+          id: bookingDoc.id,
+          ...bookingDoc.data(),
+        })) as Booking[];
 
         setBookings(loadedBookings);
         setLoading(false);
       },
       (error) => {
-        console.log(
-          "Error loading customer bookings:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load your bookings."
-        );
-
+        console.log("Error loading customer bookings:", error);
+        alert(error.message || "Unable to load your bookings.");
         setLoading(false);
       }
     );
@@ -108,28 +98,11 @@ export default function MyBookingsScreen() {
     return true;
   });
 
-  const getStatusLabel = (status?: string) => {
-    if (status === "in_progress") {
-      return "In Progress";
-    }
-
-    if (status === "completed") {
-      return "Completed";
-    }
-
-    if (status === "declined") {
-      return "Declined";
-    }
-
-    if (status === "confirmed") {
-      return "Confirmed";
-    }
-
-    return "Pending";
-  };
-
   return (
-    <View style={styles.container}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -141,463 +114,125 @@ export default function MyBookingsScreen() {
         </Text>
 
         <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === "all" &&
-                styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab("all")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === "all" &&
-                  styles.activeTabText,
-              ]}
+          {(["all", "active", "completed"] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, selectedTab === tab && styles.activeTab]}
+              onPress={() => setSelectedTab(tab)}
             >
-              All
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === "active" &&
-                styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab("active")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === "active" &&
-                  styles.activeTabText,
-              ]}
-            >
-              Active
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              selectedTab === "completed" &&
-                styles.activeTab,
-            ]}
-            onPress={() => setSelectedTab("completed")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === "completed" &&
-                  styles.activeTabText,
-              ]}
-            >
-              Completed
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.tabText,
+                  selectedTab === tab && styles.activeTabText,
+                ]}
+              >
+                {tab === "all" ? "All" : tab === "active" ? "Active" : "Completed"}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color="#2563EB"
-            />
-
-            <Text style={styles.loadingText}>
-              Loading bookings...
-            </Text>
-          </View>
+          <LoadingState label="Loading bookings..." />
         ) : filteredBookings.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>📭</Text>
-
-            <Text style={styles.emptyTitle}>
-              No bookings found
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Your service bookings will appear here.
-            </Text>
-          </View>
+          <EmptyState
+            icon="file-tray-outline"
+            title="No bookings found"
+            description="Your service bookings will appear here."
+          />
         ) : (
           <View style={styles.bookingList}>
             {filteredBookings.map((booking) => (
-              <TouchableOpacity
+              <BookingCard
                 key={booking.id}
-                style={styles.bookingCard}
+                service={booking.service || "Home Service"}
+                providerName={booking.providerName || "Provider"}
+                date={booking.date}
+                time={booking.time}
+                address={booking.address}
+                status={(booking.status || "pending") as StatusType}
+                totalAmount={booking.totalAmount}
                 onPress={() =>
                   router.push({
                     pathname: "/booking-details",
                     params: {
                       bookingId: booking.id,
-
-                      provider:
-                        booking.providerName ||
-                        "Provider",
-
-                      service:
-                        booking.service ||
-                        "Home Service",
-
-                      date:
-                        booking.date || "",
-
-                      time:
-                        booking.time || "",
-
-                      location:
-                        booking.address || "",
-
-                      description:
-                        booking.description || "",
-
-                      price: String(
-                        booking.servicePrice || 0
-                      ),
-
-                      totalAmount: String(
-                        booking.totalAmount || 0
-                      ),
-
-                      status:
-                        booking.status ||
-                        "pending",
+                      provider: booking.providerName || "Provider",
+                      service: booking.service || "Home Service",
+                      date: booking.date || "",
+                      time: booking.time || "",
+                      location: booking.address || "",
+                      description: booking.description || "",
+                      price: String(booking.servicePrice || 0),
+                      totalAmount: String(booking.totalAmount || 0),
+                      status: booking.status || "pending",
                     },
                   })
                 }
-              >
-                <View style={styles.cardHeader}>
-                  <View style={styles.iconBox}>
-                    <Text style={styles.icon}>
-                      🔧
-                    </Text>
-                  </View>
-
-                  <View style={styles.bookingInfo}>
-                    <Text style={styles.serviceTitle}>
-                      {booking.service ||
-                        "Home Service"}
-                    </Text>
-
-                    <Text style={styles.providerName}>
-                      {booking.providerName ||
-                        "Provider"}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statusBadge,
-
-                      booking.status ===
-                        "confirmed" &&
-                        styles.confirmedBadge,
-
-                      booking.status ===
-                        "in_progress" &&
-                        styles.progressBadge,
-
-                      booking.status ===
-                        "completed" &&
-                        styles.completedBadge,
-
-                      booking.status ===
-                        "declined" &&
-                        styles.declinedBadge,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusText,
-
-                        booking.status ===
-                          "confirmed" &&
-                          styles.confirmedText,
-
-                        booking.status ===
-                          "in_progress" &&
-                          styles.progressText,
-
-                        booking.status ===
-                          "completed" &&
-                          styles.completedText,
-
-                        booking.status ===
-                          "declined" &&
-                          styles.declinedText,
-                      ]}
-                    >
-                      {getStatusLabel(
-                        booking.status
-                      )}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.details}>
-                  <Text style={styles.detailText}>
-                    📅 October{" "}
-                    {booking.date || "-"} •{" "}
-                    {booking.time || "-"}
-                  </Text>
-
-                  <Text style={styles.detailText}>
-                    📍{" "}
-                    {booking.address ||
-                      "Location not provided"}
-                  </Text>
-                </View>
-
-                <View style={styles.bottomRow}>
-                  <View>
-                    <Text style={styles.priceLabel}>
-                      Estimated Total
-                    </Text>
-
-                    <Text style={styles.price}>
-                      Rs.{" "}
-                      {Number(
-                        booking.totalAmount || 0
-                      ).toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.viewDetails}>
-                    View Details →
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              />
             ))}
           </View>
         )}
       </ScrollView>
 
       <CustomerBottomNav />
-    </View>
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7FC",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
-    padding: 18,
+    padding: spacing.xl,
     paddingBottom: 30,
   },
 
   title: {
-    fontSize: 27,
-    fontWeight: "800",
-    color: "#0F172A",
+    ...typography.pageTitle,
+    fontSize: 26,
   },
 
   subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#64748B",
+    ...typography.secondary,
+    marginTop: spacing.xs + 2,
   },
 
   tabs: {
-    marginTop: 20,
+    marginTop: spacing.xl,
     flexDirection: "row",
-    backgroundColor: "#E2E8F0",
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.xs,
   },
 
   tab: {
     flex: 1,
-    paddingVertical: 9,
+    paddingVertical: spacing.sm + 1,
     alignItems: "center",
-    borderRadius: 9,
+    borderRadius: radius.sm + 1,
   },
 
   activeTab: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
   },
 
   tabText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   activeTabText: {
-    color: "#2563EB",
-  },
-
-  loadingContainer: {
-    marginTop: 50,
-    alignItems: "center",
-  },
-
-  loadingText: {
-    marginTop: 12,
-    color: "#64748B",
-  },
-
-  emptyCard: {
-    marginTop: 30,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 30,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  emptyIcon: {
-    fontSize: 38,
-  },
-
-  emptyTitle: {
-    marginTop: 10,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  emptyText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#64748B",
-    textAlign: "center",
+    color: colors.primary,
   },
 
   bookingList: {
-    marginTop: 16,
-    gap: 12,
-  },
-
-  bookingCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  icon: {
-    fontSize: 21,
-  },
-
-  bookingInfo: {
-    flex: 1,
-    marginLeft: 11,
-  },
-
-  serviceTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  providerName: {
-    marginTop: 3,
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  statusBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-
-  statusText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#92400E",
-  },
-
-  confirmedBadge: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  confirmedText: {
-    color: "#166534",
-  },
-
-  progressBadge: {
-    backgroundColor: "#DBEAFE",
-  },
-
-  progressText: {
-    color: "#1D4ED8",
-  },
-
-  completedBadge: {
-    backgroundColor: "#E2E8F0",
-  },
-
-  completedText: {
-    color: "#475569",
-  },
-
-  declinedBadge: {
-    backgroundColor: "#FEE2E2",
-  },
-
-  declinedText: {
-    color: "#B91C1C",
-  },
-
-  details: {
-    marginTop: 14,
-    gap: 6,
-  },
-
-  detailText: {
-    fontSize: 12,
-    color: "#475569",
-  },
-
-  bottomRow: {
-    marginTop: 15,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  priceLabel: {
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  price: {
-    marginTop: 2,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  viewDetails: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2563EB",
+    marginTop: spacing.lg,
+    gap: spacing.md,
   },
 });
