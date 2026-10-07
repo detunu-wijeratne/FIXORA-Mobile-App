@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
-
+// src/app/provider/availability.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { Stack, router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-
-import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -16,8 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import PrimaryButton from "../../components/PrimaryButton";
+import SecondaryButton from "../../components/SecondaryButton";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
+
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 type DayAvailability = {
   enabled: boolean;
@@ -34,102 +36,72 @@ type Availability = {
   sunday: DayAvailability;
 };
 
-const defaultAvailability: Availability = {
-  monday: {
-    enabled: true,
-    slots: ["09:00 AM - 12:00 PM"],
-  },
-
-  tuesday: {
-    enabled: true,
-    slots: ["09:00 AM - 12:00 PM"],
-  },
-
-  wednesday: {
-    enabled: true,
-    slots: ["09:00 AM - 12:00 PM"],
-  },
-
-  thursday: {
-    enabled: true,
-    slots: ["09:00 AM - 12:00 PM"],
-  },
-
-  friday: {
-    enabled: true,
-    slots: ["09:00 AM - 12:00 PM"],
-  },
-
-  saturday: {
-    enabled: false,
-    slots: [],
-  },
-
-  sunday: {
-    enabled: false,
-    slots: [],
-  },
+const DEFAULT_AVAILABILITY: Availability = {
+  monday: { enabled: true, slots: ["09:00 AM - 12:00 PM"] },
+  tuesday: { enabled: true, slots: ["09:00 AM - 12:00 PM"] },
+  wednesday: { enabled: true, slots: ["09:00 AM - 12:00 PM"] },
+  thursday: { enabled: true, slots: ["09:00 AM - 12:00 PM"] },
+  friday: { enabled: true, slots: ["09:00 AM - 12:00 PM"] },
+  saturday: { enabled: false, slots: [] },
+  sunday: { enabled: false, slots: [] },
 };
 
-export default function ProviderAvailabilityScreen() {
-  const [availability, setAvailability] =
-    useState<Availability>(defaultAvailability);
+const cloneDefault = (): Availability => JSON.parse(JSON.stringify(DEFAULT_AVAILABILITY));
 
+const dayLabels: { key: keyof Availability; label: string; short: string }[] = [
+  { key: "monday", label: "Monday", short: "Mon" },
+  { key: "tuesday", label: "Tuesday", short: "Tue" },
+  { key: "wednesday", label: "Wednesday", short: "Wed" },
+  { key: "thursday", label: "Thursday", short: "Thu" },
+  { key: "friday", label: "Friday", short: "Fri" },
+  { key: "saturday", label: "Saturday", short: "Sat" },
+  { key: "sunday", label: "Sunday", short: "Sun" },
+];
+
+export default function ProviderAvailabilityScreen() {
+  const insets = useSafeAreaInsets();
+
+  const [availability, setAvailability] = useState<Availability>(cloneDefault());
+  const [selectedDay, setSelectedDay] = useState<keyof Availability>("monday");
   const [newSlot, setNewSlot] = useState("");
-  const [selectedDay, setSelectedDay] =
-    useState<keyof Availability>("monday");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selectedDayLabel = useMemo(
+    () => dayLabels.find((d) => d.key === selectedDay)?.label || "Day",
+    [selectedDay],
+  );
+
+  const selectedDayData = availability[selectedDay];
 
   const loadAvailability = async () => {
     const user = auth.currentUser;
 
     if (!user) {
-      Alert.alert(
-        "Login Required",
-        "Please log in again."
-      );
-
+      Alert.alert("Login Required", "Please log in again.");
       setLoading(false);
       return;
     }
 
     try {
-      const availabilityRef = doc(
-        db,
-        "providerAvailability",
-        user.uid
-      );
-
-      const snapshot = await getDoc(
-        availabilityRef
-      );
+      const availabilityRef = doc(db, "providerAvailability", user.uid);
+      const snapshot = await getDoc(availabilityRef);
 
       if (snapshot.exists()) {
-        const data = snapshot.data();
-
-        if (data.availability) {
-          setAvailability(
-            data.availability as Availability
-          );
+        const data: any = snapshot.data();
+        if (data?.availability) {
+          setAvailability(data.availability as Availability);
         }
       }
     } catch (error: any) {
-      console.log(
-        "Load availability error:",
-        error
-      );
-
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Unable to load availability."
-      );
+      console.log("Load availability error:", error);
+      Alert.alert("Error", error.message || "Unable to load availability.");
     } finally {
       setLoading(false);
     }
@@ -139,10 +111,7 @@ export default function ProviderAvailabilityScreen() {
     const user = auth.currentUser;
 
     if (!user) {
-      Alert.alert(
-        "Login Required",
-        "Please log in again."
-      );
+      Alert.alert("Login Required", "Please log in again.");
       return;
     }
 
@@ -150,47 +119,27 @@ export default function ProviderAvailabilityScreen() {
       setSaving(true);
 
       await setDoc(
-        doc(
-          db,
-          "providerAvailability",
-          user.uid
-        ),
+        doc(db, "providerAvailability", user.uid),
         {
           providerId: user.uid,
           availability,
           updatedAt: serverTimestamp(),
         },
-        {
-          merge: true,
-        }
+        { merge: true },
       );
 
-      Alert.alert(
-        "Availability Saved",
-        "Your availability has been updated successfully."
-      );
+      Alert.alert("Saved", "Your availability has been updated successfully.");
     } catch (error: any) {
-      console.log(
-        "Save availability error:",
-        error
-      );
-
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Unable to save availability."
-      );
+      console.log("Save availability error:", error);
+      Alert.alert("Error", error.message || "Unable to save availability.");
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleDay = (
-    day: keyof Availability
-  ) => {
+  const toggleDay = (day: keyof Availability) => {
     setAvailability((current) => ({
       ...current,
-
       [day]: {
         ...current[day],
         enabled: !current[day].enabled,
@@ -202,548 +151,670 @@ export default function ProviderAvailabilityScreen() {
     const slot = newSlot.trim();
 
     if (!slot) {
-      Alert.alert(
-        "Enter Time Slot",
-        "Example: 02:00 PM - 05:00 PM"
-      );
+      Alert.alert("Enter a time slot", "Example: 02:00 PM - 05:00 PM");
       return;
     }
 
-    const existingSlots =
-      availability[selectedDay].slots;
+    const existingSlots = availability[selectedDay].slots;
 
     if (existingSlots.includes(slot)) {
-      Alert.alert(
-        "Duplicate Slot",
-        "This time slot already exists."
-      );
+      Alert.alert("Duplicate slot", "This time slot already exists.");
       return;
     }
 
     setAvailability((current) => ({
       ...current,
-
       [selectedDay]: {
         ...current[selectedDay],
         enabled: true,
-
-        slots: [
-          ...current[selectedDay].slots,
-          slot,
-        ],
+        slots: [...current[selectedDay].slots, slot],
       },
     }));
 
     setNewSlot("");
   };
 
-  const deleteSlot = (
-    day: keyof Availability,
-    slotIndex: number
-  ) => {
+  const deleteSlot = (day: keyof Availability, slotIndex: number) => {
     setAvailability((current) => ({
       ...current,
-
       [day]: {
         ...current[day],
-
-        slots: current[day].slots.filter(
-          (_, index) =>
-            index !== slotIndex
-        ),
+        slots: current[day].slots.filter((_, i) => i !== slotIndex),
       },
     }));
   };
 
-  const dayLabels: {
-    key: keyof Availability;
-    label: string;
-  }[] = [
-    {
-      key: "monday",
-      label: "Monday",
-    },
-    {
-      key: "tuesday",
-      label: "Tuesday",
-    },
-    {
-      key: "wednesday",
-      label: "Wednesday",
-    },
-    {
-      key: "thursday",
-      label: "Thursday",
-    },
-    {
-      key: "friday",
-      label: "Friday",
-    },
-    {
-      key: "saturday",
-      label: "Saturday",
-    },
-    {
-      key: "sunday",
-      label: "Sunday",
-    },
-  ];
+  const resetToDefault = () => {
+    Alert.alert(
+      "Reset availability?",
+      "This will reset your weekly schedule to the default template.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => setAvailability(cloneDefault()),
+        },
+      ],
+    );
+  };
+
+  const bottomPad = Math.max(insets.bottom, spacing.md);
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingText}>
-          Loading availability...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading availability…</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={
-        styles.scrollContent
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.title}>
-        Manage Availability
-      </Text>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <Text style={styles.subtitle}>
-        Set the days and time slots when
-        customers can book your services.
-      </Text>
-
-      <View style={styles.addCard}>
-        <Text style={styles.sectionTitle}>
-          Add Time Slot
-        </Text>
-
-        <Text style={styles.label}>
-          Select Day
-        </Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.daySelector}
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.topBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.85}
+          hitSlop={10}
         >
-          {dayLabels.map((day) => (
-            <TouchableOpacity
-              key={day.key}
-              style={[
-                styles.dayButton,
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
 
-                selectedDay === day.key &&
-                  styles.selectedDayButton,
-              ]}
-              onPress={() =>
-                setSelectedDay(day.key)
-              }
-            >
-              <Text
-                style={[
-                  styles.dayButtonText,
-
-                  selectedDay === day.key &&
-                    styles.selectedDayText,
-                ]}
-              >
-                {day.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={styles.label}>
-          Time Slot
+        <Text style={styles.topTitle} numberOfLines={1}>
+          Availability
         </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Example: 02:00 PM - 05:00 PM"
-          placeholderTextColor="#94A3B8"
-          value={newSlot}
-          onChangeText={setNewSlot}
-        />
 
         <TouchableOpacity
-          style={styles.addButton}
-          onPress={addSlot}
+          style={styles.topBtn}
+          onPress={resetToDefault}
+          activeOpacity={0.85}
+          hitSlop={10}
         >
-          <Text style={styles.addButtonText}>
-            + Add Slot
-          </Text>
+          <Ionicons name="refresh-outline" size={18} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.scheduleTitle}>
-        Weekly Schedule
-      </Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 120 + bottomPad },
+        ]}
+      >
+        <View style={styles.headerCard}>
+          <Text style={styles.pageTitle}>Manage availability</Text>
+          <Text style={styles.pageSub}>
+            Choose days you work and add the time slots customers can book.
+          </Text>
 
-      {dayLabels.map((day) => {
-        const data =
-          availability[day.key];
+          <View style={styles.tipRow}>
+            <Ionicons name="bulb-outline" size={16} color={colors.primary} />
+            <Text style={styles.tipText}>
+              Tip: Use consistent slot formats like “09:00 AM - 12:00 PM”.
+            </Text>
+          </View>
+        </View>
 
-        return (
-          <View
-            key={day.key}
-            style={styles.dayCard}
+        {/* Add slot */}
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle}>Add time slot</Text>
+            <View style={styles.dayPill}>
+              <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+              <Text style={styles.dayPillText}>{selectedDayLabel}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.label}>Select day</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dayChipsRow}
           >
-            <View style={styles.dayHeader}>
-              <View>
-                <Text style={styles.dayTitle}>
-                  {day.label}
-                </Text>
+            {dayLabels.map((day) => {
+              const active = selectedDay === day.key;
+              const enabled = availability[day.key].enabled;
 
-                <Text
+              return (
+                <TouchableOpacity
+                  key={day.key}
                   style={[
-                    styles.dayStatus,
-
-                    data.enabled
-                      ? styles.availableText
-                      : styles.unavailableText,
+                    styles.dayChip,
+                    active && styles.dayChipActive,
+                    !enabled && styles.dayChipOff,
                   ]}
+                  onPress={() => setSelectedDay(day.key)}
+                  activeOpacity={0.85}
                 >
-                  {data.enabled
-                    ? "Available"
-                    : "Unavailable"}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.dayChipText,
+                      active && styles.dayChipTextActive,
+                      !enabled && styles.dayChipTextOff,
+                    ]}
+                  >
+                    {day.short}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.label}>Time slot</Text>
+          <View style={styles.slotInputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Example: 02:00 PM - 05:00 PM"
+              placeholderTextColor={colors.textMuted}
+              value={newSlot}
+              onChangeText={setNewSlot}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.addBtn,
+                !newSlot.trim() && styles.addBtnDisabled,
+              ]}
+              onPress={addSlot}
+              activeOpacity={0.85}
+              disabled={!newSlot.trim()}
+            >
+              <Ionicons name="add" size={18} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick view of selected day slots */}
+          <View style={styles.selectedDaySlots}>
+            <View style={styles.selectedDayRow}>
+              <Text style={styles.selectedDayTitle}>
+                {selectedDayData.enabled ? "Slots" : "Day is OFF"}
+              </Text>
 
               <TouchableOpacity
+                onPress={() => toggleDay(selectedDay)}
+                activeOpacity={0.85}
                 style={[
-                  styles.toggleButton,
-
-                  data.enabled
-                    ? styles.enabledButton
-                    : styles.disabledToggleButton,
+                  styles.togglePill,
+                  selectedDayData.enabled ? styles.toggleOn : styles.toggleOff,
                 ]}
-                onPress={() =>
-                  toggleDay(day.key)
-                }
               >
                 <Text
                   style={[
                     styles.toggleText,
-
-                    data.enabled
-                      ? styles.enabledText
-                      : styles.disabledToggleText,
+                    selectedDayData.enabled ? styles.toggleTextOn : styles.toggleTextOff,
                   ]}
                 >
-                  {data.enabled
-                    ? "ON"
-                    : "OFF"}
+                  {selectedDayData.enabled ? "ON" : "OFF"}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {data.enabled ? (
-              data.slots.length === 0 ? (
-                <Text
-                  style={styles.noSlotsText}
-                >
-                  No time slots added.
-                </Text>
+            {selectedDayData.enabled ? (
+              selectedDayData.slots.length === 0 ? (
+                <Text style={styles.mutedText}>No slots added yet.</Text>
               ) : (
-                <View style={styles.slots}>
-                  {data.slots.map(
-                    (slot, index) => (
-                      <View
-                        key={`${slot}-${index}`}
-                        style={styles.slotRow}
+                <View style={styles.slotPillsWrap}>
+                  {selectedDayData.slots.map((slot, idx) => (
+                    <View key={`${slot}-${idx}`} style={styles.slotPill}>
+                      <Ionicons name="time-outline" size={14} color={colors.primary} />
+                      <Text style={styles.slotPillText}>{slot}</Text>
+                      <TouchableOpacity
+                        onPress={() => deleteSlot(selectedDay, idx)}
+                        activeOpacity={0.85}
+                        hitSlop={8}
                       >
-                        <Text
-                          style={
-                            styles.slotText
-                          }
-                        >
-                          🕒 {slot}
-                        </Text>
-
-                        <TouchableOpacity
-                          onPress={() =>
-                            deleteSlot(
-                              day.key,
-                              index
-                            )
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.deleteText
-                            }
-                          >
-                            Delete
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )
-                  )}
+                        <Ionicons name="close" size={14} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
               )
             ) : (
-              <Text
-                style={styles.noSlotsText}
-              >
-                You are unavailable on this day.
+              <Text style={styles.mutedText}>
+                Turn this day ON to accept bookings.
               </Text>
             )}
           </View>
-        );
-      })}
+        </View>
 
-      <TouchableOpacity
-        style={[
-          styles.saveButton,
-          saving &&
-            styles.disabledButton,
-        ]}
-        disabled={saving}
-        onPress={saveAvailability}
-      >
-        <Text style={styles.saveButtonText}>
-          {saving
-            ? "Saving..."
-            : "Save Availability"}
+        {/* Weekly schedule */}
+        <Text style={styles.sectionTitle}>Weekly schedule</Text>
+
+        {dayLabels.map((day) => {
+          const data = availability[day.key];
+
+          return (
+            <View key={day.key} style={styles.dayCard}>
+              <View style={styles.dayHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dayTitle}>{day.label}</Text>
+                  <Text
+                    style={[
+                      styles.dayStatus,
+                      data.enabled ? styles.statusOn : styles.statusOff,
+                    ]}
+                  >
+                    {data.enabled ? "Available" : "Unavailable"}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.togglePill,
+                    data.enabled ? styles.toggleOn : styles.toggleOff,
+                  ]}
+                  onPress={() => toggleDay(day.key)}
+                  activeOpacity={0.85}
+                >
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      data.enabled ? styles.toggleTextOn : styles.toggleTextOff,
+                    ]}
+                  >
+                    {data.enabled ? "ON" : "OFF"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {data.enabled ? (
+                data.slots.length === 0 ? (
+                  <Text style={styles.mutedText}>No time slots added.</Text>
+                ) : (
+                  <View style={styles.daySlots}>
+                    {data.slots.map((slot, index) => (
+                      <View key={`${slot}-${index}`} style={styles.daySlotRow}>
+                        <View style={styles.daySlotLeft}>
+                          <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                          <Text style={styles.daySlotText}>{slot}</Text>
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={() => deleteSlot(day.key, index)}
+                          activeOpacity={0.85}
+                          style={styles.deleteBtn}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                          <Text style={styles.deleteText}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )
+              ) : (
+                <Text style={styles.mutedText}>You are unavailable on this day.</Text>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Bottom bar */}
+      <View style={[styles.bottomBar, { paddingBottom: bottomPad }]}>
+        <View style={styles.bottomRow}>
+          <SecondaryButton
+            title="Reset"
+            onPress={resetToDefault}
+            disabled={saving}
+            style={{ flex: 1 }}
+          />
+          <PrimaryButton
+            title={saving ? "Saving..." : "Save availability"}
+            onPress={saveAvailability}
+            loading={saving}
+            icon="save-outline"
+            style={{ flex: 1 }}
+          />
+        </View>
+
+        <Text style={styles.bottomHint}>
+          Customers will only see slots on days that are ON.
         </Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
-  centerContainer: {
+  loadingContainer: {
     flex: 1,
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F7F7FC",
   },
+  loadingText: { marginTop: spacing.md, color: colors.textSecondary },
 
-  loadingText: {
-    color: "#64748B",
+  topBar: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  topBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 40,
+    padding: spacing.xl,
   },
 
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 7,
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#64748B",
-  },
-
-  addCard: {
-    marginTop: 20,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+  headerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  pageTitle: {
+    ...typography.sectionHeading,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  pageSub: {
+    marginTop: spacing.xs,
+    ...typography.secondary,
+    fontSize: 13,
+  },
+  tipRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+
+  card: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  cardTitle: {
+    ...typography.sectionHeading,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  dayPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+  dayPillText: { fontSize: 12, fontWeight: "900", color: colors.primary },
+
+  label: {
+    ...typography.label,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  dayChipsRow: {
+    paddingRight: spacing.sm,
+    gap: spacing.sm,
+  },
+  dayChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  dayChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  dayChipOff: {
+    opacity: 0.55,
+  },
+  dayChipText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.textSecondary,
+  },
+  dayChipTextActive: { color: colors.white },
+  dayChipTextOff: { color: colors.textMuted },
+
+  slotInputRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "center",
+  },
+  input: {
+    flex: 1,
+    minHeight: 52,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  addBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBtnDisabled: {
+    opacity: 0.5,
+  },
+
+  selectedDaySlots: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  selectedDayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectedDayTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  togglePill: {
+    minWidth: 64,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+  toggleOn: { backgroundColor: colors.successLight },
+  toggleOff: { backgroundColor: colors.errorLight },
+
+  toggleText: { fontSize: 11, fontWeight: "900" },
+  toggleTextOn: { color: colors.success },
+  toggleTextOff: { color: colors.error },
+
+  mutedText: {
+    marginTop: spacing.md,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  slotPillsWrap: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+
+  slotPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  slotPillText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textPrimary,
+    fontWeight: "700",
   },
 
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  label: {
-    marginTop: 15,
-    marginBottom: 7,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#475569",
-  },
-
-  daySelector: {
-    marginBottom: 5,
-  },
-
-  dayButton: {
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 18,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
-  },
-
-  selectedDayButton: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
-  },
-
-  dayButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748B",
-  },
-
-  selectedDayText: {
-    color: "#FFFFFF",
-  },
-
-  input: {
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 13,
-    color: "#0F172A",
-  },
-
-  addButton: {
-    marginTop: 12,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 11,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  addButtonText: {
-    color: "#2563EB",
-    fontWeight: "800",
-  },
-
-  scheduleTitle: {
-    marginTop: 24,
-    marginBottom: 2,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    ...typography.sectionHeading,
+    fontSize: 15,
+    fontWeight: "900",
   },
 
   dayCard: {
-    marginTop: 12,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 15,
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
-
   dayHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
-
   dayTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
-
   dayStatus: {
-    marginTop: 3,
-    fontSize: 10,
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  statusOn: { color: colors.success },
+  statusOff: { color: colors.error },
+
+  daySlots: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  daySlotRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  daySlotLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  daySlotText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textPrimary,
     fontWeight: "700",
   },
 
-  availableText: {
-    color: "#16A34A",
-  },
-
-  unavailableText: {
-    color: "#DC2626",
-  },
-
-  toggleButton: {
-    minWidth: 55,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    alignItems: "center",
-  },
-
-  enabledButton: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  disabledToggleButton: {
-    backgroundColor: "#FEE2E2",
-  },
-
-  toggleText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
-
-  enabledText: {
-    color: "#166534",
-  },
-
-  disabledToggleText: {
-    color: "#B91C1C",
-  },
-
-  slots: {
-    marginTop: 14,
-    gap: 8,
-  },
-
-  slotRow: {
+  deleteBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    padding: 11,
+    gap: 6,
+    backgroundColor: colors.errorLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
   },
-
-  slotText: {
-    fontSize: 12,
-    color: "#334155",
-  },
-
   deleteText: {
     fontSize: 11,
-    fontWeight: "800",
-    color: "#DC2626",
+    fontWeight: "900",
+    color: colors.error,
   },
 
-  noSlotsText: {
-    marginTop: 13,
-    fontSize: 11,
-    color: "#94A3B8",
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md + 2,
   },
-
-  saveButton: {
-    marginTop: 22,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
+  bottomRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
   },
-
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
+  bottomHint: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    textAlign: "center",
+    ...typography.caption,
   },
 });

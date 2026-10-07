@@ -1,13 +1,9 @@
+// src/app/provider/my-reviews.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import {
   ActivityIndicator,
@@ -17,8 +13,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import ScreenHeader from "../../components/ScreenHeader";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type Review = {
   id: string;
@@ -29,6 +28,16 @@ type Review = {
   createdAt?: {
     toDate: () => Date;
   };
+};
+
+const formatDate = (review: Review) => {
+  const date = review.createdAt?.toDate?.();
+  if (!date) return "";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 };
 
 export default function ProviderMyReviewsScreen() {
@@ -45,33 +54,30 @@ export default function ProviderMyReviewsScreen() {
 
     const reviewsQuery = query(
       collection(db, "reviews"),
-      where("providerId", "==", user.uid)
+      where("providerId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
       reviewsQuery,
       (snapshot) => {
-        const loadedReviews: Review[] = snapshot.docs.map((reviewDoc) => ({
-          id: reviewDoc.id,
-          ...reviewDoc.data(),
+        const loaded: Review[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
         })) as Review[];
 
-        /*
-          Newest first, when createdAt has resolved.
-        */
-        loadedReviews.sort((a, b) => {
+        loaded.sort((a, b) => {
           const timeA = a.createdAt?.toDate?.().getTime() ?? 0;
           const timeB = b.createdAt?.toDate?.().getTime() ?? 0;
           return timeB - timeA;
         });
 
-        setReviews(loadedReviews);
+        setReviews(loaded);
         setLoading(false);
       },
       (error) => {
         console.log("Provider reviews loading error:", error);
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -79,281 +85,313 @@ export default function ProviderMyReviewsScreen() {
 
   const reviewCount = reviews.length;
 
-  const averageRating =
-    reviewCount > 0
-      ? reviews.reduce((total, item) => total + Number(item.rating || 0), 0) /
-        reviewCount
-      : 0;
+  const averageRating = useMemo(() => {
+    if (reviewCount === 0) return 0;
+    return (
+      reviews.reduce((total, item) => total + Number(item.rating || 0), 0) /
+      reviewCount
+    );
+  }, [reviews, reviewCount]);
 
-  const formatDate = (review: Review) => {
-    const date = review.createdAt?.toDate?.();
-
-    if (!date) {
-      return "";
-    }
-
-    return date.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const ratingLabel = useMemo(() => {
+    if (averageRating >= 4.5) return "Excellent";
+    if (averageRating >= 4.0) return "Great";
+    if (averageRating >= 3.0) return "Good";
+    if (averageRating > 0) return "Needs improvement";
+    return "New";
+  }, [averageRating]);
 
   return (
-    <>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="chevron-back" size={22} color="#0F172A" />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>My Reviews</Text>
-
-          <View style={styles.backButtonSpacer} />
-        </View>
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.topBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.85}
+          hitSlop={10}
         >
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryRatingRow}>
-                <Ionicons name="star" size={20} color="#F59E0B" />
-                <Text style={styles.summaryRatingValue}>
-                  {averageRating > 0 ? averageRating.toFixed(1) : "0.0"}
-                </Text>
-              </View>
-              <Text style={styles.summaryLabel}>Average Rating</Text>
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+
+        <Text style={styles.topTitle} numberOfLines={1}>
+          My reviews
+        </Text>
+
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <ScreenHeader
+          eyebrow="FIXORA"
+          title="Ratings & Reviews"
+          subtitle="Your customer feedback helps you build trust and win more jobs."
+        />
+
+        {/* Summary */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryLeft}>
+            <View style={styles.starCircle}>
+              <Ionicons name="star" size={18} color="#F59E0B" />
             </View>
 
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryCountValue}>{reviewCount}</Text>
-              <Text style={styles.summaryLabel}>
-                {reviewCount === 1 ? "Review" : "Reviews"}
+            <View>
+              <Text style={styles.summaryValue}>
+                {averageRating > 0 ? averageRating.toFixed(1) : "0.0"}
               </Text>
+              <Text style={styles.summaryLabel}>{ratingLabel}</Text>
             </View>
           </View>
 
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2563EB" />
-              <Text style={styles.loadingText}>Loading reviews...</Text>
-            </View>
-          ) : reviews.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="star-outline" size={34} color="#94A3B8" />
-              <Text style={styles.emptyTitle}>No reviews yet</Text>
-              <Text style={styles.emptyText}>
-                Customer reviews will appear here after they rate a completed
-                job.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.reviewList}>
-              {reviews.map((item) => (
-                <View key={item.id} style={styles.reviewCard}>
-                  <View style={styles.reviewHeaderRow}>
-                    <View style={styles.starsRow}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={
-                            star <= Number(item.rating || 0)
-                              ? "star"
-                              : "star-outline"
-                          }
-                          size={15}
-                          color="#F59E0B"
-                        />
-                      ))}
-                    </View>
+          <View style={styles.summaryDivider} />
 
-                    {formatDate(item) ? (
-                      <Text style={styles.reviewDate}>{formatDate(item)}</Text>
-                    ) : null}
+          <View style={styles.summaryRight}>
+            <Text style={styles.summaryValue}>{reviewCount}</Text>
+            <Text style={styles.summaryLabel}>
+              {reviewCount === 1 ? "Review" : "Reviews"}
+            </Text>
+          </View>
+        </View>
+
+        {/* Content */}
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading reviews…</Text>
+          </View>
+        ) : reviews.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="star-outline" size={22} color={colors.textSecondary} />
+            </View>
+            <Text style={styles.emptyTitle}>No reviews yet</Text>
+            <Text style={styles.emptyText}>
+              Reviews appear here after customers rate a completed job.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {reviews.map((item) => (
+              <View key={item.id} style={styles.reviewCard}>
+                <View style={styles.reviewTopRow}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={
+                          star <= Number(item.rating || 0)
+                            ? "star"
+                            : "star-outline"
+                        }
+                        size={14}
+                        color="#F59E0B"
+                      />
+                    ))}
                   </View>
 
-                  {item.service && (
-                    <View style={styles.serviceBadge}>
-                      <Text style={styles.serviceBadgeText}>
-                        {item.service}
-                      </Text>
-                    </View>
-                  )}
-
-                  {item.review ? (
-                    <Text style={styles.reviewMessage}>{item.review}</Text>
-                  ) : (
-                    <Text style={styles.noWrittenReview}>
-                      No written review.
-                    </Text>
-                  )}
-
-                  <View style={styles.reviewerRow}>
-                    <Ionicons
-                      name="person-circle-outline"
-                      size={15}
-                      color="#64748B"
-                    />
-                    <Text style={styles.reviewerText}>
-                      {item.customerEmail || "Verified customer"}
-                    </Text>
-                  </View>
+                  {formatDate(item) ? (
+                    <Text style={styles.reviewDate}>{formatDate(item)}</Text>
+                  ) : null}
                 </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    </>
+
+                {item.service ? (
+                  <View style={styles.servicePill}>
+                    <Ionicons name="pricetag-outline" size={13} color={colors.primary} />
+                    <Text style={styles.servicePillText}>{item.service}</Text>
+                  </View>
+                ) : null}
+
+                {item.review?.trim() ? (
+                  <Text style={styles.reviewText}>{item.review}</Text>
+                ) : (
+                  <Text style={styles.noReviewText}>No written review.</Text>
+                )}
+
+                <View style={styles.reviewerRow}>
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.reviewerText} numberOfLines={1}>
+                    {item.customerEmail || "Verified customer"}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.tipCard}>
+          <View style={styles.tipIcon}>
+            <Ionicons name="bulb-outline" size={18} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Tip to get better reviews</Text>
+            <Text style={styles.tipText}>
+              Confirm arrival time, keep your workspace clean, and explain what you fixed.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
-  header: {
+  topBar: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 54,
-    paddingBottom: 14,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: colors.background,
   },
 
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#F1F5F9",
+  topBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  backButtonSpacer: {
-    width: 38,
-  },
-
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
+  topTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 24,
   },
 
   summaryCard: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 20,
   },
 
-  summaryItem: {
+  summaryLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  starCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  summaryRight: {
     flex: 1,
     alignItems: "center",
   },
 
-  summaryRatingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+  summaryDivider: {
+    width: 1,
+    height: 42,
+    backgroundColor: colors.border,
   },
 
-  summaryRatingValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  summaryCountValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0F172A",
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   summaryLabel: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "#64748B",
+    marginTop: 3,
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
-  summaryDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: "#E2E8F0",
-  },
-
-  loadingContainer: {
-    marginTop: 40,
+  loadingWrap: {
+    marginTop: spacing.xl,
     alignItems: "center",
   },
 
   loadingText: {
-    marginTop: 10,
-    color: "#64748B",
+    marginTop: spacing.md,
+    color: colors.textSecondary,
   },
 
   emptyCard: {
-    marginTop: 18,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    paddingVertical: 36,
-    paddingHorizontal: 24,
+    borderColor: colors.border,
+    padding: spacing.xl,
     alignItems: "center",
   },
 
+  emptyIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   emptyTitle: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   emptyText: {
-    marginTop: 6,
+    marginTop: spacing.xs,
     fontSize: 12,
     lineHeight: 18,
-    color: "#64748B",
+    color: colors.textSecondary,
     textAlign: "center",
   },
 
-  reviewList: {
-    marginTop: 16,
-    gap: 12,
+  list: {
+    marginTop: spacing.md,
+    gap: spacing.md,
   },
 
   reviewCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
-  reviewHeaderRow: {
+  reviewTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -365,48 +403,90 @@ const styles = StyleSheet.create({
   },
 
   reviewDate: {
-    fontSize: 11,
-    color: "#94A3B8",
+    ...typography.caption,
+    color: colors.textMuted,
   },
 
-  serviceBadge: {
+  servicePill: {
+    marginTop: spacing.md,
     alignSelf: "flex-start",
-    marginTop: 10,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-
-  serviceBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-
-  reviewMessage: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#334155",
-  },
-
-  noWrittenReview: {
-    marginTop: 10,
-    fontSize: 12,
-    fontStyle: "italic",
-    color: "#94A3B8",
-  },
-
-  reviewerRow: {
-    marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+
+  servicePillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  reviewText: {
+    marginTop: spacing.md,
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.textPrimary,
+  },
+
+  noReviewText: {
+    marginTop: spacing.md,
+    fontSize: 12,
+    fontStyle: "italic",
+    color: colors.textMuted,
+  },
+
+  reviewerRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
   reviewerText: {
-    fontSize: 11,
-    color: "#64748B",
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  tipCard: {
+    marginTop: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  tipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tipTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  tipText: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 });

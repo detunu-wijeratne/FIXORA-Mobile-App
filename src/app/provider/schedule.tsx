@@ -1,13 +1,7 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
-
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
-
+// src/app/provider/schedule.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,9 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import ScreenHeader from "../../components/ScreenHeader";
+import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type Booking = {
   id: string;
@@ -41,6 +41,20 @@ type Booking = {
   status?: string;
 };
 
+const formatWhen = (date?: string, time?: string) => {
+  const d = (date || "").trim();
+  const t = (time || "").trim();
+  if (!d && !t) return "—";
+  const dateLabel = /^\d+$/.test(d) ? `Day ${d}` : d;
+  return [dateLabel, t].filter(Boolean).join(" • ");
+};
+
+const toStatusType = (status?: string): StatusType => {
+  if (status === "in_progress") return "in_progress";
+  if (status === "confirmed") return "confirmed";
+  return "confirmed";
+};
+
 export default function ProviderScheduleScreen() {
   const [jobs, setJobs] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,158 +69,152 @@ export default function ProviderScheduleScreen() {
 
     const scheduleQuery = query(
       collection(db, "bookings"),
-      where("providerId", "==", user.uid)
+      where("providerId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
       scheduleQuery,
       (snapshot) => {
-        const loadedJobs: Booking[] =
-          snapshot.docs
-            .map((jobDoc) => ({
-              id: jobDoc.id,
-              ...jobDoc.data(),
-            }))
-            .filter(
-              (job: any) =>
-                job.status === "confirmed" ||
-                job.status === "in_progress"
-            ) as Booking[];
+        const loadedJobs: Booking[] = snapshot.docs
+          .map((jobDoc) => ({
+            id: jobDoc.id,
+            ...(jobDoc.data() as any),
+          }))
+          .filter(
+            (job: any) => job.status === "confirmed" || job.status === "in_progress",
+          ) as Booking[];
 
+        // Sort by date (if numeric) then time
         loadedJobs.sort((a, b) => {
-          const dateA = Number(a.date || 0);
-          const dateB = Number(b.date || 0);
+          const dateA = Number(a.date);
+          const dateB = Number(b.date);
 
-          if (dateA !== dateB) {
+          if (!Number.isNaN(dateA) && !Number.isNaN(dateB) && dateA !== dateB) {
             return dateA - dateB;
           }
 
-          return String(a.time || "").localeCompare(
-            String(b.time || "")
-          );
+          return String(a.time || "").localeCompare(String(b.time || ""));
         });
 
         setJobs(loadedJobs);
         setLoading(false);
       },
       (error) => {
-        console.log(
-          "Schedule loading error:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load schedule."
-        );
-
+        console.log("Schedule loading error:", error);
+        alert(error.message || "Unable to load schedule.");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
   }, []);
 
+  const nextJob = useMemo(() => (jobs.length > 0 ? jobs[0] : null), [jobs]);
+
   const openJobDetails = (job: Booking) => {
     router.push({
       pathname: "/provider/job-details",
-
       params: {
         bookingId: job.id,
-
-        customer:
-          job.customerName ||
-          "Customer",
-
-        phone:
-          job.customerPhone || "",
-
-        email:
-          job.customerEmail || "",
-
-        service:
-          job.service ||
-          "Home Service",
-
-        date:
-          job.date || "",
-
-        time:
-          job.time || "",
-
-        location:
-          job.address || "",
-
-        description:
-          job.description || "",
-
-        price: String(
-          job.servicePrice || 0
-        ),
-
-        totalAmount: String(
-          job.totalAmount || 0
-        ),
-
-        status:
-          job.status || "confirmed",
+        customer: job.customerName || "Customer",
+        phone: job.customerPhone || "",
+        email: job.customerEmail || "",
+        service: job.service || "Home Service",
+        date: job.date || "",
+        time: job.time || "",
+        location: job.address || "",
+        description: job.description || "",
+        price: String(job.servicePrice || 0),
+        totalAmount: String(job.totalAmount || 0),
+        status: job.status || "confirmed",
       },
     });
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          Schedule
-        </Text>
+        <ScreenHeader
+          eyebrow="FIXORA"
+          title="Schedule"
+          subtitle="See what’s coming next and manage your availability."
+        />
 
-        <Text style={styles.subtitle}>
-          View your jobs and manage your available time slots.
-        </Text>
+        {/* Next job highlight */}
+        <View style={styles.highlightCard}>
+          <View style={styles.highlightTop}>
+            <View style={styles.highlightIcon}>
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
+            </View>
 
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.highlightTitle}>Next job</Text>
+              <Text style={styles.highlightSub} numberOfLines={1}>
+                {nextJob
+                  ? `${nextJob.service || "Home Service"} • ${formatWhen(
+                      nextJob.date,
+                      nextJob.time,
+                    )}`
+                  : "No upcoming jobs yet"}
+              </Text>
+            </View>
+
+            {nextJob ? (
+              <StatusBadge status={toStatusType(nextJob.status)} />
+            ) : (
+              <View style={styles.neutralPill}>
+                <Text style={styles.neutralPillText}>—</Text>
+              </View>
+            )}
+          </View>
+
+          {nextJob ? (
+            <TouchableOpacity
+              style={styles.highlightBtn}
+              onPress={() => openJobDetails(nextJob)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.highlightBtnText}>Open job</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.highlightBtn}
+              onPress={() => router.push("/provider/requests")}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.highlightBtnText}>Check requests</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Upcoming jobs */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Upcoming Jobs
-          </Text>
-
-          <TouchableOpacity
-            onPress={() =>
-              router.push("/provider/jobs")
-            }
-          >
-            <Text style={styles.link}>
-              View All
-            </Text>
+          <Text style={styles.sectionTitle}>Upcoming jobs</Text>
+          <TouchableOpacity onPress={() => router.push("/provider/jobs")} activeOpacity={0.85}>
+            <Text style={styles.link}>View all</Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color="#2563EB"
-            />
-
-            <Text style={styles.loadingText}>
-              Loading schedule...
-            </Text>
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading schedule…</Text>
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              📅
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              No scheduled jobs
-            </Text>
-
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="calendar-outline" size={22} color={colors.textSecondary} />
+            </View>
+            <Text style={styles.emptyTitle}>No scheduled jobs</Text>
             <Text style={styles.emptyText}>
-              Accepted bookings will appear here.
+              Accepted bookings will appear here. You can also check your incoming requests.
             </Text>
           </View>
         ) : (
@@ -215,297 +223,348 @@ export default function ProviderScheduleScreen() {
               <TouchableOpacity
                 key={job.id}
                 style={styles.jobCard}
-                onPress={() =>
-                  openJobDetails(job)
-                }
+                onPress={() => openJobDetails(job)}
+                activeOpacity={0.85}
               >
-                <View style={styles.timeBox}>
-                  <Text style={styles.timeText}>
-                    {job.time || "-"}
-                  </Text>
+                <View style={styles.jobTop}>
+                  <View style={styles.timeBox}>
+                    <Ionicons name="alarm-outline" size={14} color={colors.primary} />
+                    <Text style={styles.timeText} numberOfLines={1}>
+                      {job.time || "—"}
+                    </Text>
+                    <Text style={styles.dateText} numberOfLines={1}>
+                      {job.date ? (String(job.date).match(/^\d+$/) ? `Day ${job.date}` : job.date) : "—"}
+                    </Text>
+                  </View>
 
-                  <Text style={styles.dateText}>
-                    Oct {job.date || "-"}
-                  </Text>
+                  <View style={styles.jobInfo}>
+                    <Text style={styles.jobTitle} numberOfLines={1}>
+                      {job.service || "Home Service"}
+                    </Text>
+
+                    <Text style={styles.customer} numberOfLines={1}>
+                      {job.customerName || "Customer"}
+                    </Text>
+
+                    <View style={styles.locationRow}>
+                      <Ionicons
+                        name="location-outline"
+                        size={14}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {job.address || "Location not provided"}
+                      </Text>
+                    </View>
+
+                    <View style={{ marginTop: spacing.sm }}>
+                      <StatusBadge status={toStatusType(job.status)} />
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                 </View>
-
-                <View style={styles.jobInfo}>
-                  <Text style={styles.jobTitle}>
-                    {job.service ||
-                      "Home Service"}
-                  </Text>
-
-                  <Text style={styles.customer}>
-                    {job.customerName ||
-                      "Customer"}
-                  </Text>
-
-                  <Text style={styles.location}>
-                    📍{" "}
-                    {job.address ||
-                      "Location not provided"}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.status,
-                      job.status ===
-                        "in_progress" &&
-                        styles.progressStatus,
-                    ]}
-                  >
-                    {job.status ===
-                    "in_progress"
-                      ? "In Progress"
-                      : "Confirmed"}
-                  </Text>
-                </View>
-
-                <Text style={styles.arrow}>
-                  ›
-                </Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
+        {/* Availability */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Availability
-          </Text>
+          <Text style={styles.sectionTitle}>Availability</Text>
         </View>
 
         <View style={styles.availabilityCard}>
-          <View style={styles.availabilityInfo}>
-            <Text
-              style={styles.availabilityTitle}
-            >
-              Manage Availability
-            </Text>
+          <View style={styles.availabilityIcon}>
+            <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
+          </View>
 
-            <Text
-              style={styles.availabilityText}
-            >
+          <View style={styles.availabilityInfo}>
+            <Text style={styles.availabilityTitle}>Manage availability</Text>
+            <Text style={styles.availabilityText}>
               Add, remove or change the time slots customers can book.
             </Text>
           </View>
 
           <TouchableOpacity
-            style={styles.manageButton}
-            onPress={() =>
-              router.push(
-                "/provider/availability"
-              )
-            }
+            style={styles.manageBtn}
+            onPress={() => router.push("/provider/availability")}
+            activeOpacity={0.85}
           >
-            <Text
-              style={styles.manageButtonText}
-            >
-              Manage
-            </Text>
+            <Text style={styles.manageBtnText}>Manage</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
       <ProviderBottomNav />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 30,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90, // room for bottom nav
   },
 
-  title: {
-    fontSize: 27,
-    fontWeight: "800",
-    color: "#0F172A",
+  highlightCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
-  subtitle: {
-    marginTop: 6,
+  highlightTop: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  highlightIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  highlightTitle: {
     fontSize: 13,
-    lineHeight: 20,
-    color: "#64748B",
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  highlightSub: {
+    marginTop: 3,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  neutralPill: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+  },
+
+  neutralPillText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.textSecondary,
+  },
+
+  highlightBtn: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+  },
+
+  highlightBtnText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
   },
 
   sectionHeader: {
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
+    ...typography.sectionHeading,
+    fontSize: 16,
+    fontWeight: "900",
   },
 
   link: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#1D4ED8",
+    fontWeight: "900",
+    color: colors.primary,
   },
 
-  loadingContainer: {
-    marginTop: 30,
+  loadingWrap: {
+    marginTop: spacing.xl,
     alignItems: "center",
   },
 
   loadingText: {
-    marginTop: 10,
-    color: "#64748B",
+    marginTop: spacing.md,
+    color: colors.textSecondary,
   },
 
   emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 28,
+    borderColor: colors.border,
+    padding: spacing.xl,
     alignItems: "center",
   },
 
-  emptyIcon: {
-    fontSize: 34,
-  },
-
-  emptyTitle: {
-    marginTop: 10,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  emptyText: {
-    marginTop: 5,
-    fontSize: 12,
-    color: "#64748B",
-    textAlign: "center",
-  },
-
-  jobList: {
-    gap: 12,
-  },
-
-  jobCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
+  emptyIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  timeBox: {
-    width: 74,
-    minHeight: 62,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 14,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  timeText: {
+  emptyTitle: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  emptyText: {
+    marginTop: spacing.xs,
     fontSize: 12,
-    fontWeight: "800",
-    color: "#1D4ED8",
+    lineHeight: 18,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+
+  jobList: {
+    gap: spacing.md,
+  },
+
+  jobCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  jobTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  timeBox: {
+    width: 92,
+    minHeight: 82,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+
+  timeText: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
     textAlign: "center",
   },
 
   dateText: {
-    marginTop: 4,
+    marginTop: 3,
     fontSize: 10,
-    color: "#64748B",
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 
-  jobInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
+  jobInfo: { flex: 1 },
 
   jobTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0F172A",
+    ...typography.cardTitle,
+    fontWeight: "900",
   },
 
   customer: {
     marginTop: 3,
+    ...typography.secondary,
     fontSize: 12,
-    color: "#475569",
   },
 
-  location: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "#64748B",
+  locationRow: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
-  status: {
-    marginTop: 6,
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#166534",
-  },
-
-  progressStatus: {
-    color: "#1D4ED8",
-  },
-
-  arrow: {
-    fontSize: 24,
-    color: "#94A3B8",
+  locationText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 
   availabilityCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
+    gap: spacing.md,
+  },
+
+  availabilityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   availabilityInfo: {
     flex: 1,
-    paddingRight: 12,
   },
 
   availabilityTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   availabilityText: {
-    marginTop: 5,
+    marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
-  manageButton: {
-    backgroundColor: "#1D4ED8",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+  manageBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
   },
 
-  manageButtonText: {
-    color: "#FFFFFF",
+  manageBtnText: {
+    color: colors.white,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "900",
   },
 });

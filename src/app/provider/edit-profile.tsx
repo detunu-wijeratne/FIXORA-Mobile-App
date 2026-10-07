@@ -1,23 +1,29 @@
+// src/app/provider/edit-profile.tsx
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-    doc,
-    getDoc,
-    serverTimestamp,
-    updateDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
-
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppTextInput from "../../components/AppTextInput";
+import PrimaryButton from "../../components/PrimaryButton";
+import ScreenHeader from "../../components/ScreenHeader";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 export default function ProviderEditProfileScreen() {
   const [name, setName] = useState("");
@@ -38,9 +44,7 @@ export default function ProviderEditProfileScreen() {
           return;
         }
 
-        const providerDoc = await getDoc(
-          doc(db, "users", user.uid)
-        );
+        const providerDoc = await getDoc(doc(db, "users", user.uid));
 
         if (!providerDoc.exists()) {
           alert("Provider profile not found.");
@@ -54,15 +58,8 @@ export default function ProviderEditProfileScreen() {
         setCategory(data.category || "");
         setDistrict(data.district || "");
       } catch (error: any) {
-        console.log(
-          "Error loading provider profile:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load profile."
-        );
+        console.log("Error loading provider profile:", error);
+        alert(error.message || "Unable to load profile.");
       } finally {
         setLoading(false);
       }
@@ -72,60 +69,32 @@ export default function ProviderEditProfileScreen() {
   }, []);
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      alert("Please enter your name.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      alert("Please enter your phone number.");
-      return;
-    }
-
-    if (!category.trim()) {
-      alert("Please enter your service category.");
-      return;
-    }
-
-    if (!district.trim()) {
-      alert("Please enter your service area.");
-      return;
-    }
+    if (!name.trim()) return alert("Please enter your name.");
+    if (!phone.trim()) return alert("Please enter your phone number.");
+    if (!category.trim()) return alert("Please enter your service category.");
+    if (!district.trim()) return alert("Please enter your service area.");
 
     try {
       setSaving(true);
 
       const user = auth.currentUser;
-
       if (!user) {
         router.replace("/provider/login");
         return;
       }
 
-      await updateDoc(
-        doc(db, "users", user.uid),
-        {
-          name: name.trim(),
-          phone: phone.trim(),
-          category: category.trim(),
-          district: district.trim(),
-          updatedAt: serverTimestamp(),
-        }
-      );
-
-      alert("Profile updated successfully.");
+      await updateDoc(doc(db, "users", user.uid), {
+        name: name.trim(),
+        phone: phone.trim(),
+        category: category.trim(),
+        district: district.trim(),
+        updatedAt: serverTimestamp(),
+      });
 
       router.back();
     } catch (error: any) {
-      console.log(
-        "Provider profile update error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to update profile."
-      );
+      console.log("Provider profile update error:", error);
+      alert(error.message || "Unable to update profile.");
     } finally {
       setSaving(false);
     }
@@ -133,200 +102,205 @@ export default function ProviderEditProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text style={styles.loadingText}>
-          Loading profile...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading profile…</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Text style={styles.title}>
-          Edit Profile
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Update your provider information.
-        </Text>
-
-        <Text style={styles.label}>
-          Full Name
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Enter your full name"
-          placeholderTextColor="#94A3B8"
-        />
-
-        <Text style={styles.label}>
-          Phone Number
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="Enter phone number"
-          placeholderTextColor="#94A3B8"
-          keyboardType="phone-pad"
-        />
-
-        <Text style={styles.label}>
-          Service Category
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={category}
-          onChangeText={setCategory}
-          placeholder="Example: Plumbing & Pipe Diagnostics"
-          placeholderTextColor="#94A3B8"
-        />
-
-        <Text style={styles.label}>
-          Service Area
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={district}
-          onChangeText={setDistrict}
-          placeholder="Example: Colombo District"
-          placeholderTextColor="#94A3B8"
-        />
-
-        <View style={styles.noteBox}>
-          <Text style={styles.noteTitle}>
-            Provider Information
-          </Text>
-
-          <Text style={styles.noteText}>
-            These details will be visible to customers when they browse service providers.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.saveButton,
-            saving && styles.disabledButton,
-          ]}
-          onPress={handleSave}
-          disabled={saving}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
         >
-          <Text style={styles.saveButtonText}>
-            {saving
-              ? "Saving..."
-              : "Save Changes"}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          <ScreenHeader
+            eyebrow="FIXORA"
+            title="Edit profile"
+            subtitle="Update your provider details shown to customers."
+          />
+
+          <View style={styles.card}>
+            <AppTextInput
+              label="Full name"
+              placeholder="Enter your full name"
+              value={name}
+              onChangeText={setName}
+            />
+
+            <Text style={styles.inlineLabel}>Mobile number</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.countryCodeText}>+94</Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <AppTextInput
+                  placeholder="77 123 4567"
+                  keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
+                  style={styles.phoneInputInner}
+                />
+              </View>
+            </View>
+
+            <AppTextInput
+              label="Primary trade category"
+              placeholder="Example: Plumbing & Pipe Diagnostics"
+              value={category}
+              onChangeText={setCategory}
+            />
+
+            <AppTextInput
+              label="Service coverage / district"
+              placeholder="Example: Colombo District (Zones 01–15)"
+              value={district}
+              onChangeText={setDistrict}
+            />
+
+            <View style={styles.note}>
+              <View style={styles.noteIcon}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.noteTitle}>Visible to customers</Text>
+                <Text style={styles.noteText}>
+                  Your name, category and coverage area appear in search results
+                  and booking pages. Keep them accurate for better matches.
+                </Text>
+              </View>
+            </View>
+
+            <PrimaryButton
+              title={saving ? "Saving..." : "Save changes"}
+              onPress={handleSave}
+              loading={saving}
+              icon="checkmark-outline"
+              style={styles.saveBtn}
+            />
+
+            <Text style={styles.helper}>
+              You can update availability separately from the Schedule tab.
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: { marginTop: spacing.md, color: colors.textSecondary },
+
+  scrollContent: {
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 24,
+  },
+
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  inlineLabel: {
+    ...typography.label,
+    marginTop: spacing.md + 2,
+    marginBottom: spacing.sm,
+  },
+
+  phoneRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "center",
+    marginBottom: spacing.md,
+  },
+
+  countryCode: {
+    width: 74,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  loadingText: {
-    marginTop: 12,
-    color: "#64748B",
-  },
-
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#64748B",
-  },
-
-  label: {
-    marginTop: 22,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#334155",
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+  countryCodeText: {
+    color: colors.primary,
+    fontWeight: "900",
     fontSize: 14,
-    color: "#0F172A",
   },
 
-  noteBox: {
-    marginTop: 24,
-    padding: 15,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 14,
+  phoneInputInner: {
+    marginBottom: 0,
+  },
+
+  note: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.md,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    padding: spacing.md + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  noteIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   noteTitle: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#1D4ED8",
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   noteText: {
-    marginTop: 5,
+    marginTop: 3,
     fontSize: 12,
     lineHeight: 18,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
-  saveButton: {
-    marginTop: 28,
-    backgroundColor: "#2563EB",
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
+  saveBtn: {
+    marginTop: spacing.lg,
   },
 
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "700",
+  helper: {
+    marginTop: spacing.md,
+    textAlign: "center",
+    ...typography.caption,
   },
 });

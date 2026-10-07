@@ -1,16 +1,11 @@
-import { router, useLocalSearchParams } from "expo-router";
-
-import { useEffect, useState } from "react";
-
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-
+// src/app/provider/request-details.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import {
   Alert,
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -18,89 +13,76 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import PrimaryButton from "../../components/PrimaryButton";
+import SecondaryButton from "../../components/SecondaryButton";
+import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
+
+const asMoney = (value: any) => `Rs. ${Number(value || 0).toLocaleString()}`;
+
+const formatWhen = (date?: string, time?: string) => {
+  const d = (date || "").trim();
+  const t = (time || "").trim();
+  if (!d && !t) return "—";
+  const dateLabel = /^\d+$/.test(d) ? `Day ${d}` : d;
+  return [dateLabel, t].filter(Boolean).join(" • ");
+};
+
+const toStatusType = (status?: string): StatusType => {
+  if (status === "pending") return "pending";
+  if (status === "confirmed") return "confirmed";
+  if (status === "in_progress") return "in_progress";
+  if (status === "completed") return "completed";
+  if (status === "declined") return "declined";
+  if (status === "cancelled") return "cancelled";
+  return "pending";
+};
 
 export default function ProviderRequestDetailsScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
 
-  const bookingId =
-    typeof params.bookingId === "string"
-      ? params.bookingId
-      : "";
+  const bookingId = typeof params.bookingId === "string" ? params.bookingId : "";
 
-  const customer =
-    typeof params.customer === "string"
-      ? params.customer
-      : "Customer";
+  const customer = typeof params.customer === "string" ? params.customer : "Customer";
+  const phone = typeof params.phone === "string" ? params.phone : "";
+  const email = typeof params.email === "string" ? params.email : "";
 
-  const phone =
-    typeof params.phone === "string"
-      ? params.phone
-      : "";
-
-  const email =
-    typeof params.email === "string"
-      ? params.email
-      : "";
-
-  const service =
-    typeof params.service === "string"
-      ? params.service
-      : "Home Service";
-
-  const date =
-    typeof params.date === "string"
-      ? params.date
-      : "";
-
-  const time =
-    typeof params.time === "string"
-      ? params.time
-      : "";
-
-  const location =
-    typeof params.location === "string"
-      ? params.location
-      : "";
-
+  const service = typeof params.service === "string" ? params.service : "Home Service";
+  const date = typeof params.date === "string" ? params.date : "";
+  const time = typeof params.time === "string" ? params.time : "";
+  const location = typeof params.location === "string" ? params.location : "";
   const description =
     typeof params.description === "string"
       ? params.description
       : "No description provided";
 
-  const price =
-    typeof params.price === "string"
-      ? params.price
-      : "0";
-
-  const totalAmount =
-    typeof params.totalAmount === "string"
-      ? params.totalAmount
-      : "0";
+  const price = typeof params.price === "string" ? params.price : "0";
+  const totalAmount = typeof params.totalAmount === "string" ? params.totalAmount : "0";
 
   const [status, setStatus] = useState(
-    typeof params.status === "string"
-      ? params.status
-      : "pending"
+    typeof params.status === "string" ? params.status : "pending",
   );
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  /*
-    Real Cloudinary image URL
-    loaded directly from the booking document.
-  */
-  const [imageUrl, setImageUrl] =
-    useState("");
+  // Booking photo loaded from Firestore
+  const [imageUrl, setImageUrl] = useState("");
+  const [loadingImage, setLoadingImage] = useState(true);
 
-  const [loadingImage, setLoadingImage] =
-    useState(true);
+  const initials = useMemo(() => {
+    return customer
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [customer]);
 
-  /*
-    LOAD BOOKING PHOTO FROM FIRESTORE
-  */
   useEffect(() => {
     const loadBookingPhoto = async () => {
       if (!bookingId) {
@@ -109,38 +91,13 @@ export default function ProviderRequestDetailsScreen() {
       }
 
       try {
-        const bookingSnapshot =
-          await getDoc(
-            doc(
-              db,
-              "bookings",
-              bookingId
-            )
-          );
-
-        if (bookingSnapshot.exists()) {
-          const data =
-            bookingSnapshot.data();
-
-          const storedImageUrl =
-            typeof data.imageUrl === "string"
-              ? data.imageUrl
-              : "";
-
-          setImageUrl(
-            storedImageUrl
-          );
-
-          console.log(
-            "Provider booking image:",
-            storedImageUrl
-          );
+        const snap = await getDoc(doc(db, "bookings", bookingId));
+        if (snap.exists()) {
+          const data: any = snap.data();
+          setImageUrl(typeof data.imageUrl === "string" ? data.imageUrl : "");
         }
       } catch (error) {
-        console.log(
-          "Load booking image error:",
-          error
-        );
+        console.log("Load booking image error:", error);
       } finally {
         setLoadingImage(false);
       }
@@ -149,736 +106,561 @@ export default function ProviderRequestDetailsScreen() {
     loadBookingPhoto();
   }, [bookingId]);
 
-  /*
-    ACCEPT BOOKING
-  */
   const handleAccept = async () => {
     if (!bookingId) {
-      Alert.alert(
-        "Error",
-        "Booking ID not found."
-      );
-
+      Alert.alert("Error", "Booking ID not found.");
       return;
     }
 
     try {
       setLoading(true);
 
-      await updateDoc(
-        doc(
-          db,
-          "bookings",
-          bookingId
-        ),
-        {
-          status: "confirmed",
-          acceptedAt:
-            serverTimestamp(),
-          updatedAt:
-            serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, "bookings", bookingId), {
+        status: "confirmed",
+        acceptedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       setStatus("confirmed");
 
       Alert.alert(
         "Booking Accepted",
         "The booking has been accepted successfully.",
-        [
-          {
-            text: "View Jobs",
-            onPress: () =>
-              router.replace(
-                "/provider/jobs"
-              ),
-          },
-        ]
+        [{ text: "View Jobs", onPress: () => router.replace("/provider/jobs") }],
       );
     } catch (error: any) {
-      console.log(
-        "Accept booking error:",
-        error
-      );
-
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Unable to accept booking."
-      );
+      console.log("Accept booking error:", error);
+      Alert.alert("Error", error.message || "Unable to accept booking.");
     } finally {
       setLoading(false);
     }
   };
 
-  /*
-    DECLINE BOOKING
-  */
   const handleDecline = async () => {
     if (!bookingId) {
-      Alert.alert(
-        "Error",
-        "Booking ID not found."
-      );
-
+      Alert.alert("Error", "Booking ID not found.");
       return;
     }
 
     try {
       setLoading(true);
 
-      await updateDoc(
-        doc(
-          db,
-          "bookings",
-          bookingId
-        ),
-        {
-          status: "declined",
-          declinedAt:
-            serverTimestamp(),
-          updatedAt:
-            serverTimestamp(),
-        }
-      );
+      await updateDoc(doc(db, "bookings", bookingId), {
+        status: "declined",
+        declinedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
 
       setStatus("declined");
 
       Alert.alert(
         "Booking Declined",
         "The booking has been declined.",
-        [
-          {
-            text: "Back to Requests",
-            onPress: () =>
-              router.replace(
-                "/provider/requests"
-              ),
-          },
-        ]
+        [{ text: "Back to Requests", onPress: () => router.replace("/provider/requests") }],
       );
     } catch (error: any) {
-      console.log(
-        "Decline booking error:",
-        error
-      );
-
-      Alert.alert(
-        "Error",
-        error.message ||
-          "Unable to decline booking."
-      );
+      console.log("Decline booking error:", error);
+      Alert.alert("Error", error.message || "Unable to decline booking.");
     } finally {
       setLoading(false);
     }
   };
 
+  const bottomPad = Math.max(insets.bottom, spacing.md);
+  const showPendingActions = status === "pending";
+  const showConfirmedCta = status === "confirmed";
+  const showDeclinedCta = status === "declined";
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.topBarBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.85}
+          hitSlop={10}
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
+
+        <Text style={styles.topBarTitle} numberOfLines={1}>
+          Request details
+        </Text>
+
+        <View style={{ width: 40, alignItems: "flex-end" }}>
+          <StatusBadge status={toStatusType(status)} />
+        </View>
+      </View>
+
       <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom:
+              (showPendingActions || showConfirmedCta || showDeclinedCta ? 120 : 24) + bottomPad,
+          },
+        ]}
       >
-        {/* STATUS */}
+        {/* Summary */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTop}>
+            <View style={styles.summaryIcon}>
+              <Ionicons name="clipboard-outline" size={18} color={colors.warning} />
+            </View>
 
-        <View style={styles.statusRow}>
-          <Text style={styles.requestId}>
-            Booking Request
-          </Text>
-
-          <View
-            style={[
-              styles.statusBadge,
-
-              status ===
-                "confirmed" &&
-                styles.confirmedBadge,
-
-              status ===
-                "declined" &&
-                styles.declinedBadge,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-
-                status ===
-                  "confirmed" &&
-                  styles.confirmedText,
-
-                status ===
-                  "declined" &&
-                  styles.declinedText,
-              ]}
-            >
-              {status.toUpperCase()}
-            </Text>
-          </View>
-        </View>
-
-        {/* SERVICE DETAILS */}
-
-        <View style={styles.section}>
-          <Text
-            style={styles.sectionTitle}
-          >
-            Service Details
-          </Text>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Service
-            </Text>
-
-            <Text style={styles.value}>
-              {service}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Date
-            </Text>
-
-            <Text style={styles.value}>
-              October {date}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Time
-            </Text>
-
-            <Text style={styles.value}>
-              {time}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Estimated Service
-            </Text>
-
-            <Text style={styles.value}>
-              Rs.{" "}
-              {Number(
-                price
-              ).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              Customer Total
-            </Text>
-
-            <Text
-              style={
-                styles.totalValue
-              }
-            >
-              Rs.{" "}
-              {Number(
-                totalAmount
-              ).toLocaleString()}
-            </Text>
-          </View>
-        </View>
-
-        {/* CUSTOMER */}
-
-        <View style={styles.section}>
-          <Text
-            style={styles.sectionTitle}
-          >
-            Customer
-          </Text>
-
-          <View
-            style={styles.customerRow}
-          >
-            <View style={styles.avatar}>
-              <Text
-                style={styles.avatarText}
-              >
-                {customer
-                  .split(" ")
-                  .map(
-                    (word) =>
-                      word[0]
-                  )
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.serviceTitle} numberOfLines={1}>
+                {service}
+              </Text>
+              <Text style={styles.whenText} numberOfLines={1}>
+                {formatWhen(date, time)}
               </Text>
             </View>
 
-            <View
-              style={styles.customerInfo}
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={styles.serviceMoney}>{asMoney(price)}</Text>
+              <Text style={styles.moneyCaption}>Est. payout</Text>
+            </View>
+          </View>
+
+          <View style={styles.summaryBottom}>
+            <View style={styles.summaryPill}>
+              <Ionicons name="cash-outline" size={14} color={colors.primary} />
+              <Text style={styles.summaryPillText}>
+                Customer total: {asMoney(totalAmount)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Customer */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Customer</Text>
+
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/provider/chat",
+                  params: { bookingId, customer },
+                })
+              }
+              activeOpacity={0.85}
             >
-              <Text
-                style={
-                  styles.customerName
-                }
-              >
+              <Text style={styles.linkText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.customerRow}>
+            <View style={styles.customerAvatar}>
+              <Text style={styles.customerInitials}>{initials}</Text>
+            </View>
+
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.customerName} numberOfLines={1}>
                 {customer}
               </Text>
 
-              {phone ? (
-                <Text
-                  style={
-                    styles.customerDetail
-                  }
-                >
-                  📞 {phone}
+              {!!phone && (
+                <Text style={styles.customerMeta} numberOfLines={1}>
+                  <Ionicons name="call-outline" size={13} color={colors.textSecondary} /> {phone}
                 </Text>
-              ) : null}
-
-              {email ? (
-                <Text
-                  style={
-                    styles.customerDetail
-                  }
-                >
-                  ✉️ {email}
+              )}
+              {!!email && (
+                <Text style={styles.customerMeta} numberOfLines={1}>
+                  <Ionicons name="mail-outline" size={13} color={colors.textSecondary} /> {email}
                 </Text>
-              ) : null}
+              )}
             </View>
+          </View>
+
+          <View style={styles.customerActions}>
+            <SecondaryButton
+              title="Open chat"
+              onPress={() =>
+                router.push({
+                  pathname: "/provider/chat",
+                  params: { bookingId, customer },
+                })
+              }
+              style={{ flex: 1 }}
+            />
+            <SecondaryButton
+              title="All requests"
+              variant="ghost"
+              onPress={() => router.replace("/provider/requests")}
+              style={{ flex: 1 }}
+            />
           </View>
         </View>
 
-        {/* LOCATION */}
-
-        <View style={styles.section}>
-          <Text
-            style={styles.sectionTitle}
-          >
-            Service Location
-          </Text>
-
-          <Text
-            style={styles.description}
-          >
-            📍{" "}
-            {location ||
-              "Location not provided"}
-          </Text>
-        </View>
-
-        {/* DESCRIPTION */}
-
-        <View style={styles.section}>
-          <Text
-            style={styles.sectionTitle}
-          >
-            Problem Description
-          </Text>
-
-          <View
-            style={styles.descriptionBox}
-          >
-            <Text
-              style={styles.description}
-            >
-              {description}
+        {/* Location */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Service location</Text>
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.infoText} numberOfLines={3}>
+              {location || "Location not provided"}
             </Text>
           </View>
         </View>
 
-        {/* CUSTOMER PHOTO */}
+        {/* Description */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Problem description</Text>
+          <View style={styles.descriptionBox}>
+            <Text style={styles.descriptionText}>
+              {description || "No description provided"}
+            </Text>
+          </View>
+        </View>
 
-        <View style={styles.section}>
-          <Text
-            style={styles.sectionTitle}
-          >
-            Customer Photo
-          </Text>
+        {/* Customer Photo */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Customer photo</Text>
 
           {loadingImage ? (
-            <View
-              style={
-                styles.photoPlaceholder
-              }
-            >
-              <Text
-                style={styles.photoIcon}
-              >
-                🖼️
-              </Text>
-
-              <Text
-                style={styles.photoText}
-              >
-                Loading photo...
-              </Text>
+            <View style={styles.photoPlaceholder}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.photoHint}>Loading attachment…</Text>
             </View>
           ) : imageUrl ? (
             <>
               <Image
-                source={{
-                  uri: imageUrl,
-                }}
-                style={
-                  styles.customerPhoto
-                }
+                source={{ uri: imageUrl }}
+                style={styles.customerPhoto}
                 resizeMode="cover"
-                onLoad={() => {
-                  console.log(
-                    "Provider image loaded successfully"
-                  );
-                }}
-                onError={(event) => {
-                  console.log(
-                    "Provider image error:",
-                    event.nativeEvent
-                      .error
-                  );
-                }}
               />
 
-              <View
-                style={
-                  styles.photoSuccess
-                }
-              >
-                <Text
-                  style={
-                    styles.photoSuccessIcon
-                  }
-                >
-                  ✓
-                </Text>
-
-                <Text
-                  style={
-                    styles.photoSuccessText
-                  }
-                >
-                  Customer attachment
-                </Text>
+              <View style={styles.photoOkRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
+                <Text style={styles.photoOkText}>Attachment received</Text>
               </View>
             </>
           ) : (
-            <View
-              style={
-                styles.photoPlaceholder
-              }
-            >
-              <Text
-                style={styles.photoIcon}
-              >
-                📷
-              </Text>
-
-              <Text
-                style={styles.photoText}
-              >
-                No photo attached
-              </Text>
+            <View style={styles.photoPlaceholder}>
+              <Ionicons name="image-outline" size={22} color={colors.textSecondary} />
+              <Text style={styles.photoHint}>No photo attached</Text>
             </View>
           )}
         </View>
+
+        {/* Status helper */}
+        <View style={styles.statusHelp}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+          <Text style={styles.statusHelpText}>
+            Review the details carefully before accepting. Once accepted, it will move to your Jobs.
+          </Text>
+        </View>
       </ScrollView>
 
-      {/* PENDING */}
+      {/* Bottom actions */}
+      {(showPendingActions || showConfirmedCta || showDeclinedCta) && (
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad }]}>
+          {showPendingActions ? (
+            <View style={styles.bottomRow}>
+              <SecondaryButton
+                title={loading ? "Please wait…" : "Decline"}
+                onPress={handleDecline}
+                disabled={loading}
+                style={styles.bottomBtn}
+              />
+              <PrimaryButton
+                title={loading ? "Please wait…" : "Accept request"}
+                onPress={handleAccept}
+                loading={loading}
+                disabled={loading}
+                icon="checkmark-outline"
+                style={styles.bottomBtn}
+              />
+            </View>
+          ) : null}
 
-      {status === "pending" && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[
-              styles.declineButton,
-              loading &&
-                styles.disabledButton,
-            ]}
-            disabled={loading}
-            onPress={
-              handleDecline
-            }
-          >
-            <Text
-              style={
-                styles.declineText
-              }
-            >
-              {loading
-                ? "Please wait..."
-                : "Decline"}
-            </Text>
-          </TouchableOpacity>
+          {showConfirmedCta ? (
+            <PrimaryButton
+              title="View my jobs"
+              onPress={() => router.replace("/provider/jobs")}
+              icon="briefcase-outline"
+            />
+          ) : null}
 
-          <TouchableOpacity
-            style={[
-              styles.acceptButton,
-              loading &&
-                styles.disabledButton,
-            ]}
-            disabled={loading}
-            onPress={
-              handleAccept
-            }
-          >
-            <Text
-              style={
-                styles.acceptText
-              }
-            >
-              {loading
-                ? "Please wait..."
-                : "Accept Request"}
-            </Text>
-          </TouchableOpacity>
+          {showDeclinedCta ? (
+            <PrimaryButton
+              title="Back to requests"
+              onPress={() => router.replace("/provider/requests")}
+              icon="arrow-back-outline"
+            />
+          ) : null}
         </View>
       )}
-
-      {/* CONFIRMED */}
-
-      {status === "confirmed" && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.fullButton}
-            onPress={() =>
-              router.replace(
-                "/provider/jobs"
-              )
-            }
-          >
-            <Text
-              style={
-                styles.acceptText
-              }
-            >
-              View My Jobs
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* DECLINED */}
-
-      {status === "declined" && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.fullButton}
-            onPress={() =>
-              router.replace(
-                "/provider/requests"
-              )
-            }
-          >
-            <Text
-              style={
-                styles.acceptText
-              }
-            >
-              Back to Requests
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
-  scrollContent: {
-    padding: 18,
-    paddingBottom: 120,
-  },
-
-  statusRow: {
+  topBar: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.background,
   },
 
-  requestId: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  statusBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-
-  statusText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#92400E",
-  },
-
-  confirmedBadge: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  confirmedText: {
-    color: "#166534",
-  },
-
-  declinedBadge: {
-    backgroundColor: "#FEE2E2",
-  },
-
-  declinedText: {
-    color: "#B91C1C",
-  },
-
-  section: {
-    marginTop: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+  topBarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-    marginBottom: 10,
-  },
-
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-
-  label: {
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  value: {
-    maxWidth: "60%",
-    textAlign: "right",
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  totalValue: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#2563EB",
-  },
-
-  customerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#DBEAFE",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#1D4ED8",
+  topBarTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.textPrimary,
+    textAlign: "center",
   },
 
-  customerInfo: {
-    flex: 1,
-    marginLeft: 12,
+  scrollContent: {
+    padding: spacing.xl,
+  },
+
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  summaryTop: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  summaryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  serviceTitle: {
+    ...typography.cardTitle,
+    fontWeight: "900",
+  },
+
+  whenText: {
+    marginTop: 3,
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  serviceMoney: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  moneyCaption: {
+    marginTop: 2,
+    ...typography.caption,
+    textAlign: "right",
+  },
+
+  summaryBottom: {
+    marginTop: spacing.md,
+  },
+
+  summaryPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  summaryPillText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.textPrimary,
+  },
+
+  card: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  cardTitle: {
+    ...typography.sectionHeading,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  linkText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  customerRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  customerAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  customerInitials: {
+    color: colors.primary,
+    fontWeight: "900",
+    fontSize: 14,
   },
 
   customerName: {
     fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
-  customerDetail: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "#64748B",
+  customerMeta: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  customerActions: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  infoRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 
   descriptionBox: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    padding: 12,
+    marginTop: spacing.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
   },
 
-  description: {
+  descriptionText: {
     fontSize: 12,
     lineHeight: 19,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
   customerPhoto: {
+    marginTop: spacing.md,
     width: "100%",
-    height: 230,
-    borderRadius: 14,
-    backgroundColor: "#E2E8F0",
+    height: 240,
+    borderRadius: radius.xl,
+    backgroundColor: colors.border,
   },
 
   photoPlaceholder: {
+    marginTop: spacing.md,
     width: "100%",
-    height: 140,
-    borderRadius: 12,
+    height: 150,
+    borderRadius: radius.xl,
+    backgroundColor: colors.background,
     borderWidth: 1,
+    borderColor: colors.borderStrong,
     borderStyle: "dashed",
-    borderColor: "#CBD5E1",
-    backgroundColor: "#F8FAFC",
     alignItems: "center",
     justifyContent: "center",
+    gap: spacing.sm,
   },
 
-  photoIcon: {
-    fontSize: 28,
+  photoHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 
-  photoText: {
-    marginTop: 6,
-    fontSize: 11,
-    color: "#64748B",
-  },
-
-  photoSuccess: {
-    marginTop: 10,
+  photoOkRow: {
+    marginTop: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
   },
 
-  photoSuccessIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#DCFCE7",
-    color: "#16A34A",
-    textAlign: "center",
-    lineHeight: 20,
-    fontSize: 11,
-    fontWeight: "800",
-    marginRight: 7,
-  },
-
-  photoSuccessText: {
+  photoOkText: {
     fontSize: 12,
-    color: "#16A34A",
-    fontWeight: "700",
+    fontWeight: "800",
+    color: colors.success,
+  },
+
+  statusHelp: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md + 2,
+  },
+
+  statusHelpText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 
   bottomBar: {
@@ -886,50 +668,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#FFFFFF",
-    padding: 14,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: colors.border,
+    padding: spacing.md + 2,
+  },
+
+  bottomRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: spacing.sm,
   },
 
-  declineButton: {
+  bottomBtn: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#DC2626",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-
-  declineText: {
-    color: "#DC2626",
-    fontWeight: "800",
-  },
-
-  acceptButton: {
-    flex: 1,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-
-  fullButton: {
-    flex: 1,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-
-  acceptText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
   },
 });

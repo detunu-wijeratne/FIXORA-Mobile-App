@@ -1,5 +1,15 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+// src/app/provider/earnings.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   collection,
@@ -9,16 +19,10 @@ import {
   where,
 } from "firebase/firestore";
 
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
-
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import ScreenHeader from "../../components/ScreenHeader";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type Booking = {
   id: string;
@@ -36,12 +40,20 @@ type Booking = {
   completedAt?: Timestamp | null;
 };
 
-export default function ProviderEarningsScreen() {
-  const [completedJobs, setCompletedJobs] =
-    useState<Booking[]>([]);
+const asMoney = (value: any) => `Rs. ${Number(value || 0).toLocaleString()}`;
 
-  const [loading, setLoading] =
-    useState(true);
+const formatDate = (timestamp?: Timestamp | null) => {
+  if (!timestamp) return "Completed";
+  return timestamp.toDate().toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+export default function ProviderEarningsScreen() {
+  const [completedJobs, setCompletedJobs] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -53,822 +65,557 @@ export default function ProviderEarningsScreen() {
 
     const earningsQuery = query(
       collection(db, "bookings"),
-      where("providerId", "==", user.uid)
+      where("providerId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
       earningsQuery,
-
       (snapshot) => {
-        const jobs: Booking[] =
-          snapshot.docs
-            .map((bookingDoc) => ({
-              id: bookingDoc.id,
-              ...bookingDoc.data(),
-            }))
-            .filter(
-              (booking: any) =>
-                booking.status === "completed"
-            ) as Booking[];
+        const jobs: Booking[] = snapshot.docs
+          .map((bookingDoc) => ({
+            id: bookingDoc.id,
+            ...(bookingDoc.data() as any),
+          }))
+          .filter((b: any) => b.status === "completed") as Booking[];
 
-        /*
-          Newest completed jobs first.
-        */
+        // newest first
         jobs.sort((a, b) => {
-          const first =
-            a.completedAt?.toMillis?.() || 0;
-
-          const second =
-            b.completedAt?.toMillis?.() || 0;
-
+          const first = a.completedAt?.toMillis?.() || 0;
+          const second = b.completedAt?.toMillis?.() || 0;
           return second - first;
         });
-
-        console.log(
-          "Completed jobs for earnings:",
-          jobs.length
-        );
 
         setCompletedJobs(jobs);
         setLoading(false);
       },
-
       (error) => {
-        console.log(
-          "Earnings loading error:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load earnings."
-        );
-
+        console.log("Earnings loading error:", error);
+        alert(error.message || "Unable to load earnings.");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
   }, []);
 
-  /*
-    TOTAL EARNINGS
-  */
-  const totalEarnings =
-    completedJobs.reduce(
-      (total, job) =>
-        total +
-        Number(job.servicePrice || 0),
-      0
-    );
-
-  /*
-    CURRENT DATE RANGES
-  */
   const now = new Date();
 
-  const startOfWeek = new Date(now);
+  const startOfWeek = useMemo(() => {
+    const d = new Date(now);
+    const day = d.getDay(); // Sun=0
+    const difference = day === 0 ? 6 : day - 1; // Monday as week start
+    d.setDate(d.getDate() - difference);
+    d.setHours(0, 0, 0, 0);
+    return d;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const day = now.getDay();
+  const startOfMonth = useMemo(() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const difference =
-    day === 0 ? 6 : day - 1;
-
-  startOfWeek.setDate(
-    now.getDate() - difference
+  const totalEarnings = useMemo(
+    () =>
+      completedJobs.reduce(
+        (total, job) => total + Number(job.servicePrice || 0),
+        0,
+      ),
+    [completedJobs],
   );
 
-  startOfWeek.setHours(
-    0,
-    0,
-    0,
-    0
-  );
+  const thisWeekEarnings = useMemo(() => {
+    return completedJobs.reduce((total, job) => {
+      if (!job.completedAt) return total;
+      const completedDate = job.completedAt.toDate();
+      if (completedDate >= startOfWeek) {
+        return total + Number(job.servicePrice || 0);
+      }
+      return total;
+    }, 0);
+  }, [completedJobs, startOfWeek]);
 
-  const startOfMonth = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1
-  );
+  const thisMonthEarnings = useMemo(() => {
+    return completedJobs.reduce((total, job) => {
+      if (!job.completedAt) return total;
+      const completedDate = job.completedAt.toDate();
+      if (completedDate >= startOfMonth) {
+        return total + Number(job.servicePrice || 0);
+      }
+      return total;
+    }, 0);
+  }, [completedJobs, startOfMonth]);
 
-  /*
-    THIS WEEK
-  */
-  const thisWeekEarnings =
-    completedJobs.reduce(
-      (total, job) => {
-        if (!job.completedAt) {
-          return total;
-        }
-
-        const completedDate =
-          job.completedAt.toDate();
-
-        if (
-          completedDate >= startOfWeek
-        ) {
-          return (
-            total +
-            Number(
-              job.servicePrice || 0
-            )
-          );
-        }
-
-        return total;
-      },
-      0
-    );
-
-  /*
-    THIS MONTH
-  */
-  const thisMonthEarnings =
-    completedJobs.reduce(
-      (total, job) => {
-        if (!job.completedAt) {
-          return total;
-        }
-
-        const completedDate =
-          job.completedAt.toDate();
-
-        if (
-          completedDate >=
-          startOfMonth
-        ) {
-          return (
-            total +
-            Number(
-              job.servicePrice || 0
-            )
-          );
-        }
-
-        return total;
-      },
-      0
-    );
-
-  /*
-    LAST 7 DAYS GRAPH
-  */
-  const graphDays = Array.from(
-    { length: 7 },
-    (_, index) => {
+  const graphDays = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, index) => {
       const date = new Date();
+      date.setDate(now.getDate() - (6 - index));
+      date.setHours(0, 0, 0, 0);
 
-      date.setDate(
-        now.getDate() -
-          (6 - index)
-      );
+      const nextDay = new Date(date);
+      nextDay.setDate(date.getDate() + 1);
 
-      date.setHours(
-        0,
-        0,
-        0,
-        0
-      );
-
-      const nextDay =
-        new Date(date);
-
-      nextDay.setDate(
-        date.getDate() + 1
-      );
-
-      const amount =
-        completedJobs.reduce(
-          (total, job) => {
-            if (!job.completedAt) {
-              return total;
-            }
-
-            const completedDate =
-              job.completedAt.toDate();
-
-            if (
-              completedDate >= date &&
-              completedDate < nextDay
-            ) {
-              return (
-                total +
-                Number(
-                  job.servicePrice || 0
-                )
-              );
-            }
-
-            return total;
-          },
-          0
-        );
+      const amount = completedJobs.reduce((total, job) => {
+        if (!job.completedAt) return total;
+        const completedDate = job.completedAt.toDate();
+        if (completedDate >= date && completedDate < nextDay) {
+          return total + Number(job.servicePrice || 0);
+        }
+        return total;
+      }, 0);
 
       return {
-        label:
-          date.toLocaleDateString(
-            "en-US",
-            {
-              weekday: "short",
-            }
-          ),
+        label: date.toLocaleDateString("en-US", { weekday: "short" }),
         amount,
       };
-    }
-  );
+    });
 
-  const maxGraphAmount =
-    Math.max(
-      ...graphDays.map(
-        (item) => item.amount
-      ),
-      1
-    );
+    return days;
+  }, [completedJobs, now]);
 
-  const formatTransactionDate = (
-    timestamp?: Timestamp | null
-  ) => {
-    if (!timestamp) {
-      return "Completed";
-    }
-
-    return timestamp
-      .toDate()
-      .toLocaleDateString(
-        "en-GB",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
-      );
-  };
+  const maxGraphAmount = useMemo(() => {
+    const max = Math.max(...graphDays.map((d) => d.amount), 1);
+    return max;
+  }, [graphDays]);
 
   if (loading) {
     return (
-      <View
-        style={
-          styles.loadingContainer
-        }
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={styles.loadingText}
-        >
-          Loading earnings...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading earnings…</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
       <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          Earnings
-        </Text>
+        <ScreenHeader
+          eyebrow="FIXORA"
+          title="Earnings"
+          subtitle="Track your income and recent payouts from completed jobs."
+        />
 
-        <Text
-          style={styles.subtitle}
-        >
-          Track your income and recent service payments.
-        </Text>
+        {/* Total card */}
+        <View style={styles.totalCard}>
+          <View style={styles.totalTopRow}>
+            <View style={styles.totalIcon}>
+              <Ionicons name="wallet-outline" size={18} color={colors.white} />
+            </View>
 
-        <View
-          style={styles.balanceCard}
-        >
-          <Text
-            style={
-              styles.balanceLabel
-            }
-          >
-            Total Earnings
-          </Text>
-
-          <Text
-            style={
-              styles.balanceValue
-            }
-          >
-            Rs.{" "}
-            {totalEarnings.toLocaleString()}
-          </Text>
-
-          <Text
-            style={
-              styles.balanceGrowth
-            }
-          >
-            {completedJobs.length}{" "}
-            completed{" "}
-            {completedJobs.length === 1
-              ? "job"
-              : "jobs"}
-          </Text>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text
-              style={styles.statLabel}
-            >
-              This Week
-            </Text>
-
-            <Text
-              style={styles.statValue}
-            >
-              Rs.{" "}
-              {thisWeekEarnings.toLocaleString()}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.totalLabel}>Total earnings</Text>
+              <Text style={styles.totalValue}>{asMoney(totalEarnings)}</Text>
+              <Text style={styles.totalHint}>
+                {completedJobs.length} completed{" "}
+                {completedJobs.length === 1 ? "job" : "jobs"}
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.statCard}>
-            <Text
-              style={styles.statLabel}
-            >
-              This Month
-            </Text>
+          <View style={styles.totalPillsRow}>
+            <View style={styles.totalPill}>
+              <Text style={styles.pillLabel}>This week</Text>
+              <Text style={styles.pillValue}>{asMoney(thisWeekEarnings)}</Text>
+            </View>
 
-            <Text
-              style={styles.statValue}
-            >
-              Rs.{" "}
-              {thisMonthEarnings.toLocaleString()}
-            </Text>
+            <View style={styles.totalPill}>
+              <Text style={styles.pillLabel}>This month</Text>
+              <Text style={styles.pillValue}>{asMoney(thisMonthEarnings)}</Text>
+            </View>
           </View>
         </View>
 
-        <View
-          style={styles.sectionHeader}
-        >
-          <Text
-            style={styles.sectionTitle}
-          >
-            Earnings Overview
-          </Text>
-
-          <Text
-            style={styles.filter}
-          >
-            Last 7 Days
-          </Text>
+        {/* Chart */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Last 7 days</Text>
+          <Text style={styles.sectionMeta}>Overview</Text>
         </View>
 
-        <View
-          style={styles.chartCard}
-        >
-          <View
-            style={styles.chartBars}
-          >
-            {graphDays.map(
-              (item, index) => {
-                const height =
-                  item.amount === 0
-                    ? 6
-                    : Math.max(
-                        15,
-                        (item.amount /
-                          maxGraphAmount) *
-                          120
-                      );
+        <View style={styles.chartCard}>
+          <View style={styles.chartBars}>
+            {graphDays.map((item, index) => {
+              const height =
+                item.amount === 0
+                  ? 8
+                  : Math.max(16, (item.amount / maxGraphAmount) * 130);
 
-                return (
-                  <View
-                    key={`${item.label}-${index}`}
-                    style={
-                      styles.barColumn
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.barAmount
-                      }
-                    >
-                      {item.amount > 0
-                        ? `${Math.round(
-                            item.amount /
-                              1000
-                          )}k`
-                        : ""}
-                    </Text>
+              const label =
+                item.amount > 0
+                  ? item.amount >= 1000
+                    ? `${Math.round(item.amount / 1000)}k`
+                    : `${Math.round(item.amount)}`
+                  : "";
 
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          height,
-                        },
-                      ]}
-                    />
+              return (
+                <View key={`${item.label}-${index}`} style={styles.barCol}>
+                  <Text style={styles.barTopLabel} numberOfLines={1}>
+                    {label}
+                  </Text>
 
-                    <Text
-                      style={
-                        styles.dayLabel
-                      }
-                    >
-                      {item.label}
-                    </Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { height }]} />
                   </View>
-                );
-              }
-            )}
+
+                  <Text style={styles.barDay}>{item.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.chartNote}>
+            <Ionicons
+              name="information-circle-outline"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.chartNoteText}>
+              Bars show your earned service amount per day (completed jobs).
+            </Text>
           </View>
         </View>
 
-        <View
-          style={styles.sectionHeader}
-        >
-          <Text
-            style={styles.sectionTitle}
-          >
-            Recent Transactions
-          </Text>
-
-          <Text
-            style={styles.filter}
-          >
-            {completedJobs.length} Total
-          </Text>
+        {/* Transactions */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent transactions</Text>
+          <Text style={styles.sectionMeta}>{completedJobs.length} total</Text>
         </View>
 
-        {completedJobs.length ===
-        0 ? (
-          <View
-            style={styles.emptyCard}
-          >
-            <Text
-              style={styles.emptyIcon}
-            >
-              💰
-            </Text>
+        {completedJobs.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="cash-outline" size={22} color={colors.textSecondary} />
+            </View>
 
-            <Text
-              style={styles.emptyTitle}
-            >
-              No earnings yet
-            </Text>
-
-            <Text
-              style={styles.emptyText}
-            >
-              Completed jobs will appear
-              here as transactions.
+            <Text style={styles.emptyTitle}>No earnings yet</Text>
+            <Text style={styles.emptyText}>
+              Completed jobs will appear here as transactions.
             </Text>
           </View>
         ) : (
-          <View
-            style={
-              styles.transactionList
-            }
-          >
-            {completedJobs.map(
-              (transaction) => (
-                <View
-                  key={transaction.id}
-                  style={
-                    styles.transactionCard
-                  }
-                >
-                  <View
-                    style={
-                      styles.transactionIcon
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.transactionEmoji
-                      }
-                    >
-                      💰
-                    </Text>
-                  </View>
+          <View style={styles.txList}>
+            {completedJobs.map((tx) => (
+              <View key={tx.id} style={styles.txCard}>
+                <View style={styles.txIcon}>
+                  <Ionicons name="checkmark-done-outline" size={18} color={colors.success} />
+                </View>
 
-                  <View
-                    style={
-                      styles.transactionInfo
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.transactionService
-                      }
-                    >
-                      {transaction.service ||
-                        "Home Service"}
-                    </Text>
+                <View style={styles.txInfo}>
+                  <Text style={styles.txService} numberOfLines={1}>
+                    {tx.service || "Home Service"}
+                  </Text>
+                  <Text style={styles.txCustomer} numberOfLines={1}>
+                    {tx.customerName || "Customer"}
+                  </Text>
+                  <Text style={styles.txDate}>{formatDate(tx.completedAt)}</Text>
+                </View>
 
-                    <Text
-                      style={
-                        styles.transactionCustomer
-                      }
-                    >
-                      {transaction.customerName ||
-                        "Customer"}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.transactionDate
-                      }
-                    >
-                      {formatTransactionDate(
-                        transaction.completedAt
-                      )}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={
-                      styles.amountArea
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.amount
-                      }
-                    >
-                      Rs.{" "}
-                      {Number(
-                        transaction.servicePrice ||
-                          0
-                      ).toLocaleString()}
-                    </Text>
-
-                    <Text
-                      style={styles.paid}
-                    >
-                      ✓ Earned
-                    </Text>
+                <View style={styles.txAmount}>
+                  <Text style={styles.txValue}>{asMoney(tx.servicePrice)}</Text>
+                  <View style={styles.txBadge}>
+                    <Ionicons name="shield-checkmark-outline" size={12} color={colors.success} />
+                    <Text style={styles.txBadgeText}>Earned</Text>
                   </View>
                 </View>
-              )
-            )}
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
 
       <ProviderBottomNav />
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: "#F7F7FC",
-    },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
 
-    loadingContainer: {
-      flex: 1,
-      backgroundColor: "#F7F7FC",
-      alignItems: "center",
-      justifyContent: "center",
-    },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: { marginTop: spacing.md, color: colors.textSecondary },
 
-    loadingText: {
-      marginTop: 12,
-      color: "#64748B",
-    },
+  scrollContent: {
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90, // room for bottom nav
+  },
 
-    scrollContent: {
-      padding: 18,
-      paddingBottom: 30,
-    },
+  totalCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
 
-    title: {
-      fontSize: 27,
-      fontWeight: "800",
-      color: "#0F172A",
-    },
+  totalTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
 
-    subtitle: {
-      marginTop: 6,
-      fontSize: 13,
-      lineHeight: 20,
-      color: "#64748B",
-    },
+  totalIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-    balanceCard: {
-      marginTop: 20,
-      borderRadius: 18,
-      padding: 20,
-      backgroundColor: "#1D4ED8",
-    },
+  totalLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+  },
 
-    balanceLabel: {
-      fontSize: 12,
-      color: "#BFDBFE",
-    },
+  totalValue: {
+    marginTop: 6,
+    fontSize: 30,
+    fontWeight: "900",
+    color: colors.white,
+  },
 
-    balanceValue: {
-      marginTop: 6,
-      fontSize: 30,
-      fontWeight: "800",
-      color: "#FFFFFF",
-    },
+  totalHint: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.78)",
+  },
 
-    balanceGrowth: {
-      marginTop: 8,
-      fontSize: 12,
-      fontWeight: "600",
-      color: "#BBF7D0",
-    },
+  totalPillsRow: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
 
-    statsRow: {
-      marginTop: 14,
-      flexDirection: "row",
-      gap: 12,
-    },
+  totalPill: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
 
-    statCard: {
-      flex: 1,
-      backgroundColor: "#FFFFFF",
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: "#E2E8F0",
-    },
+  pillLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+  },
 
-    statLabel: {
-      fontSize: 11,
-      color: "#64748B",
-    },
+  pillValue: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: "900",
+    color: colors.white,
+  },
 
-    statValue: {
-      marginTop: 5,
-      fontSize: 17,
-      fontWeight: "800",
-      color: "#0F172A",
-    },
+  sectionHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
-    sectionHeader: {
-      marginTop: 24,
-      marginBottom: 12,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent:
-        "space-between",
-    },
+  sectionTitle: {
+    ...typography.sectionHeading,
+    fontSize: 16,
+    fontWeight: "900",
+  },
 
-    sectionTitle: {
-      fontSize: 17,
-      fontWeight: "800",
-      color: "#0F172A",
-    },
+  sectionMeta: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.primary,
+  },
 
-    filter: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: "#1D4ED8",
-    },
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
 
-    chartCard: {
-      backgroundColor: "#FFFFFF",
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "#E2E8F0",
-      padding: 16,
-    },
+  chartBars: {
+    height: 190,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 8,
+  },
 
-    chartBars: {
-      height: 180,
-      flexDirection: "row",
-      justifyContent:
-        "space-between",
-      alignItems: "flex-end",
-    },
+  barCol: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
 
-    barColumn: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "flex-end",
-    },
+  barTopLabel: {
+    minHeight: 14,
+    marginBottom: 6,
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.textSecondary,
+  },
 
-    bar: {
-      width: 20,
-      borderRadius: 5,
-      backgroundColor: "#2563EB",
-    },
+  barTrack: {
+    width: 18,
+    height: 150,
+    borderRadius: 9,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
 
-    barAmount: {
-      marginBottom: 4,
-      minHeight: 12,
-      fontSize: 8,
-      fontWeight: "700",
-      color: "#475569",
-    },
+  barFill: {
+    width: "100%",
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+  },
 
-    dayLabel: {
-      marginTop: 7,
-      fontSize: 9,
-      color: "#64748B",
-    },
+  barDay: {
+    marginTop: 8,
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
 
-    transactionList: {
-      gap: 10,
-    },
+  chartNote: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 
-    transactionCard: {
-      backgroundColor: "#FFFFFF",
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "#E2E8F0",
-      padding: 14,
-      flexDirection: "row",
-      alignItems: "center",
-    },
+  chartNoteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
 
-    transactionIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      backgroundColor: "#DCFCE7",
-      alignItems: "center",
-      justifyContent: "center",
-    },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: "center",
+  },
 
-    transactionEmoji: {
-      fontSize: 20,
-    },
+  emptyIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-    transactionInfo: {
-      flex: 1,
-      marginLeft: 11,
-    },
+  emptyTitle: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
 
-    transactionService: {
-      fontSize: 13,
-      fontWeight: "700",
-      color: "#0F172A",
-    },
+  emptyText: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
 
-    transactionCustomer: {
-      marginTop: 2,
-      fontSize: 11,
-      color: "#475569",
-    },
+  txList: {
+    gap: spacing.md,
+  },
 
-    transactionDate: {
-      marginTop: 2,
-      fontSize: 10,
-      color: "#94A3B8",
-    },
+  txCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
 
-    amountArea: {
-      alignItems: "flex-end",
-    },
+  txIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.successLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-    amount: {
-      fontSize: 14,
-      fontWeight: "800",
-      color: "#0F172A",
-    },
+  txInfo: {
+    flex: 1,
+  },
 
-    paid: {
-      marginTop: 3,
-      fontSize: 10,
-      fontWeight: "700",
-      color: "#16A34A",
-    },
+  txService: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
 
-    emptyCard: {
-      backgroundColor: "#FFFFFF",
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "#E2E8F0",
-      padding: 30,
-      alignItems: "center",
-    },
+  txCustomer: {
+    marginTop: 3,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
 
-    emptyIcon: {
-      fontSize: 36,
-    },
+  txDate: {
+    marginTop: 3,
+    ...typography.caption,
+  },
 
-    emptyTitle: {
-      marginTop: 10,
-      fontSize: 16,
-      fontWeight: "800",
-      color: "#0F172A",
-    },
+  txAmount: {
+    alignItems: "flex-end",
+  },
 
-    emptyText: {
-      marginTop: 6,
-      fontSize: 12,
-      lineHeight: 18,
-      textAlign: "center",
-      color: "#64748B",
-    },
-  });
+  txValue: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  txBadge: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.successLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+
+  txBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: colors.success,
+  },
+});

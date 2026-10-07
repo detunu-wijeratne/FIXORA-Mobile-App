@@ -1,338 +1,423 @@
+// src/app/provider/create-account.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  SafeAreaView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 import AppTextInput from "../../components/AppTextInput";
 import PrimaryButton from "../../components/PrimaryButton";
+import SecondaryButton from "../../components/SecondaryButton";
 import { auth, db } from "../../services/firebase";
 import { colors, radius, spacing, typography } from "../../theme";
 
+function passwordStrength(pw: string) {
+  const v = pw.trim();
+  let score = 0;
+  if (v.length >= 8) score += 1;
+  if (/[A-Z]/.test(v)) score += 1;
+  if (/[0-9]/.test(v)) score += 1;
+  if (/[^A-Za-z0-9]/.test(v)) score += 1;
+
+  if (v.length === 0) return { label: "—", color: colors.textMuted, score: 0 };
+  if (score <= 1) return { label: "Weak", color: colors.error, score };
+  if (score === 2) return { label: "Good", color: colors.warning, score };
+  return { label: "Strong", color: colors.success, score };
+}
+
 export default function ProviderCreateAccountScreen() {
-  const [name, setName] = useState("Ahmad Rasheed");
-  const [phone, setPhone] = useState("77 482 9104");
-  const [email, setEmail] = useState("ahmad.pro@fixora.lk");
-  const [category, setCategory] = useState("Plumbing & Pipe Diagnostics");
-  const [district, setDistrict] = useState(
-    "Colombo District (Zones 01–15 & Suburbs)"
-  );
-  const [password, setPassword] = useState("ColomboPro#2025");
-  const [confirmPassword, setConfirmPassword] = useState("ColomboPro#2025");
-  const [agreed, setAgreed] = useState(true);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Keep these as text inputs for now (works everywhere)
+  const [category, setCategory] = useState("");
+  const [district, setDistrict] = useState("");
+
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const strength = useMemo(() => passwordStrength(password), [password]);
+  const passwordsMatch = password.length > 0 && password === confirmPassword;
+
   const continueToVerification = async () => {
-  if (!name.trim() || !email.trim() || !password.trim()) {
-    alert("Please complete all required fields.");
-    return;
-  }
-
-  if (password !== confirmPassword) {
-    alert("Passwords do not match.");
-    return;
-  }
-
-  if (!agreed) {
-    alert("Please accept the Partner Agreement.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    // 1. Create Firebase Authentication account
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email.trim(),
-      password
-    );
-
-    const user = userCredential.user;
-
-    // 2. Save provider profile in Firestore
-    await setDoc(doc(db, "users", user.uid), {
-      uid: user.uid,
-      role: "provider",
-
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim().toLowerCase(),
-
-      category,
-      district,
-
-      verificationStatus: "not_submitted",
-      accountStatus: "active",
-
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    // 3. Continue to verification
-    router.replace({
-      pathname: "/provider/verification",
-      params: {
-        providerId: user.uid,
-        name,
-        email,
-      },
-    });
-  } catch (error: any) {
-    console.log("Provider registration error:", error);
-
-    if (error.code === "auth/email-already-in-use") {
-      alert("An account already exists with this email.");
-    } else if (error.code === "auth/invalid-email") {
-      alert("Please enter a valid email address.");
-    } else if (error.code === "auth/weak-password") {
-      alert("Please use a stronger password.");
-    } else {
-      alert(error.message || "Unable to create provider account.");
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      Alert.alert("Missing details", "Please complete all required fields.");
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
-};
+
+    if (!phone.trim()) {
+      Alert.alert("Missing details", "Please enter a phone number.");
+      return;
+    }
+
+    if (!category.trim()) {
+      Alert.alert("Missing details", "Please enter your primary trade category.");
+      return;
+    }
+
+    if (!district.trim()) {
+      Alert.alert("Missing details", "Please enter your service coverage area.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Password mismatch", "Passwords do not match.");
+      return;
+    }
+
+    if (!agreed) {
+      Alert.alert("Partner Agreement", "Please accept the Partner Agreement to continue.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 1) Create auth account
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password,
+      );
+
+      const user = userCredential.user;
+
+      // 2) Save provider profile in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        role: "provider",
+
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim().toLowerCase(),
+
+        category: category.trim(),
+        district: district.trim(),
+
+        verificationStatus: "not_submitted",
+        accountStatus: "active",
+
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 3) Continue to verification
+      router.replace({
+        pathname: "/provider/verification",
+        params: {
+          providerId: user.uid,
+          name,
+          email,
+        },
+      });
+    } catch (error: any) {
+      console.log("Provider registration error:", error);
+
+      if (error.code === "auth/email-already-in-use") {
+        Alert.alert("Email already used", "An account already exists with this email.");
+      } else if (error.code === "auth/invalid-email") {
+        Alert.alert("Invalid email", "Please enter a valid email address.");
+      } else if (error.code === "auth/weak-password") {
+        Alert.alert("Weak password", "Please use a stronger password.");
+      } else {
+        Alert.alert("Error", error.message || "Unable to create provider account.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.progressRow}>
-          <Text style={styles.stepBadge}>Step 1 of 2</Text>
-          <View style={styles.proBadge}>
-            <Text style={styles.proBadgeText}>PRO</Text>
-          </View>
-        </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Top bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.topBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.85}
+              hitSlop={10}
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
 
-        <View style={styles.heroCard}>
-          <Text style={styles.networkText}>Sri Lanka Pro Network</Text>
-          <Text style={styles.heroTitle}>Join Fixora as a Pro Partner</Text>
-          <Text style={styles.heroText}>
-            Earn from verified local jobs and grow your service business.
-          </Text>
-
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
-          </View>
-
-          <View style={styles.progressLabels}>
-            <Text style={styles.activeStep}>1. Basic Profile</Text>
-            <Text style={styles.inactiveStep}>2. Verification Docs</Text>
-          </View>
-        </View>
-
-        <View style={styles.formCard}>
-          <AppTextInput
-            label="Full Legal Name"
-            value={name}
-            onChangeText={setName}
-            placeholder="Full legal name"
-          />
-
-          <Text style={styles.label}>Mobile Phone Number</Text>
-          <View style={styles.phoneRow}>
-            <View style={styles.countryCode}>
-              <Text style={styles.countryCodeText}>+94</Text>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={styles.stepText}>Step 1 of 2</Text>
             </View>
 
-            <View style={styles.phoneInputWrapper}>
-              <AppTextInput
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                style={styles.phoneInputInner}
-              />
+            <View style={styles.proPill}>
+              <Ionicons name="briefcase-outline" size={14} color={colors.white} />
+              <Text style={styles.proPillText}>PRO</Text>
             </View>
           </View>
 
-          <AppTextInput
-            label="Email Address"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          {/* Hero */}
+          <View style={styles.heroCard}>
+            <Text style={styles.heroEyebrow}>FIXORA PARTNER</Text>
+            <Text style={styles.heroTitle}>Join Fixora as a Pro Partner</Text>
+            <Text style={styles.heroSub}>
+              Earn from verified local jobs and grow your service business.
+            </Text>
 
-          <Text style={styles.label}>Primary Trade Category</Text>
-          <TouchableOpacity style={styles.selectInput}>
-            <Ionicons
-              name="construct-outline"
-              size={16}
-              color={colors.textSecondary}
-              style={styles.selectLeadingIcon}
+            <View style={styles.progressTrack}>
+              <View style={styles.progressFill} />
+            </View>
+
+            <View style={styles.progressLabels}>
+              <Text style={styles.progressActive}>1. Basic profile</Text>
+              <Text style={styles.progressInactive}>2. Verification docs</Text>
+            </View>
+          </View>
+
+          {/* Form */}
+          <View style={styles.card}>
+            <AppTextInput
+              label="Full legal name *"
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name as on NIC"
             />
-            <Text style={styles.selectText}>{category}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
 
-          <Text style={styles.label}>Service Coverage District</Text>
-          <TouchableOpacity style={styles.selectInput}>
-            <Ionicons
-              name="location-outline"
-              size={16}
-              color={colors.textSecondary}
-              style={styles.selectLeadingIcon}
-            />
-            <Text style={styles.selectText}>{district}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
+            <Text style={styles.inlineLabel}>Mobile phone number *</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.countryCodeText}>+94</Text>
+              </View>
 
-          <AppTextInput
-            label="Create Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <Text style={styles.passwordStatus}>Strong</Text>
-
-          <AppTextInput
-            label="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
-
-          <Text
-            style={[
-              styles.passwordStatus,
-              password !== confirmPassword && styles.passwordStatusError,
-            ]}
-          >
-            {password === confirmPassword ? "Match" : "Passwords do not match"}
-          </Text>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>Direct Weekly LKR Payouts</Text>
-            <Text style={styles.infoText}>
-              Automated bank deposits and instant payment settlement.
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.agreementRow}
-            onPress={() => setAgreed(!agreed)}
-          >
-            <View style={[styles.checkbox, agreed && styles.checkboxActive]}>
-              {agreed && (
-                <Ionicons name="checkmark" size={14} color={colors.white} />
-              )}
+              <View style={{ flex: 1 }}>
+                <AppTextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholder="77 123 4567"
+                  style={styles.phoneInputInner}
+                />
+              </View>
             </View>
 
-            <Text style={styles.agreementText}>
-              I agree to the Fixora Partner Agreement and Code of Conduct.
-            </Text>
-          </TouchableOpacity>
+            <AppTextInput
+              label="Email address *"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="you@example.com"
+            />
 
-          <PrimaryButton
-            title={
-              loading
-                ? "Creating Account..."
-                : "Continue to Document Verification"
-            }
-            onPress={continueToVerification}
-            loading={loading}
-            disabled={!agreed || password !== confirmPassword}
-            icon="arrow-forward"
-            style={styles.continueButton}
-          />
+            <AppTextInput
+              label="Primary trade category *"
+              value={category}
+              onChangeText={setCategory}
+              placeholder="Example: Plumbing, Electrical, AC Repair"
+            />
 
-          <TouchableOpacity onPress={() => router.replace("/provider/login")}>
-            <Text style={styles.loginText}>
-              Already registered as a Fixora Partner?{" "}
-              <Text style={styles.loginLink}>Log In</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            <AppTextInput
+              label="Service coverage / district *"
+              value={district}
+              onChangeText={setDistrict}
+              placeholder="Example: Colombo District (Zones 01–15)"
+            />
+
+            <AppTextInput
+              label="Create password *"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Min 8 characters"
+            />
+
+            <View style={styles.passwordRow}>
+              <Text style={styles.passwordHint}>Strength:</Text>
+              <Text style={[styles.passwordValue, { color: strength.color }]}>
+                {strength.label}
+              </Text>
+            </View>
+
+            <AppTextInput
+              label="Confirm password *"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              placeholder="Re-enter your password"
+            />
+
+            <View style={styles.passwordRow}>
+              <Text style={styles.passwordHint}>Match:</Text>
+              <Text
+                style={[
+                  styles.passwordValue,
+                  { color: passwordsMatch ? colors.success : colors.textMuted },
+                ]}
+              >
+                {confirmPassword.length === 0
+                  ? "—"
+                  : passwordsMatch
+                    ? "Yes"
+                    : "No"}
+              </Text>
+            </View>
+
+            <View style={styles.infoCard}>
+              <View style={styles.infoIcon}>
+                <Ionicons name="cash-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoTitle}>Weekly LKR payouts</Text>
+                <Text style={styles.infoText}>
+                  Automated settlements based on completed jobs.
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.agreementRow}
+              onPress={() => setAgreed((v) => !v)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.checkbox, agreed && styles.checkboxActive]}>
+                {agreed ? (
+                  <Ionicons name="checkmark" size={14} color={colors.white} />
+                ) : null}
+              </View>
+
+              <Text style={styles.agreementText}>
+                I agree to the Fixora Partner Agreement and Code of Conduct.
+              </Text>
+            </TouchableOpacity>
+
+            <PrimaryButton
+              title={loading ? "Creating account..." : "Continue to verification"}
+              onPress={continueToVerification}
+              loading={loading}
+              disabled={!agreed || !passwordsMatch || password.length < 8}
+              icon="arrow-forward"
+              style={styles.continueBtn}
+            />
+
+            <SecondaryButton
+              title="Already registered? Log in"
+              onPress={() => router.replace("/provider/login")}
+              variant="ghost"
+              style={styles.backToLogin}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
   scrollContent: {
-    padding: spacing.lg + 2,
+    padding: spacing.xl,
     paddingBottom: spacing.xxxl + 8,
   },
 
-  progressRow: {
+  topBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
 
-  stepBadge: {
+  topBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  stepText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "900",
     color: colors.primary,
   },
 
-  proBadge: {
+  proPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs - 1,
-    borderRadius: radius.sm - 2,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
   },
 
-  proBadgeText: {
+  proPillText: {
     color: colors.white,
-    fontSize: 10,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "900",
   },
 
   heroCard: {
-    marginTop: spacing.lg,
     borderRadius: radius.xl,
-    padding: spacing.lg + 2,
+    padding: spacing.lg,
     backgroundColor: colors.textPrimary,
   },
 
-  networkText: {
-    color: colors.borderStrong,
+  heroEyebrow: {
     fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    color: "rgba(255,255,255,0.75)",
   },
 
   heroTitle: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     fontSize: 22,
-    fontWeight: "800",
+    fontWeight: "900",
     color: colors.white,
   },
 
-  heroText: {
-    marginTop: spacing.xs + 2,
+  heroSub: {
+    marginTop: spacing.sm,
     fontSize: 13,
     lineHeight: 20,
-    color: colors.borderStrong,
+    color: "rgba(255,255,255,0.75)",
   },
 
-  progressBar: {
+  progressTrack: {
     marginTop: spacing.lg,
-    height: 5,
-    borderRadius: 5,
-    backgroundColor: "#334155",
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    overflow: "hidden",
   },
 
   progressFill: {
     width: "50%",
     height: "100%",
-    borderRadius: 5,
     backgroundColor: colors.primarySoft,
   },
 
@@ -342,114 +427,116 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  activeStep: {
+  progressActive: {
     color: colors.white,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  progressInactive: {
+    color: "rgba(255,255,255,0.55)",
     fontSize: 11,
     fontWeight: "700",
   },
 
-  inactiveStep: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-
-  formCard: {
+  card: {
     marginTop: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
-  label: {
+  inlineLabel: {
     ...typography.label,
     marginTop: spacing.md + 2,
-    marginBottom: spacing.sm - 1,
+    marginBottom: spacing.sm,
   },
 
   phoneRow: {
     flexDirection: "row",
     gap: spacing.sm,
+    alignItems: "center",
+    marginBottom: spacing.md,
   },
 
   countryCode: {
-    width: 70,
+    width: 74,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    borderRadius: radius.md + 1,
-    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
 
   countryCodeText: {
     color: colors.primary,
-    fontWeight: "700",
-  },
-
-  phoneInputWrapper: {
-    flex: 1,
+    fontWeight: "900",
+    fontSize: 14,
   },
 
   phoneInputInner: {
     marginBottom: 0,
   },
 
-  selectInput: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md + 1,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.lg - 2,
-    marginBottom: spacing.lg,
-  },
-
-  selectLeadingIcon: {
-    marginRight: spacing.sm,
-  },
-
-  selectText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-
-  passwordStatus: {
+  passwordRow: {
     marginTop: spacing.xs,
-    textAlign: "right",
-    color: colors.success,
-    fontSize: 11,
-    fontWeight: "700",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 6,
   },
 
-  passwordStatusError: {
-    color: colors.error,
+  passwordHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  passwordValue: {
+    ...typography.caption,
+    fontWeight: "900",
   },
 
   infoCard: {
-    marginTop: spacing.lg + 2,
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
     backgroundColor: colors.primarySoft,
     borderRadius: radius.lg,
     padding: spacing.md + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  infoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   infoTitle: {
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "900",
     color: colors.textPrimary,
   },
 
   infoText: {
-    marginTop: spacing.xs,
-    fontSize: 11,
-    lineHeight: 17,
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 18,
     color: colors.textSecondary,
   },
 
   agreementRow: {
-    marginTop: spacing.lg + 2,
+    marginTop: spacing.lg,
     flexDirection: "row",
     alignItems: "flex-start",
   },
@@ -457,9 +544,10 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: radius.sm - 2,
+    borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.textMuted,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -477,19 +565,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  continueButton: {
-    marginTop: spacing.xl + 2,
+  continueBtn: {
+    marginTop: spacing.xl,
   },
 
-  loginText: {
-    marginTop: spacing.lg + 2,
-    textAlign: "center",
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-
-  loginLink: {
-    color: colors.primary,
-    fontWeight: "700",
+  backToLogin: {
+    marginTop: spacing.md,
   },
 });

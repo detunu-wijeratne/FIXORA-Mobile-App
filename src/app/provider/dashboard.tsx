@@ -1,3 +1,5 @@
+// src/app/provider/dashboard.tsx
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
   collection,
@@ -10,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,7 +23,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/PrimaryButton";
+import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type Booking = {
   id: string;
@@ -46,24 +53,17 @@ type Booking = {
   status?: string;
 };
 
+const money = (v: any) => `Rs. ${Number(v || 0).toLocaleString()}`;
+
 export default function ProviderDashboardScreen() {
-  const [providerName, setProviderName] =
-    useState("Provider");
+  const [providerName, setProviderName] = useState("Provider");
+  const [category, setCategory] = useState("Service Provider");
+  const [district, setDistrict] = useState("Service Area");
 
-  const [category, setCategory] =
-    useState("Service Provider");
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const [district, setDistrict] =
-    useState("Service Area");
-
-  const [loadingProfile, setLoadingProfile] =
-    useState(true);
-
-  const [bookings, setBookings] =
-    useState<Booking[]>([]);
-
-  const [loadingBookings, setLoadingBookings] =
-    useState(true);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -75,35 +75,20 @@ export default function ProviderDashboardScreen() {
 
     const loadProviderProfile = async () => {
       try {
-        const providerDoc = await getDoc(
-          doc(db, "users", user.uid)
-        );
+        const providerDoc = await getDoc(doc(db, "users", user.uid));
 
         if (!providerDoc.exists()) {
-          console.log(
-            "Provider profile not found."
-          );
+          console.log("Provider profile not found.");
           return;
         }
 
         const data = providerDoc.data();
 
-        setProviderName(
-          data.name || "Provider"
-        );
-
-        setCategory(
-          data.category || "Service Provider"
-        );
-
-        setDistrict(
-          data.district || "Service Area"
-        );
+        setProviderName(data.name || "Provider");
+        setCategory(data.category || "Service Provider");
+        setDistrict(data.district || "Service Area");
       } catch (error) {
-        console.log(
-          "Error loading provider profile:",
-          error
-        );
+        console.log("Error loading provider profile:", error);
       } finally {
         setLoadingProfile(false);
       }
@@ -111,804 +96,430 @@ export default function ProviderDashboardScreen() {
 
     loadProviderProfile();
 
-    /*
-      Load only bookings assigned to this
-      logged-in provider.
-    */
     const bookingsQuery = query(
       collection(db, "bookings"),
-      where("providerId", "==", user.uid)
+      where("providerId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
       bookingsQuery,
-
       (snapshot) => {
-        const loadedBookings: Booking[] =
-          snapshot.docs.map((bookingDoc) => ({
-            id: bookingDoc.id,
-            ...bookingDoc.data(),
-          })) as Booking[];
+        const loadedBookings: Booking[] = snapshot.docs.map((bookingDoc) => ({
+          id: bookingDoc.id,
+          ...(bookingDoc.data() as any),
+        })) as Booking[];
 
-        console.log(
-          "Dashboard provider bookings:",
-          loadedBookings.length
-        );
+        console.log("Dashboard provider bookings:", loadedBookings.length);
 
         setBookings(loadedBookings);
         setLoadingBookings(false);
       },
-
       (error) => {
-        console.log(
-          "Dashboard booking error:",
-          error
-        );
-
+        console.log("Dashboard booking error:", error);
         setLoadingBookings(false);
-      }
+      },
     );
 
     return () => unsubscribe();
   }, []);
 
-  const pendingRequests = bookings.filter(
-    (booking) =>
-      booking.status === "pending"
-  );
+  const pendingRequests = bookings.filter((booking) => booking.status === "pending");
 
   const upcomingJobs = bookings.filter(
-    (booking) =>
-      booking.status === "confirmed" ||
-      booking.status === "in_progress"
+    (booking) => booking.status === "confirmed" || booking.status === "in_progress",
   );
 
-  const completedJobs = bookings.filter(
-    (booking) =>
-      booking.status === "completed"
+  const completedJobs = bookings.filter((booking) => booking.status === "completed");
+
+  const totalEarnings = completedJobs.reduce(
+    (total, booking) => total + Number(booking.servicePrice || 0),
+    0,
   );
 
-  const totalEarnings =
-    completedJobs.reduce(
-      (total, booking) =>
-        total +
-        Number(booking.servicePrice || 0),
-      0
-    );
+  const latestRequest = pendingRequests.length > 0 ? pendingRequests[0] : null;
 
-  const latestRequest =
-    pendingRequests.length > 0
-      ? pendingRequests[0]
-      : null;
+  const displayedUpcomingJobs = upcomingJobs.slice(0, 2);
 
-  const displayedUpcomingJobs =
-    upcomingJobs.slice(0, 2);
-
-  const openRequestDetails = (
-    booking: Booking
-  ) => {
+  const openRequestDetails = (booking: Booking) => {
     router.push({
       pathname: "/provider/request-details",
-
       params: {
         bookingId: booking.id,
-
-        customer:
-          booking.customerName ||
-          "Customer",
-
-        phone:
-          booking.customerPhone || "",
-
-        email:
-          booking.customerEmail || "",
-
-        service:
-          booking.service ||
-          "Home Service",
-
-        date:
-          booking.date || "",
-
-        time:
-          booking.time || "",
-
-        location:
-          booking.address || "",
-
-        description:
-          booking.description || "",
-
-        price: String(
-          booking.servicePrice || 0
-        ),
-
-        totalAmount: String(
-          booking.totalAmount || 0
-        ),
-
-        status:
-          booking.status || "pending",
+        customer: booking.customerName || "Customer",
+        phone: booking.customerPhone || "",
+        email: booking.customerEmail || "",
+        service: booking.service || "Home Service",
+        date: booking.date || "",
+        time: booking.time || "",
+        location: booking.address || "",
+        description: booking.description || "",
+        price: String(booking.servicePrice || 0),
+        totalAmount: String(booking.totalAmount || 0),
+        status: booking.status || "pending",
       },
     });
   };
 
-  const openJobDetails = (
-    booking: Booking
-  ) => {
+  const openJobDetails = (booking: Booking) => {
     router.push({
       pathname: "/provider/job-details",
-
       params: {
         bookingId: booking.id,
-
-        customer:
-          booking.customerName ||
-          "Customer",
-
-        phone:
-          booking.customerPhone || "",
-
-        email:
-          booking.customerEmail || "",
-
-        service:
-          booking.service ||
-          "Home Service",
-
-        date:
-          booking.date || "",
-
-        time:
-          booking.time || "",
-
-        location:
-          booking.address || "",
-
-        description:
-          booking.description || "",
-
-        price: String(
-          booking.servicePrice || 0
-        ),
-
-        totalAmount: String(
-          booking.totalAmount || 0
-        ),
-
-        status:
-          booking.status || "confirmed",
+        customer: booking.customerName || "Customer",
+        phone: booking.customerPhone || "",
+        email: booking.customerEmail || "",
+        service: booking.service || "Home Service",
+        date: booking.date || "",
+        time: booking.time || "",
+        location: booking.address || "",
+        description: booking.description || "",
+        price: String(booking.servicePrice || 0),
+        totalAmount: String(booking.totalAmount || 0),
+        status: booking.status || "confirmed",
       },
     });
   };
 
-  const getInitials = (
-    name?: string
-  ) => {
-    if (!name) {
-      return "CU";
-    }
-
+  const getInitials = (name?: string) => {
+    if (!name) return "CU";
     return name
       .split(" ")
+      .filter(Boolean)
       .map((word) => word[0])
       .join("")
       .slice(0, 2)
       .toUpperCase();
   };
 
-  const getJobStatusLabel = (
-    status?: string
-  ) => {
-    if (status === "in_progress") {
-      return "In Progress";
-    }
-
+  const getJobStatusLabel = (status?: string) => {
+    if (status === "in_progress") return "In Progress";
     return "Confirmed";
   };
 
+  const toStatusType = (status?: string): StatusType => {
+    if (status === "pending") return "pending";
+    if (status === "confirmed") return "confirmed";
+    if (status === "in_progress") return "in_progress";
+    if (status === "completed") return "completed";
+    if (status === "declined") return "declined";
+    if (status === "cancelled") return "cancelled";
+    return "confirmed";
+  };
+
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={["top"]}
-    >
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* subtle attractive background (does not block touches) */}
+      <View pointerEvents="none" style={styles.bgDecor}>
+        <View style={styles.blobA} />
+        <View style={styles.blobB} />
+        <View style={styles.blobC} />
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* HEADER */}
+        {/* PREMIUM BLUE HEADER */}
+        <View style={styles.headerHero}>
+          <View style={styles.headerTopRow}>
+            <View style={{ flex: 1, paddingRight: spacing.md }}>
+              <Text style={styles.brand}>FIXORA</Text>
 
-        <View style={styles.topHeader}>
-          <View>
-            <Text style={styles.logo}>
-              FIXORA
-            </Text>
+              <View style={styles.headerLocationRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color="rgba(255,255,255,0.85)"
+                />
+                <Text style={styles.headerLocationText} numberOfLines={1}>
+                  {loadingProfile ? "Loading..." : district}
+                </Text>
+              </View>
+            </View>
 
-            <Text style={styles.location}>
-              📍{" "}
-              {loadingProfile
-                ? "Loading..."
-                : district}
-            </Text>
+            {/* Notification -> Settings (as you requested) */}
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push("/provider/settings")}
+            >
+              <Ionicons name="notifications-outline" size={20} color={colors.white} />
+            </TouchableOpacity>
+
+            {/* Profile/avatar -> /provider/profile */}
+            <TouchableOpacity
+              style={styles.headerAvatarBtn}
+              onPress={() => router.push("/provider/profile")}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.headerAvatarText}>
+                {getInitials(loadingProfile ? "PR" : providerName)}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.headerRight}>
-            <TouchableOpacity>
-              <Text
-                style={styles.notification}
-              >
-                🔔
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.headerMain}>
+            <Text style={styles.greeting} numberOfLines={1}>
+              {loadingProfile ? "Loading..." : `Hello, ${providerName}`}
+            </Text>
 
-            <TouchableOpacity
-              style={styles.smallAvatar}
-              onPress={() =>
-                router.push(
-                  "/provider/profile"
-                )
-              }
-            >
-              <Text
-                style={styles.avatarEmoji}
+            <Text style={styles.category} numberOfLines={2}>
+              {loadingProfile ? "Loading provider profile..." : category}
+            </Text>
+
+            <View style={styles.headerPillsRow}>
+              {/* Availability status */}
+              <View style={styles.availabilityPill}>
+                <View style={styles.availabilityDot} />
+                <Text style={styles.availabilityText}>Available</Text>
+              </View>
+
+              {/* Change availability */}
+              <TouchableOpacity
+                style={styles.changeAvailabilityPill}
+                onPress={() => router.push("/provider/availability")}
+                activeOpacity={0.85}
               >
-                👨‍🔧
-              </Text>
-            </TouchableOpacity>
+                <Ionicons name="calendar-outline" size={14} color={colors.white} />
+                <Text style={styles.changeAvailabilityText}>Change availability</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* PROVIDER */}
-
-        <View style={styles.welcomeCard}>
-          <View style={styles.welcomeTop}>
-            <View
-              style={styles.providerAvatar}
-            >
-              <Text
-                style={styles.providerEmoji}
-              >
-                👨‍🔧
-              </Text>
-            </View>
-
-            <View
-              style={styles.welcomeContent}
-            >
-              <Text
-                style={styles.welcomeTitle}
-              >
-                {loadingProfile
-                  ? "Loading..."
-                  : `Hello, ${providerName} 👋`}
-              </Text>
-
-              <Text
-                style={
-                  styles.welcomeSubtitle
-                }
-              >
-                {loadingProfile
-                  ? "Loading provider profile..."
-                  : category}
-              </Text>
-            </View>
-
-            <View
-              style={styles.availableBadge}
-            >
-              <View
-                style={styles.greenDot}
-              />
-
-              <Text
-                style={styles.availableText}
-              >
-                Available
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.zoneRow}>
-            <Text style={styles.zoneText}>
-              📍{" "}
-              {loadingProfile
-                ? "Loading service area..."
-                : district}
-            </Text>
-
-            <TouchableOpacity
-              onPress={() =>
-                router.push(
-                  "/provider/availability"
-                )
-              }
-            >
-              <Text
-                style={styles.changeText}
-              >
-                Change
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* REAL STATS */}
-
+        {/* SUMMARY / STATISTICS */}
         <View style={styles.statsRow}>
           <TouchableOpacity
             style={styles.statCard}
-            onPress={() =>
-              router.push(
-                "/provider/jobs"
-              )
-            }
+            onPress={() => router.push("/provider/jobs")}
+            activeOpacity={0.9}
           >
-            <Text style={styles.statIcon}>
-              🧰
-            </Text>
-
+            <View style={styles.statIconWrap}>
+              <Ionicons name="briefcase-outline" size={18} color={colors.primary} />
+            </View>
             <Text style={styles.statValue}>
-              {loadingBookings
-                ? "..."
-                : upcomingJobs.length}
+              {loadingBookings ? "..." : String(upcomingJobs.length)}
             </Text>
-
-            <Text style={styles.statLabel}>
-              Active Jobs
-            </Text>
+            <Text style={styles.statLabel}>Active Jobs</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.statCard}
-            onPress={() =>
-              router.push(
-                "/provider/requests"
-              )
-            }
+            onPress={() => router.push("/provider/requests")}
+            activeOpacity={0.9}
           >
-            <Text style={styles.statIcon}>
-              📋
-            </Text>
-
-            <View
-              style={styles.statValueRow}
-            >
-              <Text
-                style={styles.statValue}
-              >
-                {loadingBookings
-                  ? "..."
-                  : pendingRequests.length}
-              </Text>
-
-              {pendingRequests.length >
-                0 && (
-                <Text
-                  style={styles.newBadge}
-                >
-                  NEW
-                </Text>
-              )}
+            <View style={[styles.statIconWrap, { backgroundColor: colors.warningLight }]}>
+              <Ionicons name="clipboard-outline" size={18} color={colors.warning} />
             </View>
 
-            <Text style={styles.statLabel}>
-              Pending Action
-            </Text>
+            <View style={styles.pendingValueRow}>
+              <Text style={styles.statValue}>
+                {loadingBookings ? "..." : String(pendingRequests.length)}
+              </Text>
+
+              {pendingRequests.length > 0 && !loadingBookings ? (
+                <View style={styles.newBadge}>
+                  <Text style={styles.newBadgeText}>NEW</Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={styles.statLabel}>Pending Action</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.statCard}
-            onPress={() =>
-              router.push(
-                "/provider/earnings"
-              )
-            }
+            onPress={() => router.push("/provider/earnings")}
+            activeOpacity={0.9}
           >
-            <Text style={styles.statIcon}>
-              💵
-            </Text>
+            <View style={[styles.statIconWrap, { backgroundColor: colors.successLight }]}>
+              <Ionicons name="cash-outline" size={18} color={colors.success} />
+            </View>
 
             <Text style={styles.statValue}>
-              {loadingBookings
-                ? "..."
-                : `Rs. ${totalEarnings.toLocaleString()}`}
+              {loadingBookings ? "..." : money(totalEarnings)}
             </Text>
 
-            <Text
-              style={styles.statLabel}
-            >
-              Earnings
-            </Text>
+            <Text style={styles.statLabel}>Earnings</Text>
           </TouchableOpacity>
         </View>
 
         {/* NEW REQUEST */}
-
-        <View
-          style={styles.sectionHeader}
-        >
-          <Text
-            style={styles.sectionTitle}
-          >
-            🟠 New Request
-          </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>New request</Text>
 
           <TouchableOpacity
-            onPress={() =>
-              router.push(
-                "/provider/requests"
-              )
-            }
+            onPress={() => router.push("/provider/requests")}
+            activeOpacity={0.85}
           >
-            <Text style={styles.viewAll}>
-              View All
-            </Text>
+            <Text style={styles.sectionLink}>View all</Text>
           </TouchableOpacity>
         </View>
 
         {latestRequest ? (
-          <View style={styles.requestCard}>
-            <View
-              style={styles.requestTop}
-            >
-              <View
-                style={
-                  styles.requestTitleArea
-                }
-              >
-                <Text
-                  style={
-                    styles.requestTitle
-                  }
-                >
-                  {latestRequest.service ||
-                    "Home Service"}
+          <View style={styles.card}>
+            <View style={styles.cardTopRow}>
+              <View style={{ flex: 1, paddingRight: spacing.md }}>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {latestRequest.service || "Home Service"}
                 </Text>
 
-                <Text
-                  style={
-                    styles.requestDate
-                  }
-                >
-                  🕐 October{" "}
-                  {latestRequest.date ||
-                    "-"}
-                  ,{" "}
-                  {latestRequest.time ||
-                    "-"}
-                </Text>
+                <View style={styles.metaRow}>
+                  <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
+                  <Text style={styles.metaText} numberOfLines={1}>
+                    October {latestRequest.date || "-"}, {latestRequest.time || "-"}
+                  </Text>
+                </View>
               </View>
 
-              <View>
-                <Text
-                  style={
-                    styles.requestPrice
-                  }
-                >
-                  Rs.{" "}
-                  {Number(
-                    latestRequest.servicePrice ||
-                      0
-                  ).toLocaleString()}
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.moneyText}>
+                  Rs. {Number(latestRequest.servicePrice || 0).toLocaleString()}
                 </Text>
-
-                <Text
-                  style={styles.priceLabel}
-                >
-                  Est. Payout
-                </Text>
+                <Text style={styles.moneySub}>Est. Payout</Text>
               </View>
             </View>
 
-            <Text
-              style={
-                styles.requestLocation
-              }
-            >
-              📍{" "}
-              {latestRequest.address ||
-                "Location not provided"}
-            </Text>
-
-            <View
-              style={styles.customerRow}
-            >
-              <View
-                style={
-                  styles.customerAvatar
-                }
-              >
-                <Text
-                  style={
-                    styles.customerInitials
-                  }
-                >
-                  {getInitials(
-                    latestRequest.customerName
-                  )}
-                </Text>
-              </View>
-
-              <View
-                style={styles.customerInfo}
-              >
-                <Text
-                  style={
-                    styles.customerName
-                  }
-                >
-                  {latestRequest.customerName ||
-                    "Customer"}
-                </Text>
-
-                <Text
-                  style={styles.rating}
-                >
-                  New booking request
-                </Text>
-              </View>
-
-              <View
-                style={
-                  styles.paymentBadge
-                }
-              >
-                <Text
-                  style={styles.paymentText}
-                >
-                  Pending
-                </Text>
-              </View>
+            <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
+              <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.metaText} numberOfLines={2}>
+                {latestRequest.address || "Location not provided"}
+              </Text>
             </View>
 
-            <View
-              style={
-                styles.requestButtons
-              }
-            >
-              <TouchableOpacity
-                style={
-                  styles.detailsButton
-                }
-                onPress={() =>
-                  openRequestDetails(
-                    latestRequest
-                  )
-                }
-              >
-                <Text
-                  style={
-                    styles.detailsText
-                  }
-                >
-                  View Details
+            <View style={styles.personRow}>
+              <View style={styles.personAvatar}>
+                <Text style={styles.personInitials}>
+                  {getInitials(latestRequest.customerName)}
                 </Text>
-              </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                style={
-                  styles.acceptButton
-                }
-                onPress={() =>
-                  openRequestDetails(
-                    latestRequest
-                  )
-                }
-              >
-                <Text
-                  style={
-                    styles.acceptText
-                  }
-                >
-                  ✓ Review Request
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.personName} numberOfLines={1}>
+                  {latestRequest.customerName || "Customer"}
                 </Text>
-              </TouchableOpacity>
+                <Text style={styles.personSub}>New booking request</Text>
+              </View>
+
+              <StatusBadge status={toStatusType(latestRequest.status) as StatusType} />
+            </View>
+
+            <View style={styles.actionsRow}>
+              <SecondaryButton
+                title="View Details"
+                onPress={() => openRequestDetails(latestRequest)}
+                style={{ flex: 1 }}
+              />
+
+              <PrimaryButton
+                title="✓ Review Request"
+                onPress={() => openRequestDetails(latestRequest)}
+                style={{ flex: 1 }}
+              />
             </View>
           </View>
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              📭
-            </Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="mail-open-outline" size={22} color={colors.textSecondary} />
+            </View>
 
-            <Text
-              style={styles.emptyTitle}
-            >
-              No new requests
-            </Text>
-
-            <Text
-              style={styles.emptyText}
-            >
-              New customer booking requests
-              will appear here.
+            <Text style={styles.emptyTitle}>No new requests</Text>
+            <Text style={styles.emptyText}>
+              New customer booking requests will appear here.
             </Text>
           </View>
         )}
 
         {/* UPCOMING JOBS */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming jobs</Text>
 
-        <View
-          style={styles.sectionHeader}
-        >
-          <Text
-            style={styles.sectionTitle}
-          >
-            📅 Upcoming Jobs
-          </Text>
-
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                "/provider/jobs"
-              )
-            }
-          >
-            <Text style={styles.viewAll}>
-              See All (
-              {upcomingJobs.length})
-            </Text>
+          <TouchableOpacity onPress={() => router.push("/provider/jobs")} activeOpacity={0.85}>
+            <Text style={styles.sectionLink}>See all ({upcomingJobs.length})</Text>
           </TouchableOpacity>
         </View>
 
-        {displayedUpcomingJobs.length >
-        0 ? (
-          displayedUpcomingJobs.map(
-            (job) => (
-              <TouchableOpacity
-                key={job.id}
-                style={styles.jobCard}
-                onPress={() =>
-                  openJobDetails(job)
-                }
-              >
-                <View
-                  style={styles.jobTop}
-                >
-                  <Text
-                    style={
-                      styles.jobTitle
-                    }
-                  >
-                    {job.service ||
-                      "Home Service"}
-                  </Text>
+        {displayedUpcomingJobs.length > 0 ? (
+          displayedUpcomingJobs.map((job) => (
+            <TouchableOpacity
+              key={job.id}
+              style={styles.jobCard}
+              onPress={() => openJobDetails(job)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.jobTopRow}>
+                <View style={styles.jobIconWrap}>
+                  <Ionicons name="construct-outline" size={18} color={colors.primary} />
+                </View>
 
-                  <View
-                    style={
-                      styles.confirmedBadge
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.confirmedText
-                      }
-                    >
-                      {getJobStatusLabel(
-                        job.status
-                      )}
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <Text style={styles.jobTitle} numberOfLines={1}>
+                    {job.service || "Home Service"}
+                  </Text>
+                  <Text style={styles.jobMeta} numberOfLines={1}>
+                    October {job.date || "-"}, {job.time || "-"}
+                  </Text>
+                </View>
+
+                <View style={{ alignItems: "flex-end" }}>
+                  <View style={styles.statusPillWrap}>
+                    <Text style={styles.statusPillText}>
+                      {getJobStatusLabel(job.status)}
                     </Text>
                   </View>
-
-                  <Text
-                    style={
-                      styles.jobPrice
-                    }
-                  >
-                    Rs.{" "}
-                    {Number(
-                      job.servicePrice || 0
-                    ).toLocaleString()}
-                  </Text>
                 </View>
+              </View>
 
-                <Text
-                  style={styles.jobDate}
-                >
-                  October{" "}
-                  {job.date || "-"},{" "}
-                  {job.time || "-"}
+              <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
+                <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {job.address || "Location not provided"}
                 </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </View>
 
-                <View
-                  style={styles.jobBottom}
-                >
-                  <Text
-                    style={
-                      styles.jobLocation
-                    }
-                  >
-                    📍{" "}
-                    {job.address ||
-                      "Location not provided"}
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.jobAction
-                    }
-                  >
-                    ›
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )
-          )
+              <View style={styles.jobBottomRow}>
+                <Text style={styles.jobMoney}>
+                  Rs. {Number(job.servicePrice || 0).toLocaleString()}
+                </Text>
+                <Text style={styles.jobMoneySub}>Service price</Text>
+              </View>
+            </TouchableOpacity>
+          ))
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              🧰
-            </Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="calendar-outline" size={22} color={colors.textSecondary} />
+            </View>
 
-            <Text
-              style={styles.emptyTitle}
-            >
-              No upcoming jobs
-            </Text>
-
-            <Text
-              style={styles.emptyText}
-            >
-              Accepted bookings will appear
-              here.
-            </Text>
+            <Text style={styles.emptyTitle}>No upcoming jobs</Text>
+            <Text style={styles.emptyText}>Accepted bookings will appear here.</Text>
           </View>
         )}
 
         {/* COMPLETED SUMMARY */}
-
-        <View
-          style={styles.completedSummary}
+        <TouchableOpacity
+          style={styles.completedCard}
+          onPress={() => router.push("/provider/jobs")}
+          activeOpacity={0.9}
         >
-          <Text
-            style={styles.completedIcon}
-          >
-            ✅
-          </Text>
+          <View style={styles.completedIcon}>
+            <Ionicons name="checkmark-done-outline" size={20} color={colors.white} />
+          </View>
 
-          <View
-            style={styles.completedContent}
-          >
-            <Text
-              style={
-                styles.completedTitle
-              }
-            >
-              {completedJobs.length} Completed{" "}
-              {completedJobs.length === 1
-                ? "Job"
-                : "Jobs"}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.completedTitle}>
+              {completedJobs.length} Completed {completedJobs.length === 1 ? "Job" : "Jobs"}
             </Text>
 
-            <Text
-              style={
-                styles.completedDescription
-              }
-            >
-              Total earnings: Rs.{" "}
-              {totalEarnings.toLocaleString()}
+            <Text style={styles.completedSub}>
+              Total earnings: Rs. {totalEarnings.toLocaleString()}
             </Text>
           </View>
 
-          <TouchableOpacity
-            onPress={() =>
-              router.push(
-                "/provider/jobs"
-              )
-            }
-          >
-            <Text
-              style={
-                styles.completedArrow
-              }
-            >
-              ›
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.white} />
+        </TouchableOpacity>
       </ScrollView>
 
       <ProviderBottomNav />
@@ -916,461 +527,503 @@ export default function ProviderDashboardScreen() {
   );
 }
 
+const shadow = Platform.select({
+  ios: {
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  android: { elevation: 10 },
+  default: {},
+});
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
+  container: { flex: 1, backgroundColor: colors.background },
+
+  // subtle decorative background (light only)
+  bgDecor: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  blobA: {
+    position: "absolute",
+    top: -120,
+    right: -140,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: colors.primarySoft,
+    opacity: 0.55,
+  },
+  blobB: {
+    position: "absolute",
+    top: 220,
+    left: -160,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: "#EEF2FF",
+    opacity: 0.45,
+  },
+  blobC: {
+    position: "absolute",
+    bottom: -180,
+    right: -170,
+    width: 420,
+    height: 420,
+    borderRadius: 210,
+    backgroundColor: "#ECFEFF",
+    opacity: 0.35,
   },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 28,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90,
   },
 
-  topHeader: {
+  /* Header hero */
+  headerHero: {
+    backgroundColor: "#0B2F9F",
+    borderRadius: 18,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    overflow: "hidden",
+    ...(shadow as any),
+  },
+
+  headerTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing.sm,
   },
 
-  logo: {
+  brand: {
     fontSize: 18,
-    fontWeight: "800",
-    color: "#0D47C7",
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    color: colors.white,
   },
 
-  location: {
-    marginTop: 3,
-    fontSize: 12,
-    color: "#334155",
-    maxWidth: 240,
-  },
-
-  headerRight: {
+  headerLocationRow: {
+    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 6,
   },
 
-  notification: {
-    fontSize: 21,
+  headerLocationText: {
+    flex: 1,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
   },
 
-  smallAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#E2E8F0",
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarEmoji: {
+  headerAvatarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerAvatarText: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+
+  headerMain: {
+    marginTop: spacing.lg,
+  },
+
+  greeting: {
     fontSize: 20,
+    fontWeight: "900",
+    color: colors.white,
   },
 
-  welcomeCard: {
-    marginTop: 18,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+  category: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.82)",
   },
 
-  welcomeTop: {
+  headerPillsRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+
+  availabilityPill: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
   },
 
-  providerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#E2E8F0",
-    alignItems: "center",
-    justifyContent: "center",
+  availabilityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.success,
   },
 
-  providerEmoji: {
-    fontSize: 26,
-  },
-
-  welcomeContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  welcomeTitle: {
-    fontSize: 18,
+  availabilityText: {
+    fontSize: 12,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.white,
   },
 
-  welcomeSubtitle: {
-    marginTop: 3,
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  availableBadge: {
+  changeAvailabilityPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
   },
 
-  greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#059669",
-    marginRight: 6,
-  },
-
-  availableText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#334155",
-  },
-
-  zoneRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  zoneText: {
-    flex: 1,
-    paddingRight: 10,
+  changeAvailabilityText: {
     fontSize: 12,
-    color: "#334155",
+    fontWeight: "800",
+    color: colors.white,
   },
 
-  changeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#1D4ED8",
-  },
-
+  /* Stats */
   statsRow: {
-    marginTop: 16,
+    marginTop: spacing.md,
     flexDirection: "row",
-    gap: 10,
+    gap: spacing.sm,
   },
 
   statCard: {
     flex: 1,
-    minHeight: 105,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    ...(shadow as any),
   },
 
-  statIcon: {
-    fontSize: 20,
-  },
-
-  statValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-
-  statValue: {
-    marginTop: 8,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  statLabel: {
-    marginTop: 3,
-    fontSize: 10,
-    color: "#475569",
-  },
-
-  newBadge: {
-    marginLeft: 5,
-    backgroundColor: "#FED7AA",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    fontSize: 8,
-    fontWeight: "700",
-    color: "#92400E",
-  },
-
-  sectionHeader: {
-    marginTop: 22,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  viewAll: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#1D4ED8",
-  },
-
-  requestCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-  },
-
-  requestTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
-  requestTitleArea: {
-    flex: 1,
-    paddingRight: 10,
-  },
-
-  requestTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  requestDate: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "#64748B",
-  },
-
-  requestPrice: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#1D4ED8",
-  },
-
-  priceLabel: {
-    fontSize: 9,
-    color: "#64748B",
-    textAlign: "right",
-  },
-
-  requestLocation: {
-    marginTop: 10,
-    fontSize: 12,
-    color: "#64748B",
-  },
-
-  customerRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  customerAvatar: {
+  statIconWrap: {
     width: 34,
     height: 34,
-    borderRadius: 17,
-    backgroundColor: "#DBEAFE",
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  customerInitials: {
-    color: "#1D4ED8",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-
-  customerInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-
-  customerName: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  rating: {
-    marginTop: 2,
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  paymentBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 14,
-  },
-
-  paymentText: {
-    fontSize: 9,
-    color: "#92400E",
-    fontWeight: "700",
-  },
-
-  requestButtons: {
-    marginTop: 14,
-    flexDirection: "row",
-    gap: 10,
-  },
-
-  detailsButton: {
-    flex: 1,
-    backgroundColor: "#EEF2FF",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  detailsText: {
-    color: "#1D4ED8",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  acceptButton: {
-    flex: 1,
-    backgroundColor: "#1D4ED8",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  acceptText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  jobCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-  },
-
-  jobTop: {
+  pendingValueRow: {
+    marginTop: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 6,
   },
 
-  jobTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#0F172A",
+  statValue: {
+    marginTop: spacing.sm,
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
-  confirmedBadge: {
-    backgroundColor: "#A7F3D0",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  confirmedText: {
-    fontSize: 9,
-    color: "#065F46",
-    fontWeight: "700",
-  },
-
-  jobPrice: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  jobDate: {
+  statLabel: {
     marginTop: 4,
-    fontSize: 11,
-    color: "#64748B",
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
-  jobBottom: {
-    marginTop: 14,
+  newBadge: {
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+
+  newBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: colors.warning,
+  },
+
+  /* Sections */
+  sectionHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
-  jobLocation: {
-    flex: 1,
-    fontSize: 11,
-    color: "#64748B",
+  sectionTitle: {
+    ...typography.sectionHeading,
+    fontSize: 16,
+    fontWeight: "900",
   },
 
-  jobAction: {
-    fontSize: 18,
-    color: "#2563EB",
+  sectionLink: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
   },
 
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 22,
+  /* Card */
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...(shadow as any),
+  },
+
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  metaRow: {
+    marginTop: spacing.xs,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
   },
 
-  emptyIcon: {
-    fontSize: 30,
+  metaText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 
-  emptyTitle: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
+  moneyText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.primary,
   },
 
-  emptyText: {
-    marginTop: 5,
-    fontSize: 11,
-    textAlign: "center",
-    color: "#64748B",
+  moneySub: {
+    marginTop: 2,
+    ...typography.caption,
+    textAlign: "right",
   },
 
-  completedSummary: {
-    marginTop: 18,
-    backgroundColor: "#0D47C7",
-    borderRadius: 14,
-    padding: 15,
+  personRow: {
+    marginTop: spacing.md,
     flexDirection: "row",
     alignItems: "center",
   },
 
-  completedIcon: {
-    fontSize: 22,
+  personAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  completedContent: {
-    flex: 1,
-    marginLeft: 12,
+  personInitials: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  personName: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  personSub: {
+    marginTop: 2,
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  actionsRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  /* Jobs */
+  jobCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    ...(shadow as any),
+  },
+
+  jobTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  jobIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  jobTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  jobMeta: {
+    marginTop: 3,
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+
+  statusPillWrap: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  jobBottomRow: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+
+  jobMoney: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  jobMoneySub: {
+    marginTop: 2,
+    ...typography.caption,
+  },
+
+  /* Empty */
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: "center",
+    ...(shadow as any),
+  },
+
+  emptyIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emptyTitle: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  emptyText: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+    color: colors.textSecondary,
+  },
+
+  /* Completed summary */
+  completedCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    ...(shadow as any),
+  },
+
+  completedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   completedTitle: {
-    color: "#FFFFFF",
-    fontWeight: "700",
+    color: colors.white,
     fontSize: 13,
+    fontWeight: "900",
   },
 
-  completedDescription: {
-    marginTop: 2,
-    color: "#BFDBFE",
-    fontSize: 11,
-  },
-
-  completedArrow: {
-    color: "#FFFFFF",
-    fontSize: 24,
+  completedSub: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

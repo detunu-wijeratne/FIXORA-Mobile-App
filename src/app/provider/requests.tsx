@@ -1,13 +1,7 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
-
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
-
+// src/app/provider/requests.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { router, Stack } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,9 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
+import ScreenHeader from "../../components/ScreenHeader";
+import StatusBadge from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type Booking = {
   id: string;
@@ -44,9 +44,23 @@ type Booking = {
   status?: string;
 };
 
+type FilterKey = "all" | "today" | "tomorrow";
+
+const asMoney = (value: any) => `Rs. ${Number(value || 0).toLocaleString()}`;
+
+const formatWhen = (date?: string, time?: string) => {
+  const d = (date || "").trim();
+  const t = (time || "").trim();
+  if (!d && !t) return "—";
+  const dateLabel = /^\d+$/.test(d) ? `Day ${d}` : d;
+  return [dateLabel, t].filter(Boolean).join(" • ");
+};
+
 export default function ProviderRequestsScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -56,308 +70,164 @@ export default function ProviderRequestsScreen() {
       return;
     }
 
-    console.log(
-      "Logged provider UID:",
-      user.uid
-    );
-
-    /*
-      Load only bookings assigned to this provider.
-
-      We only use providerId in the Firestore query.
-      Then we filter pending bookings locally.
-
-      This avoids needing a Firestore composite index.
-    */
+    // Load only bookings assigned to this provider,
+    // then filter pending locally.
     const bookingsQuery = query(
       collection(db, "bookings"),
-      where("providerId", "==", user.uid)
+      where("providerId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
       bookingsQuery,
-
       (snapshot) => {
-        console.log(
-          "Bookings assigned to provider:",
-          snapshot.docs.length
-        );
+        const loaded: Booking[] = snapshot.docs
+          .map((d) => ({ id: d.id, ...(d.data() as any) }))
+          .filter((b) => b.status === "pending") as Booking[];
 
-        const loadedBookings: Booking[] =
-          snapshot.docs
-            .map((bookingDoc) => {
-              const data = bookingDoc.data();
+        // Optional sort: if date is numeric, earlier first
+        loaded.sort((a, b) => {
+          const da = Number(a.date);
+          const dbb = Number(b.date);
+          if (!Number.isNaN(da) && !Number.isNaN(dbb) && da !== dbb) return da - dbb;
+          return String(a.time || "").localeCompare(String(b.time || ""));
+        });
 
-              console.log(
-                "Provider booking:",
-                bookingDoc.id,
-                data
-              );
-
-              return {
-                id: bookingDoc.id,
-                ...data,
-              } as Booking;
-            })
-            .filter(
-              (booking) =>
-                booking.status === "pending"
-            );
-
-        console.log(
-          "Pending requests:",
-          loadedBookings.length
-        );
-
-        setBookings(loadedBookings);
+        setBookings(loaded);
         setLoading(false);
       },
-
       (error) => {
-        console.log(
-          "Error loading provider requests:",
-          error
-        );
-
-        alert(
-          error.message ||
-            "Unable to load booking requests."
-        );
-
+        console.log("Error loading provider requests:", error);
+        alert(error.message || "Unable to load booking requests.");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
   }, []);
 
+  const filteredBookings = useMemo(() => {
+    if (filter === "all") return bookings;
+
+    // NOTE: Your date field appears to be a day-of-month string.
+    // This filter will behave best if `date` equals today's day number.
+    const now = new Date();
+    const todayDay = String(now.getDate());
+    const tomorrowDay = String(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getDate());
+
+    if (filter === "today") return bookings.filter((b) => String(b.date || "") === todayDay);
+    if (filter === "tomorrow") return bookings.filter((b) => String(b.date || "") === tomorrowDay);
+
+    return bookings;
+  }, [bookings, filter]);
+
+  const openRequest = (booking: Booking) => {
+    router.push({
+      pathname: "/provider/request-details",
+      params: {
+        bookingId: booking.id,
+        customer: booking.customerName || "Customer",
+        phone: booking.customerPhone || "",
+        email: booking.customerEmail || "",
+        service: booking.service || "Home Service",
+        date: booking.date || "",
+        time: booking.time || "",
+        location: booking.address || "",
+        description: booking.description || "",
+        price: String(booking.servicePrice || 0),
+        totalAmount: String(booking.totalAmount || 0),
+        status: booking.status || "pending",
+      },
+    });
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.title}>
-          Incoming Requests
-        </Text>
+        <ScreenHeader
+          eyebrow="FIXORA"
+          title="Incoming requests"
+          subtitle="Review new customer service requests assigned to you."
+        />
 
-        <Text style={styles.subtitle}>
-          Review new customer service requests.
-        </Text>
-
-        <View style={styles.tabs}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              styles.activeTab,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                styles.activeTabText,
-              ]}
-            >
-              All
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>
-              Today
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.tab}>
-            <Text style={styles.tabText}>
-              Tomorrow
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.filtersCard}>
+          <FilterButton label="All" active={filter === "all"} onPress={() => setFilter("all")} />
+          <FilterButton label="Today" active={filter === "today"} onPress={() => setFilter("today")} />
+          <FilterButton label="Tomorrow" active={filter === "tomorrow"} onPress={() => setFilter("tomorrow")} />
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color="#2563EB"
-            />
-
-            <Text style={styles.loadingText}>
-              Loading requests...
-            </Text>
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading requests…</Text>
           </View>
-        ) : bookings.length === 0 ? (
+        ) : filteredBookings.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              📭
-            </Text>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="mail-open-outline" size={22} color={colors.textSecondary} />
+            </View>
 
-            <Text style={styles.emptyTitle}>
-              No pending requests
-            </Text>
-
+            <Text style={styles.emptyTitle}>No pending requests</Text>
             <Text style={styles.emptyText}>
-              There are currently no pending
-              bookings assigned to you.
+              New booking requests assigned to you will appear here.
             </Text>
           </View>
         ) : (
-          <View style={styles.requestList}>
-            {bookings.map((booking) => (
+          <View style={styles.list}>
+            {filteredBookings.map((booking) => (
               <TouchableOpacity
                 key={booking.id}
                 style={styles.requestCard}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      "/provider/request-details",
-
-                    params: {
-                      bookingId: booking.id,
-
-                      customer:
-                        booking.customerName ||
-                        "Customer",
-
-                      phone:
-                        booking.customerPhone ||
-                        "",
-
-                      email:
-                        booking.customerEmail ||
-                        "",
-
-                      service:
-                        booking.service ||
-                        "Home Service",
-
-                      date:
-                        booking.date ||
-                        "",
-
-                      time:
-                        booking.time ||
-                        "",
-
-                      location:
-                        booking.address ||
-                        "",
-
-                      description:
-                        booking.description ||
-                        "",
-
-                      price: String(
-                        booking.servicePrice ||
-                          0
-                      ),
-
-                      totalAmount: String(
-                        booking.totalAmount ||
-                          0
-                      ),
-
-                      status:
-                        booking.status ||
-                        "pending",
-                    },
-                  })
-                }
+                onPress={() => openRequest(booking)}
+                activeOpacity={0.85}
               >
                 <View style={styles.cardTop}>
-                  <View
-                    style={styles.serviceIcon}
-                  >
-                    <Text
-                      style={
-                        styles.serviceEmoji
-                      }
-                    >
-                      🔧
+                  <View style={styles.iconBox}>
+                    <Ionicons name="clipboard-outline" size={18} color={colors.warning} />
+                  </View>
+
+                  <View style={styles.info}>
+                    <Text style={styles.service} numberOfLines={1}>
+                      {booking.service || "Home Service"}
+                    </Text>
+                    <Text style={styles.customer} numberOfLines={1}>
+                      {booking.customerName || "Customer"}
                     </Text>
                   </View>
 
-                  <View
-                    style={styles.requestInfo}
-                  >
-                    <Text
-                      style={
-                        styles.serviceTitle
-                      }
-                    >
-                      {booking.service ||
-                        "Home Service"}
-                    </Text>
+                  <StatusBadge status="pending" />
+                </View>
 
-                    <Text
-                      style={
-                        styles.customerName
-                      }
-                    >
-                      {booking.customerName ||
-                        "Customer"}
+                <View style={styles.meta}>
+                  <View style={styles.metaRow}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                    <Text style={styles.metaText} numberOfLines={1}>
+                      {formatWhen(booking.date, booking.time)}
                     </Text>
                   </View>
 
-                  <View
-                    style={
-                      styles.pendingBadge
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.pendingText
-                      }
-                    >
-                      Pending
+                  <View style={styles.metaRow}>
+                    <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                    <Text style={styles.metaText} numberOfLines={2}>
+                      {booking.address || "Location not provided"}
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.details}>
-                  <Text
-                    style={styles.detailText}
-                  >
-                    📅 October{" "}
-                    {booking.date || "-"} •{" "}
-                    {booking.time || "-"}
-                  </Text>
-
-                  <Text
-                    style={styles.detailText}
-                  >
-                    📍{" "}
-                    {booking.address ||
-                      "Location not provided"}
-                  </Text>
-                </View>
-
-                <View style={styles.bottomRow}>
+                <View style={styles.bottom}>
                   <View>
-                    <Text
-                      style={
-                        styles.priceLabel
-                      }
-                    >
-                      Estimated Service
-                    </Text>
-
-                    <Text style={styles.price}>
-                      Rs.{" "}
-                      {Number(
-                        booking.servicePrice ||
-                          0
-                      ).toLocaleString()}
-                    </Text>
+                    <Text style={styles.priceLabel}>Estimated service</Text>
+                    <Text style={styles.price}>{asMoney(booking.servicePrice)}</Text>
                   </View>
 
-                  <Text
-                    style={
-                      styles.viewDetails
-                    }
-                  >
-                    View Details →
-                  </Text>
+                  <View style={styles.ctaRow}>
+                    <Text style={styles.ctaText}>Review</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
@@ -366,196 +236,211 @@ export default function ProviderRequestsScreen() {
       </ScrollView>
 
       <ProviderBottomNav />
-    </View>
+    </SafeAreaView>
+  );
+}
+
+function FilterButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.9}
+      style={[styles.filterBtn, active && styles.filterBtnActive]}
+    >
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 30,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90,
   },
 
-  title: {
-    fontSize: 27,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    color: "#64748B",
-  },
-
-  tabs: {
-    marginTop: 20,
+  filtersCard: {
     flexDirection: "row",
-    backgroundColor: "#E2E8F0",
-    borderRadius: 12,
-    padding: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: 6,
+    gap: 6,
   },
 
-  tab: {
+  filterBtn: {
     flex: 1,
+    minHeight: 40,
+    borderRadius: radius.lg,
     alignItems: "center",
-    paddingVertical: 9,
-    borderRadius: 9,
+    justifyContent: "center",
   },
 
-  activeTab: {
-    backgroundColor: "#FFFFFF",
+  filterBtnActive: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
-  tabText: {
+  filterText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#64748B",
+    fontWeight: "900",
+    color: colors.textSecondary,
   },
 
-  activeTabText: {
-    color: "#1D4ED8",
+  filterTextActive: {
+    color: colors.primary,
   },
 
-  loadingContainer: {
-    marginTop: 50,
+  loadingWrap: {
+    marginTop: spacing.xl + 10,
     alignItems: "center",
   },
 
   loadingText: {
-    marginTop: 12,
-    color: "#64748B",
+    marginTop: spacing.md,
+    color: colors.textSecondary,
   },
 
   emptyCard: {
-    marginTop: 30,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 30,
-    alignItems: "center",
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: "center",
   },
 
-  emptyIcon: {
-    fontSize: 38,
+  emptyIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyTitle: {
-    marginTop: 10,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   emptyText: {
-    marginTop: 6,
+    marginTop: spacing.xs,
     fontSize: 12,
-    color: "#64748B",
+    lineHeight: 18,
+    color: colors.textSecondary,
     textAlign: "center",
   },
 
-  requestList: {
-    marginTop: 16,
-    gap: 12,
+  list: {
+    marginTop: spacing.md,
+    gap: spacing.md,
   },
 
   requestCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 15,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
   cardTop: {
     flexDirection: "row",
     alignItems: "center",
+    gap: spacing.md,
   },
 
-  serviceIcon: {
+  iconBox: {
     width: 44,
     height: 44,
-    borderRadius: 14,
-    backgroundColor: "#EFF6FF",
+    borderRadius: radius.lg,
+    backgroundColor: colors.warningLight,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  serviceEmoji: {
-    fontSize: 21,
+  info: { flex: 1 },
+
+  service: {
+    ...typography.cardTitle,
+    fontWeight: "900",
   },
 
-  requestInfo: {
-    flex: 1,
-    marginLeft: 11,
-  },
-
-  serviceTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  customerName: {
+  customer: {
     marginTop: 3,
+    ...typography.secondary,
     fontSize: 12,
-    color: "#64748B",
   },
 
-  pendingBadge: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 20,
+  meta: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
   },
 
-  pendingText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#92400E",
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
-  details: {
-    marginTop: 14,
-    gap: 6,
-  },
-
-  detailText: {
+  metaText: {
+    flex: 1,
     fontSize: 12,
-    color: "#475569",
+    color: colors.textSecondary,
   },
 
-  bottomRow: {
-    marginTop: 15,
-    paddingTop: 14,
+  bottom: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: colors.border,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
 
   priceLabel: {
-    fontSize: 10,
-    color: "#64748B",
+    ...typography.caption,
+    color: colors.textSecondary,
   },
 
   price: {
-    marginTop: 2,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
+    marginTop: 3,
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
-  viewDetails: {
+  ctaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+
+  ctaText: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#2563EB",
+    fontWeight: "900",
+    color: colors.primary,
   },
 });

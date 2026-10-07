@@ -1,538 +1,579 @@
+// src/app/provider/verification.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
-import { useState } from "react";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  SafeAreaView,
+  Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
 import PrimaryButton from "../../components/PrimaryButton";
+import SecondaryButton from "../../components/SecondaryButton";
 import { auth, db } from "../../services/firebase";
 import { colors, radius, spacing, typography } from "../../theme";
 
-export default function ProviderVerificationScreen() {
-  const [frontNIC, setFrontNIC] = useState(true);
-  const [backNIC, setBackNIC] = useState(false);
-  const [certificate, setCertificate] = useState(false);
-  const [businessDoc, setBusinessDoc] = useState(false);
+const CLOUDINARY_CLOUD_NAME = "yuoh84r1";
+const CLOUDINARY_UPLOAD_PRESET = "fixora_uploads";
 
-  const submitVerification = async () => {
-  if (!frontNIC || !backNIC || !certificate) {
-    Alert.alert(
-      "Missing Documents",
-      "Please upload both sides of your NIC and your trade certificate."
-    );
+type UploadState = {
+  url: string;
+  name?: string;
+  mimeType?: string;
+};
+
+type PickedAsset = {
+  uri: string;
+  name?: string | null;
+  mimeType?: string | null;
+  file?: File | null; // web (sometimes)
+};
+
+function notify(title: string, message: string) {
+  if (Platform.OS === "web") {
+    // web-friendly
+    window.alert(`${title}\n\n${message}`);
     return;
   }
+  Alert.alert(title, message);
+}
 
-  try {
-    const user = auth.currentUser;
+async function cloudinaryUpload(asset: PickedAsset) {
+  const name = asset.name || "upload";
+  const mimeType = asset.mimeType || "application/octet-stream";
 
-    if (!user) {
-      Alert.alert(
-        "Error",
-        "No logged-in provider was found."
-      );
+  const isPdf =
+    mimeType === "application/pdf" || name.toLowerCase().endsWith(".pdf");
+
+  const resource = isPdf ? "raw" : "image";
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resource}/upload`;
+
+  const form = new FormData();
+
+  if (Platform.OS === "web") {
+    if (asset.file instanceof File) {
+      form.append("file", asset.file);
+    } else {
+      const blob = await (await fetch(asset.uri)).blob();
+      form.append("file", blob, name);
+    }
+  } else {
+    form.append("file", { uri: asset.uri, name, type: mimeType } as any);
+  }
+
+  form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+  const res = await fetch(endpoint, { method: "POST", body: form });
+  const data: any = await res.json();
+
+  if (!res.ok) throw new Error(data?.error?.message || "Upload failed.");
+  if (!data?.secure_url) throw new Error("Upload succeeded but no URL returned.");
+
+  return data.secure_url as string;
+}
+
+export default function ProviderVerificationScreen() {
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ providerId?: string }>();
+
+  const providerIdParam =
+    typeof params.providerId === "string" ? params.providerId : "";
+
+  const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setUid(user?.uid ?? null);
+    });
+    return () => unsub();
+  }, []);
+
+  const [frontNIC, setFrontNIC] = useState<UploadState>({ url: "" });
+  const [backNIC, setBackNIC] = useState<UploadState>({ url: "" });
+  const [certificate, setCertificate] = useState<UploadState>({ url: "" });
+  const [businessDoc, setBusinessDoc] = useState<UploadState>({ url: "" });
+
+  const [uploadingKey, setUploadingKey] = useState<
+    "front" | "back" | "cert" | "biz" | null
+  >(null);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const requiredDone = !!frontNIC.url && !!backNIC.url && !!certificate.url;
+
+  const progress = useMemo(() => {
+    const done =
+      Number(!!frontNIC.url) +
+      Number(!!backNIC.url) +
+      Number(!!certificate.url) +
+      Number(!!businessDoc.url);
+
+    const pct = Math.round((done / 4) * 100);
+    return { done, pct };
+  }, [frontNIC.url, backNIC.url, certificate.url, businessDoc.url]);
+
+  const pickNICImage = async (side: "front" | "back") => {
+    try {
+      setSubmitError(null);
+
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted && Platform.OS !== "web") {
+        notify("Permission needed", "Please allow photo access to upload documents.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.9,
+      });
+
+      if (result.canceled || result.assets.length === 0) return;
+
+      const a = result.assets[0] as any;
+      setUploadingKey(side);
+
+      const url = await cloudinaryUpload({
+        uri: a.uri,
+        name: `${side}-nic.jpg`,
+        mimeType: a.mimeType || "image/jpeg",
+        file: a.file || null,
+      });
+
+      if (side === "front") setFrontNIC({ url, name: "NIC Front", mimeType: a.mimeType });
+      else setBackNIC({ url, name: "NIC Back", mimeType: a.mimeType });
+    } catch (e: any) {
+      console.log("NIC upload error:", e);
+      notify("Upload failed", e?.message || "Unable to upload this image.");
+    } finally {
+      setUploadingKey(null);
+    }
+  };
+
+  const pickDocument = async (key: "cert" | "biz") => {
+    try {
+      setSubmitError(null);
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      console.log("DocumentPicker result:", result);
+      if (result.canceled) return;
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) return;
+
+      setUploadingKey(key);
+
+      const url = await cloudinaryUpload({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+        file: (asset as any).file || null,
+      });
+
+      const payload: UploadState = {
+        url,
+        name: asset.name,
+        mimeType: asset.mimeType,
+      };
+
+      if (key === "cert") setCertificate(payload);
+      else setBusinessDoc(payload);
+    } catch (e: any) {
+      console.log("Doc upload error:", e);
+      notify("Upload failed", e?.message || "Unable to upload this document.");
+    } finally {
+      setUploadingKey(null);
+    }
+  };
+
+  const submitVerification = async () => {
+    setSubmitError(null);
+
+    if (!requiredDone) {
+      notify("Missing documents", "Please upload NIC front + back and your trade/NVQ certificate.");
       return;
     }
 
-    await updateDoc(doc(db, "users", user.uid), {
-      verificationStatus: "pending",
+    const docId = uid || providerIdParam;
 
-      verificationDocuments: {
-        frontNIC,
-        backNIC,
-        tradeCertificate: certificate,
-        optionalDocument: businessDoc,
-      },
+    if (!uid) {
+      // This is the most common cause on web after refresh
+      const msg =
+        "You are not logged in (auth.currentUser is null).\n\nPlease go back and log in again, then submit.";
+      setSubmitError(msg);
+      notify("Login required", msg);
+      return;
+    }
 
-      verificationSubmittedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    if (!docId) {
+      const msg = "Provider id not found.";
+      setSubmitError(msg);
+      notify("Error", msg);
+      return;
+    }
 
-    Alert.alert(
-      "Verification Submitted",
-      "Your documents have been submitted for review.",
-      [
+    try {
+      setSubmitting(true);
+
+      console.log("Submitting verification for UID:", docId);
+
+      // Use setDoc({merge:true}) so it never fails if doc missing
+      await setDoc(
+        doc(db, "users", docId),
         {
-          text: "Continue",
-          onPress: () =>
-            router.replace("/provider/dashboard"),
+          verificationStatus: "pending",
+          verificationDocuments: {
+            frontNICUrl: frontNIC.url,
+            backNICUrl: backNIC.url,
+            tradeCertificateUrl: certificate.url,
+            optionalDocumentUrl: businessDoc.url || null,
+            tradeCertificateName: certificate.name || null,
+            optionalDocumentName: businessDoc.name || null,
+          },
+          verificationSubmittedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         },
-      ]
-    );
-  } catch (error: any) {
-    console.log("Verification update error:", error);
+        { merge: true }
+      );
 
-    Alert.alert(
-      "Error",
-      error.message || "Unable to submit verification."
-    );
-  }
-};
+      notify("Verification submitted", "Your documents have been submitted for review.");
+
+      router.replace("/provider/dashboard");
+    } catch (e: any) {
+      console.log("Verification submit error:", e);
+
+      const msg =
+        e?.code === "permission-denied"
+          ? "Firestore permission denied.\nCheck your Firestore Rules to allow the logged-in provider to update their own user document."
+          : e?.message || "Unable to submit verification.";
+
+      setSubmitError(msg);
+      notify("Submit failed", msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const bottomPad = Math.max(insets.bottom, spacing.md);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.progressHeader}>
-          <Text style={styles.stepText}>Step 2 of 2: Verification</Text>
-          <Text style={styles.progressText}>75% Completed</Text>
-        </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <Stack.Screen options={{ headerShown: false }} />
 
-        <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
-        </View>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.topBtn}
+          onPress={() => router.back()}
+          activeOpacity={0.85}
+          hitSlop={10}
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
 
-        <Text style={styles.title}>Partner Verification</Text>
-
-        <Text style={styles.subtitle}>
-          Help us verify your identity and professional trade credentials.
+        <Text style={styles.topTitle} numberOfLines={1}>
+          Verification
         </Text>
 
-        <View style={styles.securityCard}>
-          <Ionicons
-            name="shield-checkmark-outline"
-            size={22}
-            color={colors.primary}
+        <View style={{ width: 40 }} />
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 + bottomPad }]}
+      >
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>Partner verification</Text>
+          <Text style={styles.heroSub}>
+            Upload documents to get verified and unlock more bookings.
+          </Text>
+
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{progress.pct}% completed</Text>
+            <Text style={styles.progressText}>{progress.done}/4</Text>
+          </View>
+
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.max(10, progress.pct)}%` }]} />
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Required documents</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>National ID (NIC) / License</Text>
+          <Text style={styles.helperText}>Upload both sides.</Text>
+
+          <View style={styles.gridRow}>
+            <UploadTile
+              title="Front side"
+              subtitle={frontNIC.url ? "Uploaded (tap to replace)" : "Tap to upload"}
+              done={!!frontNIC.url}
+              uploading={uploadingKey === "front"}
+              iconIdle="camera-outline"
+              onPress={() => pickNICImage("front")}
+              previewUrl={frontNIC.url}
+            />
+
+            <UploadTile
+              title="Back side"
+              subtitle={backNIC.url ? "Uploaded (tap to replace)" : "Tap to upload"}
+              done={!!backNIC.url}
+              uploading={uploadingKey === "back"}
+              iconIdle="camera-outline"
+              onPress={() => pickNICImage("back")}
+              previewUrl={backNIC.url}
+            />
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Trade / NVQ certificate</Text>
+          <Text style={styles.helperText}>Upload PDF or image.</Text>
+
+          <UploadTile
+            wide
+            title={certificate.url ? "Certificate uploaded" : "Upload trade credential"}
+            subtitle={certificate.url ? `File: ${certificate.name || "Uploaded"}` : "PDF, PNG or JPG"}
+            done={!!certificate.url}
+            uploading={uploadingKey === "cert"}
+            iconIdle="document-text-outline"
+            onPress={() => pickDocument("cert")}
+            previewUrl={certificate.url}
           />
+        </View>
 
-          <View style={styles.securityInfo}>
-            <Text style={styles.securityTitle}>Secure 24-Hour Review</Text>
-            <Text style={styles.securityText}>
-              Your documents are reviewed privately before your provider
-              account is activated.
+        <Text style={styles.sectionTitle}>Optional</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Business reg / Police clearance</Text>
+          <Text style={styles.helperText}>Optional document.</Text>
+
+          <UploadTile
+            wide
+            title={businessDoc.url ? "Optional document uploaded" : "Upload optional document"}
+            subtitle={businessDoc.url ? `File: ${businessDoc.name || "Uploaded"}` : "PDF, PNG or JPG"}
+            done={!!businessDoc.url}
+            uploading={uploadingKey === "biz"}
+            iconIdle="add-circle-outline"
+            onPress={() => pickDocument("biz")}
+            previewUrl={businessDoc.url}
+          />
+        </View>
+
+        {!uid ? (
+          <View style={styles.warnCard}>
+            <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+            <Text style={styles.warnText}>
+              You are not logged in. If you refreshed the page on web, please log in again before
+              submitting verification.
             </Text>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Profile Photo</Text>
-
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>VERIFIED</Text>
-            </View>
-          </View>
-
-          <View style={styles.profileRow}>
-            <View style={styles.avatar}>
-              <Ionicons
-                name="person-circle-outline"
-                size={34}
-                color={colors.primary}
-              />
-            </View>
-
-            <Text style={styles.profileText}>
-              Customer-facing avatar for trust
-            </Text>
-
-            <TouchableOpacity style={styles.changeButton}>
-              <Text style={styles.changeText}>Change</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            National ID (NIC) / License *
-          </Text>
-
-          <Text style={styles.helperText}>
-            Sri Lankan NIC or driving license
-          </Text>
-
-          <View style={styles.uploadRow}>
-            <TouchableOpacity
-              style={[
-                styles.uploadBox,
-                frontNIC && styles.uploadedBox,
-              ]}
-              onPress={() => setFrontNIC(!frontNIC)}
-            >
-              <Ionicons
-                name={frontNIC ? "checkmark-circle" : "camera-outline"}
-                size={26}
-                color={frontNIC ? colors.success : colors.textSecondary}
-              />
-              <Text style={styles.uploadTitle}>Front Side</Text>
-              <Text style={styles.uploadStatus}>
-                {frontNIC ? "Uploaded" : "Tap to upload"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.uploadBox,
-                backNIC && styles.uploadedBox,
-              ]}
-              onPress={() => setBackNIC(!backNIC)}
-            >
-              <Ionicons
-                name={backNIC ? "checkmark-circle" : "camera-outline"}
-                size={26}
-                color={backNIC ? colors.success : colors.textSecondary}
-              />
-              <Text style={styles.uploadTitle}>Back Side</Text>
-              <Text style={styles.uploadStatus}>
-                {backNIC ? "Uploaded" : "Tap to upload"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.note}>
-            Ensure all four corners and the NIC number are clearly readable.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Trade / NVQ Certificate *
-          </Text>
-
-          <Text style={styles.helperText}>
-            NVQ Level 3/4, NAITA, or City & Guilds qualification
-          </Text>
-
-          <TouchableOpacity
-            style={[
-              styles.largeUploadBox,
-              certificate && styles.uploadedBox,
-            ]}
-            onPress={() => setCertificate(!certificate)}
-          >
-            <Ionicons
-              name={certificate ? "checkmark-circle" : "document-text-outline"}
-              size={30}
-              color={certificate ? colors.success : colors.textSecondary}
-            />
-
-            <Text style={styles.largeUploadTitle}>
-              {certificate
-                ? "Trade Certificate Uploaded"
-                : "Upload Trade Credential"}
-            </Text>
-
-            <Text style={styles.uploadStatus}>PDF, PNG or JPG</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Business Reg or Police Clearance
-          </Text>
-
-          <Text style={styles.helperText}>
-            Optional document to strengthen your provider profile
-          </Text>
-
-          <TouchableOpacity
-            style={styles.optionalRow}
-            onPress={() => setBusinessDoc(!businessDoc)}
-          >
-            <View>
-              <Text style={styles.optionalTitle}>
-                {businessDoc
-                  ? "Optional document added"
-                  : "Add optional document"}
-              </Text>
-
-              <Text style={styles.optionalText}>
-                Recommended for high-value bookings
-              </Text>
-            </View>
-
-            <Ionicons
-              name={businessDoc ? "checkmark-circle" : "add-circle-outline"}
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.privacyRow}>
-          <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
-          <Text style={styles.privacyText}>
-            Your documents are kept private and used only for verification.
-          </Text>
-        </View>
+        ) : null}
       </ScrollView>
 
-      <View style={styles.bottomBar}>
-        <View style={styles.slaRow}>
-          <Text style={styles.slaLabel}>Verification SLA</Text>
-          <Text style={styles.slaValue}>Under 24h</Text>
-        </View>
+      <View style={[styles.bottomBar, { paddingBottom: bottomPad }]}>
+        {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
 
         <PrimaryButton
-          title="Submit for Verification"
+          title={submitting ? "Submitting..." : "Submit for verification"}
           onPress={submitVerification}
           icon="arrow-forward"
+          loading={submitting}
+          disabled={!requiredDone || uploadingKey !== null}
+        />
+
+        <SecondaryButton
+          title="Back to dashboard"
+          onPress={() => router.replace("/provider/dashboard")}
+          variant="ghost"
+          style={{ marginTop: spacing.xs }}
         />
       </View>
     </SafeAreaView>
   );
 }
 
+function UploadTile({
+  title,
+  subtitle,
+  done,
+  uploading,
+  iconIdle,
+  onPress,
+  wide,
+  previewUrl,
+}: {
+  title: string;
+  subtitle: string;
+  done: boolean;
+  uploading: boolean;
+  iconIdle: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  wide?: boolean;
+  previewUrl?: string;
+}) {
+  const showPreview = !!previewUrl && previewUrl.includes("/image/upload");
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.uploadTile,
+        wide && styles.uploadTileWide,
+        done ? styles.uploadTileDone : styles.uploadTileIdle,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      disabled={uploading}
+    >
+      {uploading ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : showPreview ? (
+        <Image source={{ uri: previewUrl }} style={styles.preview} />
+      ) : (
+        <Ionicons
+          name={done ? "checkmark-circle" : iconIdle}
+          size={26}
+          color={done ? colors.success : colors.textSecondary}
+        />
+      )}
+
+      <Text style={styles.uploadTitle}>{title}</Text>
+      <Text style={styles.uploadSubtitle} numberOfLines={2}>
+        {subtitle}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
-  scrollContent: {
-    padding: spacing.lg + 2,
-    paddingBottom: 130,
-  },
-
-  progressHeader: {
+  topBar: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
   },
-
-  stepText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
+  topBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-
-  progressText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-
-  progressTrack: {
-    marginTop: spacing.sm + 2,
-    height: 5,
-    backgroundColor: colors.borderStrong,
-    borderRadius: 5,
-  },
-
-  progressFill: {
-    width: "75%",
-    height: "100%",
-    backgroundColor: colors.primary,
-    borderRadius: 5,
-  },
-
-  title: {
-    ...typography.pageTitle,
-    marginTop: spacing.xl,
-    fontSize: 26,
-  },
-
-  subtitle: {
-    ...typography.secondary,
-    marginTop: spacing.xs + 2,
-    fontSize: 13,
-  },
-
-  securityCard: {
-    marginTop: spacing.lg + 2,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    padding: spacing.lg - 1,
-    gap: spacing.md,
-  },
-
-  securityInfo: {
+  topTitle: {
     flex: 1,
-  },
-
-  securityTitle: {
-    fontSize: 14,
-    fontWeight: "800",
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "900",
     color: colors.textPrimary,
   },
 
-  securityText: {
+  scrollContent: { padding: spacing.xl },
+
+  heroCard: {
+    backgroundColor: colors.textPrimary,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  heroTitle: { fontSize: 18, fontWeight: "900", color: colors.white },
+  heroSub: {
     marginTop: spacing.xs,
-    fontSize: 11,
-    lineHeight: 17,
-    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.75)",
+  },
+  progressRow: { marginTop: spacing.md, flexDirection: "row", justifyContent: "space-between" },
+  progressText: { fontSize: 12, fontWeight: "800", color: "rgba(255,255,255,0.75)" },
+  progressTrack: {
+    marginTop: spacing.sm,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 999, backgroundColor: colors.primarySoft },
+
+  sectionTitle: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    ...typography.sectionHeading,
+    fontSize: 15,
+    fontWeight: "900",
   },
 
-  section: {
-    marginTop: spacing.md + 2,
+  card: {
+    marginTop: spacing.md,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
   },
+  cardTitle: { fontSize: 15, fontWeight: "900", color: colors.textPrimary },
+  helperText: { marginTop: spacing.xs, fontSize: 12, lineHeight: 18, color: colors.textSecondary },
 
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  gridRow: { marginTop: spacing.md, flexDirection: "row", gap: spacing.sm },
 
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: colors.textPrimary,
-  },
-
-  verifiedBadge: {
-    marginLeft: spacing.sm,
-    backgroundColor: colors.successLight,
-    paddingHorizontal: spacing.sm - 1,
-    paddingVertical: spacing.xs - 1,
-    borderRadius: radius.sm,
-  },
-
-  verifiedText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: colors.success,
-  },
-
-  helperText: {
-    marginTop: spacing.xs - 1,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-
-  profileRow: {
-    marginTop: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  profileText: {
+  uploadTile: {
     flex: 1,
-    marginLeft: spacing.md,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-
-  changeButton: {
-    backgroundColor: colors.primarySoft,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 3,
-    borderRadius: radius.sm,
-  },
-
-  changeText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  uploadRow: {
-    marginTop: spacing.md + 2,
-    flexDirection: "row",
-    gap: spacing.sm + 2,
-  },
-
-  uploadBox: {
-    flex: 1,
-    minHeight: 120,
-    backgroundColor: colors.background,
-    borderRadius: radius.lg - 2,
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 130,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.md,
   },
+  uploadTileWide: { marginTop: spacing.md, minHeight: 150 },
+  uploadTileIdle: {},
+  uploadTileDone: { backgroundColor: colors.successLight, borderColor: colors.success },
 
-  uploadedBox: {
-    borderColor: colors.success,
-    backgroundColor: colors.successLight,
-  },
+  preview: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.border },
 
   uploadTitle: {
     marginTop: spacing.sm,
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-
-  uploadStatus: {
-    marginTop: spacing.xs,
-    fontSize: 10,
-    color: colors.textSecondary,
-  },
-
-  note: {
-    marginTop: spacing.md,
-    fontSize: 10,
-    lineHeight: 16,
-    color: colors.textSecondary,
-  },
-
-  largeUploadBox: {
-    marginTop: spacing.md + 2,
-    minHeight: 140,
-    borderRadius: radius.lg - 2,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  largeUploadTitle: {
-    marginTop: spacing.sm + 1,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "900",
     color: colors.textPrimary,
+    textAlign: "center",
   },
+  uploadSubtitle: { marginTop: spacing.xs, fontSize: 11, color: colors.textSecondary, textAlign: "center" },
 
-  optionalRow: {
-    marginTop: spacing.md + 2,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.background,
-    padding: spacing.md + 2,
-    borderRadius: radius.md,
-  },
-
-  optionalTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-
-  optionalText: {
-    marginTop: spacing.xs - 1,
-    fontSize: 10,
-    color: colors.textSecondary,
-  },
-
-  privacyRow: {
+  warnCard: {
     marginTop: spacing.lg,
     flexDirection: "row",
-    alignItems: "center",
     gap: spacing.sm,
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md + 2,
   },
-
-  privacyText: {
-    flex: 1,
-    fontSize: 10,
-    lineHeight: 16,
-    color: colors.textSecondary,
-  },
+  warnText: { flex: 1, fontSize: 12, lineHeight: 18, color: colors.textSecondary },
 
   bottomBar: {
     position: "absolute",
@@ -542,23 +583,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    padding: spacing.md + 2,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md + 2,
   },
 
-  slaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm + 2,
-  },
-
-  slaLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-
-  slaValue: {
-    fontSize: 11,
+  errorText: {
+    color: colors.error,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
     fontWeight: "700",
-    color: colors.primary,
   },
 });
