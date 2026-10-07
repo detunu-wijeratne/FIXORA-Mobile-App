@@ -4,7 +4,7 @@ import { File } from "expo-file-system";
 import { fetch } from "expo/fetch";
 
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { signOut } from "firebase/auth";
 
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -166,14 +166,20 @@ export default function CustomerProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <LoadingState label="Loading profile..." />
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container} edges={["top"]}>
+          <LoadingState label="Loading profile..." />
+        </SafeAreaView>
+      </>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -277,7 +283,8 @@ export default function CustomerProfileScreen() {
       </ScrollView>
 
       <CustomerBottomNav />
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

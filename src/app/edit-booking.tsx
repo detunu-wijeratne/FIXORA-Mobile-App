@@ -183,7 +183,7 @@ export default function EditBookingScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-        <Stack.Screen options={{ title: "Edit Booking" }} />
+        <Stack.Screen options={{ headerShown: false }} />
         <LoadingState label="Loading booking..." />
       </SafeAreaView>
     );
@@ -192,7 +192,7 @@ export default function EditBookingScreen() {
   if (notEditable) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-        <Stack.Screen options={{ title: "Edit Booking" }} />
+        <Stack.Screen options={{ headerShown: false }} />
 
         <Ionicons name="lock-closed-outline" size={40} color={colors.textMuted} />
 

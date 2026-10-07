@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,7 +25,10 @@ export default function BookingConfirmationScreen() {
     typeof params.imageUrl === "string" ? params.imageUrl : "";
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -102,7 +105,8 @@ export default function BookingConfirmationScreen() {
           onPress={() => router.replace("/customer-home")}
         />
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

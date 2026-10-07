@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useEffect, useState } from "react";
 
 import {
@@ -99,7 +99,10 @@ export default function MyBookingsScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -173,7 +176,8 @@ export default function MyBookingsScreen() {
       </ScrollView>
 
       <CustomerBottomNav />
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

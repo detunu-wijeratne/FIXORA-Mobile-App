@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 
 import {
@@ -51,7 +51,10 @@ export default function SelectDateTimeScreen() {
   const [selectedTime, setSelectedTime] = useState("9:30 AM");
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -156,7 +159,8 @@ export default function SelectDateTimeScreen() {
           }
         />
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

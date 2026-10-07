@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 
 import {
@@ -139,18 +139,24 @@ export default function BookingDetailsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-        <LoadingState label="Loading booking..." />
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.centerContainer} edges={["top"]}>
+          <LoadingState label="Loading booking..." />
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!booking) {
     return (
-      <SafeAreaView style={styles.centerContainer} edges={["top"]}>
-        <Ionicons name="file-tray-outline" size={40} color={colors.textMuted} />
-        <Text style={styles.emptyTitle}>Booking not found</Text>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.centerContainer} edges={["top"]}>
+          <Ionicons name="file-tray-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.emptyTitle}>Booking not found</Text>
+        </SafeAreaView>
+      </>
     );
   }
 
@@ -172,7 +178,10 @@ export default function BookingDetailsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -386,7 +395,8 @@ export default function BookingDetailsScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

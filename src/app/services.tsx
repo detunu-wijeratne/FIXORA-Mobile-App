@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -53,7 +53,10 @@ const SERVICES = [
 
 export default function ServicesScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -85,7 +88,8 @@ export default function ServicesScreen() {
       </ScrollView>
 
       <CustomerBottomNav />
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 

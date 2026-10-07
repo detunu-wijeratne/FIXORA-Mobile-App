@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import {
     addDoc,
     collection,
@@ -220,7 +220,10 @@ export default function SavedLocationsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -389,7 +392,8 @@ export default function SavedLocationsScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+      </View>
+    </>
   );
 }
 

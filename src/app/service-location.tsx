@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 
 import { collection, onSnapshot } from "firebase/firestore";
 
@@ -147,7 +147,10 @@ export default function ServiceLocationScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -265,7 +268,8 @@ export default function ServiceLocationScreen() {
           onPress={handleContinue}
         />
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 
