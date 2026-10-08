@@ -15,9 +15,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import PrimaryButton from "../components/PrimaryButton";
 import { db } from "../services/firebase";
@@ -33,6 +34,7 @@ type Review = {
 
 export default function ProviderProfileScreen() {
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const providerId =
     typeof params.providerId === "string" ? params.providerId : "";
@@ -133,188 +135,247 @@ export default function ProviderProfileScreen() {
     };
   }, [providerId]);
 
+  const bottomPad = Math.max(insets.bottom, spacing.md);
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
       <SafeAreaView style={styles.container} edges={["top"]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.profileSection}>
-          {profileImageUrl ? (
-            <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={44} color={colors.primary} />
-            </View>
-          )}
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+            hitSlop={10}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
 
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.service}>{service}</Text>
+          <Text style={styles.topTitle} numberOfLines={1}>
+            Provider Profile
+          </Text>
 
-          {verified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-              <Text style={styles.verifiedText}>Verified Provider</Text>
-            </View>
-          )}
+          <View style={{ width: 40 }} />
+        </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <View style={styles.statValueRow}>
-                <Ionicons name="star" size={14} color={colors.warning} />
-                <Text style={styles.statValue}>
-                  {rating > 0 ? rating.toFixed(1) : "New"}
-                </Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 110 + bottomPad },
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.headerCard}>
+            <View style={styles.headerTint} pointerEvents="none" />
+
+            <View style={styles.profileSection}>
+              {profileImageUrl ? (
+                <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Ionicons name="person" size={46} color={colors.primary} />
+                </View>
+              )}
+
+              <Text style={styles.name}>{name}</Text>
+              <Text style={styles.service}>{service}</Text>
+
+              {verified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
+                  <Text style={styles.verifiedText}>Verified Provider</Text>
+                </View>
+              )}
+
+              {/* Rating + Experience as compact chips, District as its own
+                  full-width row so a long district name never has to
+                  squeeze into a cramped third column. */}
+              <View style={styles.statChipsRow}>
+                <View style={styles.statChip}>
+                  <Ionicons name="star" size={14} color={colors.warning} />
+                  <Text style={styles.statChipValue}>
+                    {rating > 0 ? rating.toFixed(1) : "New"}
+                  </Text>
+                  <Text style={styles.statChipLabel}>
+                    ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+                  </Text>
+                </View>
+
+                <View style={styles.statChip}>
+                  <Ionicons name="ribbon-outline" size={14} color={colors.primary} />
+                  <Text style={styles.statChipValue} numberOfLines={1}>
+                    {experience}
+                  </Text>
+                </View>
               </View>
 
-              <Text style={styles.statLabel}>
+              <View style={styles.districtRow}>
+                <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
+                <Text style={styles.districtText} numberOfLines={2}>
+                  {district}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* About */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+
+            <Text style={styles.description}>
+              Experienced and reliable professional providing quality home
+              services. Available for repairs, installations and general
+              service requests.
+            </Text>
+          </View>
+
+          {/* Service details */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Service Details</Text>
+
+            <View style={styles.detailCard}>
+              <DetailRow
+                icon="construct-outline"
+                label="Service"
+                value={service}
+              />
+              <DetailRow
+                icon="pricetag-outline"
+                label="Starting price"
+                value={`Rs. ${Number(price).toLocaleString()}`}
+              />
+              <DetailRow
+                icon="location-outline"
+                label="District"
+                value={district}
+                valueNumberOfLines={2}
+              />
+
+              <View style={styles.detailRowLast}>
+                <View style={styles.detailLabelRow}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.detailLabel}>Availability</Text>
+                </View>
+
+                <View style={styles.availabilityPill}>
+                  <Ionicons name="checkmark-circle" size={13} color={colors.success} />
+                  <Text style={styles.available}>Available</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Reviews */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Reviews</Text>
+
+              <Text style={styles.reviewCountText}>
                 {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
               </Text>
             </View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue} numberOfLines={1}>
-                {experience}
-              </Text>
-
-              <Text style={styles.statLabel}>Experience</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.statItem}>
-              <Text style={styles.statValue} numberOfLines={2}>
-                {district}
-              </Text>
-
-              <Text style={styles.statLabel}>District</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-
-          <Text style={styles.description}>
-            Experienced and reliable professional providing quality home
-            services. Available for repairs, installations and general
-            service requests.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Details</Text>
-
-          <View style={styles.detailCard}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Service</Text>
-              <Text style={styles.detailValue}>{service}</Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Starting price</Text>
-              <Text style={styles.detailValue}>
-                Rs. {Number(price).toLocaleString()}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>District</Text>
-              <Text style={styles.detailValue}>{district}</Text>
-            </View>
-
-            <View style={[styles.detailRow, styles.detailRowLast]}>
-              <Text style={styles.detailLabel}>Availability</Text>
-
-              <View style={styles.availabilityPill}>
-                <Ionicons name="checkmark-circle" size={13} color={colors.success} />
-                <Text style={styles.available}>Available</Text>
+            {reviews.length === 0 ? (
+              <View style={styles.reviewCard}>
+                <Text style={styles.noReviewText}>
+                  Reviews will appear here after customers complete services.
+                </Text>
               </View>
-            </View>
+            ) : (
+              reviews.map((item) => (
+                <View key={item.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={{ flex: 1, marginRight: spacing.sm }}>
+                      <Text style={styles.reviewerName}>Customer</Text>
+
+                      <Text style={styles.reviewerEmail} numberOfLines={1}>
+                        {item.customerEmail || "Verified customer"}
+                      </Text>
+                    </View>
+
+                    <View style={styles.reviewRatingRow}>
+                      <Ionicons name="star" size={13} color={colors.warning} />
+                      <Text style={styles.reviewRating}>
+                        {Number(item.rating || 0).toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {item.review ? (
+                    <Text style={styles.reviewMessage}>{item.review}</Text>
+                  ) : (
+                    <Text style={styles.noWrittenReview}>No written review.</Text>
+                  )}
+
+                  {item.service && (
+                    <Text style={styles.reviewService}>Service: {item.service}</Text>
+                  )}
+                </View>
+              ))
+            )}
           </View>
-        </View>
+        </ScrollView>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Reviews</Text>
-
-            <Text style={styles.reviewCountText}>
-              {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+        {/* Sticky Book Service bar */}
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad }]}>
+          <View>
+            <Text style={styles.bottomLabel}>Starting from</Text>
+            <Text style={styles.bottomPrice}>
+              Rs. {Number(price).toLocaleString()}
             </Text>
           </View>
 
-          {reviews.length === 0 ? (
-            <View style={styles.reviewCard}>
-              <Text style={styles.noReviewText}>
-                Reviews will appear here after customers complete services.
-              </Text>
-            </View>
-          ) : (
-            reviews.map((item) => (
-              <View key={item.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <View>
-                    <Text style={styles.reviewerName}>Customer</Text>
-
-                    <Text style={styles.reviewerEmail}>
-                      {item.customerEmail || "Verified customer"}
-                    </Text>
-                  </View>
-
-                  <View style={styles.reviewRatingRow}>
-                    <Ionicons name="star" size={13} color={colors.warning} />
-                    <Text style={styles.reviewRating}>
-                      {Number(item.rating || 0).toFixed(1)}
-                    </Text>
-                  </View>
-                </View>
-
-                {item.review ? (
-                  <Text style={styles.reviewMessage}>{item.review}</Text>
-                ) : (
-                  <Text style={styles.noWrittenReview}>No written review.</Text>
-                )}
-
-                {item.service && (
-                  <Text style={styles.reviewService}>Service: {item.service}</Text>
-                )}
-              </View>
-            ))
-          )}
+          <PrimaryButton
+            title="Book Service"
+            icon="calendar-outline"
+            style={styles.bookButton}
+            onPress={() =>
+              router.push({
+                pathname: "/select-date-time",
+                params: {
+                  providerId,
+                  name,
+                  service,
+                  price,
+                },
+              })
+            }
+          />
         </View>
-      </ScrollView>
-
-      <View style={styles.bottomBar}>
-        <View>
-          <Text style={styles.bottomLabel}>Starting from</Text>
-          <Text style={styles.bottomPrice}>
-            Rs. {Number(price).toLocaleString()}
-          </Text>
-        </View>
-
-        <PrimaryButton
-          title="Book Service"
-          style={styles.bookButton}
-          onPress={() =>
-            router.push({
-              pathname: "/select-date-time",
-              params: {
-                providerId,
-                name,
-                service,
-                price,
-              },
-            })
-          }
-        />
-      </View>
       </SafeAreaView>
     </>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  valueNumberOfLines,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  valueNumberOfLines?: number;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <View style={styles.detailLabelRow}>
+        <Ionicons name={icon} size={16} color={colors.textSecondary} />
+        <Text style={styles.detailLabel}>{label}</Text>
+      </View>
+
+      <Text
+        style={styles.detailValue}
+        numberOfLines={valueNumberOfLines}
+        ellipsizeMode="tail"
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -324,45 +385,102 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  scrollContent: {
-    paddingBottom: 120,
-  },
-
-  profileSection: {
-    backgroundColor: colors.surface,
-    alignItems: "center",
+  topBar: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxl + 4,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.background,
   },
 
-  avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: colors.primarySoft,
+  topBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+  topTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  scrollContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+
+  headerCard: {
+    borderRadius: radius.xl,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  headerTint: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 110,
     backgroundColor: colors.primarySoft,
+  },
+
+  profileSection: {
+    alignItems: "center",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xl,
+  },
+
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.surface,
+    borderWidth: 3,
+    borderColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 3,
+    borderColor: colors.surface,
   },
 
   name: {
     marginTop: spacing.md + 2,
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "900",
     color: colors.textPrimary,
+    textAlign: "center",
   },
 
   service: {
     marginTop: spacing.xs,
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textSecondary,
+    textAlign: "center",
   },
 
   verifiedBadge: {
@@ -370,7 +488,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.successLight,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill,
@@ -378,57 +496,70 @@ const styles = StyleSheet.create({
 
   verifiedText: {
     fontSize: 12,
-    color: colors.primary,
-    fontWeight: "700",
+    color: colors.success,
+    fontWeight: "800",
   },
 
-  statsRow: {
-    marginTop: spacing.xl,
-    width: "100%",
+  statChipsRow: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  statChip: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    gap: 6,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 3,
+    maxWidth: "48%",
   },
 
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: spacing.xs,
-  },
-
-  statValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-
-  statValue: {
+  statChipValue: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.textPrimary,
+    flexShrink: 1,
+  },
+
+  statChipLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    flexShrink: 1,
+  },
+
+  districtRow: {
+    marginTop: spacing.sm + 2,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    maxWidth: "88%",
+  },
+
+  districtText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
     textAlign: "center",
   },
 
-  statLabel: {
-    marginTop: spacing.xs,
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-
-  divider: {
-    width: 1,
-    height: 35,
-    backgroundColor: colors.border,
-  },
-
   section: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.xl,
   },
 
   sectionTitle: {
     ...typography.sectionHeading,
+    fontWeight: "900",
   },
 
   description: {
@@ -440,33 +571,41 @@ const styles = StyleSheet.create({
 
   detailCard: {
     marginTop: spacing.md + 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
   },
 
   detailRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: spacing.md + 2,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
 
   detailRowLast: {
-    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: spacing.md,
+  },
+
+  detailLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
   },
 
   detailLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
+    fontWeight: "600",
   },
 
   detailValue: {
-    maxWidth: "60%",
+    maxWidth: "52%",
     textAlign: "right",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "800",
     color: colors.textPrimary,
   },
 
@@ -474,11 +613,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    backgroundColor: colors.successLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
   },
 
   available: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
     color: colors.success,
   },
 
@@ -490,7 +633,7 @@ const styles = StyleSheet.create({
 
   reviewCountText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "700",
     color: colors.primary,
   },
 
@@ -500,7 +643,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing.md + 2,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
   },
 
   noReviewText: {
@@ -572,7 +715,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md + 2,
+    paddingTop: spacing.md + 2,
+    shadowColor: "#0B1220",
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
   },
 
   bottomLabel: {
@@ -582,13 +730,13 @@ const styles = StyleSheet.create({
 
   bottomPrice: {
     marginTop: 2,
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "900",
     color: colors.textPrimary,
   },
 
   bookButton: {
-    paddingHorizontal: spacing.xxl,
-    minHeight: 48,
+    paddingHorizontal: spacing.xl,
+    minHeight: 50,
   },
 });
