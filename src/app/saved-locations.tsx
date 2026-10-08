@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import CustomerBottomNav from "../components/CustomerBottomNav";
 import {
@@ -12,23 +13,37 @@ import {
 import { useEffect, useState } from "react";
 
 import {
-  ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppTextInput from "../components/AppTextInput";
+import EmptyState from "../components/EmptyState";
+import LoadingState from "../components/LoadingState";
+import PrimaryButton from "../components/PrimaryButton";
+import SecondaryButton from "../components/SecondaryButton";
 import { auth, db } from "../services/firebase";
+import { colors, radius, spacing, typography } from "../theme";
 
 type SavedLocation = {
   id: string;
   label?: string;
   address?: string;
 };
+
+function locationIcon(label?: string): keyof typeof Ionicons.glyphMap {
+  const lower = label?.toLowerCase() || "";
+  if (lower.includes("work")) return "briefcase-outline";
+  if (lower.includes("home")) return "home-outline";
+  return "location-outline";
+}
 
 export default function SavedLocationsScreen() {
   const [locations, setLocations] = useState<SavedLocation[]>([]);
@@ -224,178 +239,148 @@ export default function SavedLocationsScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={styles.title}>
-          Saved Locations
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Save addresses you frequently use for service bookings.
-        </Text>
-
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {editingId
-              ? "Edit Location"
-              : "Add Location"}
-          </Text>
-
-          <Text style={styles.label}>
-            Location Name
-          </Text>
-
-          <TextInput
-            style={styles.input}
-            value={label}
-            onChangeText={setLabel}
-            placeholder="Example: Home, Work"
-            placeholderTextColor="#94A3B8"
-          />
-
-          <Text style={styles.label}>
-            Address
-          </Text>
-
-          <TextInput
-            style={[
-              styles.input,
-              styles.addressInput,
-            ]}
-            value={address}
-            onChangeText={setAddress}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            placeholder="Enter full address"
-            placeholderTextColor="#94A3B8"
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              saving && styles.disabledButton,
-            ]}
-            onPress={handleSave}
-            disabled={saving}
+      {/*
+        The missing SafeAreaView here was the actual cause of the
+        title overlapping the status bar — the screen rendered flush
+        from y=0 with no top inset at all. Using SafeAreaView from
+        react-native-safe-area-context (not a fixed offset) fixes it
+        correctly on every device/notch size.
+      */}
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
           >
-            <Text style={styles.saveButtonText}>
-              {saving
-                ? "Saving..."
-                : editingId
-                ? "Update Location"
-                : "Save Location"}
-            </Text>
-          </TouchableOpacity>
-
-          {editingId && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={resetForm}
-            >
-              <Text style={styles.cancelButtonText}>
-                Cancel Editing
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>
-          Your Locations
-        </Text>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color="#2563EB"
-            />
-
-            <Text style={styles.loadingText}>
-              Loading locations...
-            </Text>
-          </View>
-        ) : locations.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>
-              📍
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              No saved locations
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Add your first location using the form above.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.locationList}>
-            {locations.map((location) => (
-              <View
-                key={location.id}
-                style={styles.locationCard}
-              >
-                <View style={styles.iconBox}>
-                  <Text style={styles.icon}>
-                    {location.label
-                      ?.toLowerCase()
-                      .includes("work")
-                      ? "🏢"
-                      : location.label
-                          ?.toLowerCase()
-                          .includes("home")
-                      ? "🏠"
-                      : "📍"}
-                  </Text>
-                </View>
-
-                <View style={styles.locationInfo}>
-                  <Text style={styles.locationTitle}>
-                    {location.label ||
-                      "Saved Location"}
-                  </Text>
-
-                  <Text style={styles.locationAddress}>
-                    {location.address ||
-                      "Address not provided"}
-                  </Text>
-                </View>
-
-                <View style={styles.actions}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() =>
-                      handleEdit(location)
-                    }
-                  >
-                    <Text style={styles.editText}>
-                      Edit
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() =>
-                      handleDelete(location)
-                    }
-                  >
-                    <Text style={styles.deleteText}>
-                      Delete
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+            <View style={styles.header}>
+              <View style={styles.headerIconWrap}>
+                <Ionicons name="location" size={20} color={colors.primary} />
               </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
 
-      <CustomerBottomNav />
-      </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>Saved Locations</Text>
+                <Text style={styles.subtitle}>
+                  Save addresses you frequently use for service bookings.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.formCard}>
+              <View style={styles.formTitleRow}>
+                <Ionicons
+                  name={editingId ? "create-outline" : "add-circle-outline"}
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={styles.formTitle}>
+                  {editingId ? "Edit Location" : "Add Location"}
+                </Text>
+              </View>
+
+              <AppTextInput
+                label="Location Name"
+                value={label}
+                onChangeText={setLabel}
+                placeholder="Example: Home, Work"
+              />
+
+              <AppTextInput
+                label="Address"
+                value={address}
+                onChangeText={setAddress}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                style={styles.addressInput}
+                placeholder="Enter full address"
+              />
+
+              <PrimaryButton
+                title={editingId ? "Update Location" : "Save Location"}
+                onPress={handleSave}
+                loading={saving}
+                icon={editingId ? "checkmark-outline" : "save-outline"}
+              />
+
+              {editingId && (
+                <SecondaryButton
+                  title="Cancel Editing"
+                  variant="ghost"
+                  onPress={resetForm}
+                  disabled={saving}
+                  style={styles.cancelEditBtn}
+                />
+              )}
+            </View>
+
+            <Text style={styles.sectionTitle}>Your Locations</Text>
+
+            {loading ? (
+              <LoadingState label="Loading locations..." />
+            ) : locations.length === 0 ? (
+              <EmptyState
+                icon="location-outline"
+                title="No saved locations"
+                description="Add your first location using the form above."
+              />
+            ) : (
+              <View style={styles.locationList}>
+                {locations.map((location) => (
+                  <View key={location.id} style={styles.locationCard}>
+                    <View style={styles.locationTopRow}>
+                      <View style={styles.iconBox}>
+                        <Ionicons
+                          name={locationIcon(location.label)}
+                          size={20}
+                          color={colors.primary}
+                        />
+                      </View>
+
+                      <View style={styles.locationInfo}>
+                        <Text style={styles.locationTitle} numberOfLines={1}>
+                          {location.label || "Saved Location"}
+                        </Text>
+
+                        <Text style={styles.locationAddress}>
+                          {location.address || "Address not provided"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    <View style={styles.actionsRow}>
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        onPress={() => handleEdit(location)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="create-outline" size={15} color={colors.primary} />
+                        <Text style={styles.editText}>Edit</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => handleDelete(location)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="trash-outline" size={15} color={colors.error} />
+                        <Text style={styles.deleteText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <CustomerBottomNav />
+      </SafeAreaView>
     </>
   );
 }
@@ -403,213 +388,170 @@ export default function SavedLocationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.background,
+  },
+
+  flex: {
+    flex: 1,
   },
 
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+
+  headerIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   title: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#0F172A",
+    ...typography.pageTitle,
+    fontSize: 24,
   },
 
   subtitle: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 20,
-    color: "#64748B",
+    marginTop: 4,
+    ...typography.secondary,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
 
   formCard: {
-    marginTop: 22,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    marginTop: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 16,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  formTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
 
   formTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  label: {
-    marginTop: 18,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#334155",
-  },
-
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 14,
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   addressInput: {
-    minHeight: 100,
+    minHeight: 96,
   },
 
-  saveButton: {
-    marginTop: 20,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  cancelButton: {
-    marginTop: 10,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  cancelButtonText: {
-    color: "#64748B",
-    fontSize: 13,
-    fontWeight: "700",
+  cancelEditBtn: {
+    marginTop: spacing.xs,
   },
 
   sectionTitle: {
-    marginTop: 28,
-    marginBottom: 12,
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  loadingContainer: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-
-  loadingText: {
-    marginTop: 10,
-    color: "#64748B",
-  },
-
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 28,
-    alignItems: "center",
-  },
-
-  emptyIcon: {
-    fontSize: 34,
-  },
-
-  emptyTitle: {
-    marginTop: 8,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  emptyText: {
-    marginTop: 5,
-    fontSize: 12,
-    color: "#64748B",
-    textAlign: "center",
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+    ...typography.sectionHeading,
   },
 
   locationList: {
-    gap: 12,
+    gap: spacing.md,
   },
 
   locationCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    padding: 14,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+
+  locationTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
   },
 
   iconBox: {
     width: 46,
     height: 46,
-    borderRadius: 14,
-    backgroundColor: "#DBEAFE",
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  icon: {
-    fontSize: 21,
-  },
-
   locationInfo: {
     flex: 1,
-    marginLeft: 12,
-    paddingRight: 8,
+    marginLeft: spacing.md,
   },
 
   locationTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.textPrimary,
   },
 
   locationAddress: {
     marginTop: 4,
-    fontSize: 11,
-    lineHeight: 17,
-    color: "#64748B",
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.textSecondary,
   },
 
-  actions: {
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
+  },
+
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+  },
+
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-  },
-
-  editButton: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 3,
   },
 
   editText: {
-    color: "#2563EB",
-    fontSize: 11,
-    fontWeight: "700",
+    color: colors.primary,
+    fontSize: 12.5,
+    fontWeight: "800",
   },
 
-  deleteButton: {
-    backgroundColor: "#FEF2F2",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.errorLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 3,
   },
 
   deleteText: {
-    color: "#DC2626",
-    fontSize: 11,
-    fontWeight: "700",
+    color: colors.error,
+    fontSize: 12.5,
+    fontWeight: "800",
   },
 });
