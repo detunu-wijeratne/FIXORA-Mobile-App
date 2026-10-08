@@ -1,7 +1,9 @@
 // src/app/provider/jobs.tsx
+
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
+
 import {
   ActivityIndicator,
   ScrollView,
@@ -10,15 +12,29 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
 import ScreenHeader from "../../components/ScreenHeader";
-import StatusBadge, { StatusType } from "../../components/StatusBadge";
-import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import StatusBadge, {
+  StatusType,
+} from "../../components/StatusBadge";
 
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { auth, db } from "../../services/firebase";
+import {
+  colors,
+  radius,
+  spacing,
+  typography,
+} from "../../theme";
+
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
 
 type Booking = {
   id: string;
@@ -42,131 +58,306 @@ type Booking = {
   totalAmount?: number;
 
   status?: string;
+
+  source?: string;
 };
 
-type TabKey = "all" | "upcoming" | "completed";
+type TabKey =
+  | "all"
+  | "upcoming"
+  | "completed";
 
-const asMoney = (value: any) => `Rs. ${Number(value || 0).toLocaleString()}`;
+const asMoney = (value: any) =>
+  `Rs. ${Number(
+    value || 0
+  ).toLocaleString()}`;
 
-const formatWhen = (date?: string, time?: string) => {
+const formatWhen = (
+  date?: string,
+  time?: string
+) => {
   const d = (date || "").trim();
   const t = (time || "").trim();
-  if (!d && !t) return "—";
-  const dateLabel = /^\d+$/.test(d) ? `Day ${d}` : d;
-  return [dateLabel, t].filter(Boolean).join(" • ");
+
+  if (!d && !t) {
+    return "—";
+  }
+
+  const dateLabel =
+    /^\d+$/.test(d)
+      ? `Day ${d}`
+      : d;
+
+  return [dateLabel, t]
+    .filter(Boolean)
+    .join(" • ");
 };
 
-const toStatusType = (status?: string): StatusType => {
-  if (status === "pending") return "pending";
-  if (status === "confirmed") return "confirmed";
-  if (status === "in_progress") return "in_progress";
-  if (status === "completed") return "completed";
-  if (status === "declined") return "declined";
-  if (status === "cancelled") return "cancelled";
+const toStatusType = (
+  status?: string
+): StatusType => {
+  if (status === "pending") {
+    return "pending";
+  }
+
+  if (status === "confirmed") {
+    return "confirmed";
+  }
+
+  if (status === "in_progress") {
+    return "in_progress";
+  }
+
+  if (status === "completed") {
+    return "completed";
+  }
+
+  if (status === "declined") {
+    return "declined";
+  }
+
+  if (status === "cancelled") {
+    return "cancelled";
+  }
+
   return "confirmed";
 };
 
 export default function ProviderJobsScreen() {
-  const [jobs, setJobs] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [jobs, setJobs] =
+    useState<Booking[]>([]);
 
-  const [selectedTab, setSelectedTab] = useState<TabKey>("all");
+  const [loading, setLoading] =
+    useState(true);
+
+  const [selectedTab, setSelectedTab] =
+    useState<TabKey>("all");
 
   useEffect(() => {
     const user = auth.currentUser;
 
     if (!user) {
-      router.replace("/provider/login");
+      router.replace(
+        "/provider/login"
+      );
+
       return;
     }
 
-    // Load only bookings assigned to this provider.
-    // Filter relevant job statuses locally to avoid composite index.
     const jobsQuery = query(
-      collection(db, "bookings"),
-      where("providerId", "==", user.uid),
+      collection(
+        db,
+        "bookings"
+      ),
+      where(
+        "providerId",
+        "==",
+        user.uid
+      )
     );
 
     const unsubscribe = onSnapshot(
       jobsQuery,
       (snapshot) => {
-        const loadedJobs: Booking[] = snapshot.docs
-          .map((jobDoc) => ({
-            id: jobDoc.id,
-            ...(jobDoc.data() as any),
-          }))
-          .filter((job: any) =>
-            ["confirmed", "in_progress", "completed"].includes(job.status),
-          ) as Booking[];
+        const loadedJobs: Booking[] =
+          snapshot.docs
+            .map((jobDoc) => ({
+              id: jobDoc.id,
+              ...(jobDoc.data() as any),
+            }))
+            .filter(
+              (job: any) =>
+                [
+                  "confirmed",
+                  "in_progress",
+                  "completed",
+                ].includes(
+                  job.status
+                )
+            ) as Booking[];
 
-        // Optional: sort by "date" if numeric, otherwise keep firestore order
-        loadedJobs.sort((a, b) => {
-          const da = Number(a.date);
-          const dbb = Number(b.date);
-          if (!Number.isNaN(da) && !Number.isNaN(dbb) && da !== dbb) return da - dbb;
-          return String(a.time || "").localeCompare(String(b.time || ""));
-        });
+        loadedJobs.sort(
+          (a, b) => {
+            const da =
+              Number(a.date);
 
-        setJobs(loadedJobs);
-        setLoading(false);
+            const dbb =
+              Number(b.date);
+
+            if (
+              !Number.isNaN(da) &&
+              !Number.isNaN(dbb) &&
+              da !== dbb
+            ) {
+              return da - dbb;
+            }
+
+            return String(
+              a.time || ""
+            ).localeCompare(
+              String(
+                b.time || ""
+              )
+            );
+          }
+        );
+
+        setJobs(
+          loadedJobs
+        );
+
+        setLoading(
+          false
+        );
       },
       (error) => {
-        console.log("Error loading provider jobs:", error);
-        alert(error.message || "Unable to load provider jobs.");
-        setLoading(false);
-      },
+        console.log(
+          "Error loading provider jobs:",
+          error
+        );
+
+        alert(
+          error.message ||
+            "Unable to load provider jobs."
+        );
+
+        setLoading(
+          false
+        );
+      }
     );
 
-    return () => unsubscribe();
+    return () =>
+      unsubscribe();
   }, []);
 
-  const { upcomingCount, completedCount, filteredJobs } = useMemo(() => {
-    const upcoming = jobs.filter(
-      (j) => j.status === "confirmed" || j.status === "in_progress",
-    );
-    const completed = jobs.filter((j) => j.status === "completed");
+  const {
+    upcomingCount,
+    completedCount,
+    filteredJobs,
+  } = useMemo(() => {
+    const upcoming =
+      jobs.filter(
+        (job) =>
+          job.status ===
+            "confirmed" ||
+          job.status ===
+            "in_progress"
+      );
+
+    const completed =
+      jobs.filter(
+        (job) =>
+          job.status ===
+          "completed"
+      );
 
     const filtered =
       selectedTab === "all"
         ? jobs
-        : selectedTab === "upcoming"
+        : selectedTab ===
+            "upcoming"
           ? upcoming
           : completed;
 
     return {
-      upcomingCount: upcoming.length,
-      completedCount: completed.length,
-      filteredJobs: filtered,
-    };
-  }, [jobs, selectedTab]);
+      upcomingCount:
+        upcoming.length,
 
-  const openJob = (job: Booking) => {
+      completedCount:
+        completed.length,
+
+      filteredJobs:
+        filtered,
+    };
+  }, [
+    jobs,
+    selectedTab,
+  ]);
+
+  const openJob = (
+    job: Booking
+  ) => {
     router.push({
-      pathname: "/provider/job-details",
+      pathname:
+        "/provider/job-details",
+
       params: {
-        bookingId: job.id,
-        customer: job.customerName || "Customer",
-        phone: job.customerPhone || "",
-        email: job.customerEmail || "",
-        service: job.service || "Home Service",
-        date: job.date || "",
-        time: job.time || "",
-        location: job.address || "",
-        description: job.description || "",
-        price: String(job.servicePrice || 0),
-        totalAmount: String(job.totalAmount || 0),
-        status: job.status || "confirmed",
+        bookingId:
+          job.id,
+
+        customer:
+          job.customerName ||
+          "Customer",
+
+        phone:
+          job.customerPhone ||
+          "",
+
+        email:
+          job.customerEmail ||
+          "",
+
+        service:
+          job.service ||
+          "Home Service",
+
+        date:
+          job.date || "",
+
+        time:
+          job.time || "",
+
+        location:
+          job.address || "",
+
+        description:
+          job.description ||
+          "",
+
+        price:
+          String(
+            job.servicePrice ||
+              0
+          ),
+
+        totalAmount:
+          String(
+            job.totalAmount ||
+              0
+          ),
+
+        status:
+          job.status ||
+          "confirmed",
+
+        source:
+          job.source || "",
       },
     });
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <Stack.Screen options={{ headerShown: false }} />
+    <SafeAreaView
+      style={
+        styles.container
+      }
+      edges={["top"]}
+    >
+      <Stack.Screen
+        options={{
+          headerShown:
+            false,
+        }}
+      />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={
+          false
+        }
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
         <ScreenHeader
           eyebrow="FIXORA"
@@ -174,102 +365,387 @@ export default function ProviderJobsScreen() {
           subtitle="Manage confirmed, ongoing and completed service jobs."
         />
 
-        {/* Tabs */}
-        <View style={styles.tabsCard}>
+        {/* MANUAL JOB BUTTON */}
+
+        <TouchableOpacity
+          style={
+            styles.manualJobButton
+          }
+          activeOpacity={0.85}
+          onPress={() =>
+            router.push(
+              "/provider/create-manual-job"
+            )
+          }
+        >
+          <View
+            style={
+              styles.manualJobIcon
+            }
+          >
+            <Ionicons
+              name="add"
+              size={22}
+              color="#FFFFFF"
+            />
+          </View>
+
+          <View
+            style={
+              styles.manualJobInfo
+            }
+          >
+            <Text
+              style={
+                styles.manualJobTitle
+              }
+            >
+              Add Manual Job
+            </Text>
+
+            <Text
+              style={
+                styles.manualJobSubtitle
+              }
+            >
+              Add a phone, WhatsApp or offline service job.
+            </Text>
+          </View>
+
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={
+              colors.primary
+            }
+          />
+        </TouchableOpacity>
+
+        {/* TABS */}
+
+        <View
+          style={styles.tabsCard}
+        >
           <TabButton
             label="All"
-            active={selectedTab === "all"}
-            onPress={() => setSelectedTab("all")}
+            active={
+              selectedTab ===
+              "all"
+            }
+            onPress={() =>
+              setSelectedTab(
+                "all"
+              )
+            }
           />
+
           <TabButton
             label={`Upcoming (${upcomingCount})`}
-            active={selectedTab === "upcoming"}
-            onPress={() => setSelectedTab("upcoming")}
+            active={
+              selectedTab ===
+              "upcoming"
+            }
+            onPress={() =>
+              setSelectedTab(
+                "upcoming"
+              )
+            }
           />
+
           <TabButton
             label={`Completed (${completedCount})`}
-            active={selectedTab === "completed"}
-            onPress={() => setSelectedTab("completed")}
+            active={
+              selectedTab ===
+              "completed"
+            }
+            onPress={() =>
+              setSelectedTab(
+                "completed"
+              )
+            }
           />
         </View>
 
-        {/* List */}
+        {/* LIST */}
+
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading jobs…</Text>
+          <View
+            style={
+              styles.loadingWrap
+            }
+          >
+            <ActivityIndicator
+              size="large"
+              color={
+                colors.primary
+              }
+            />
+
+            <Text
+              style={
+                styles.loadingText
+              }
+            >
+              Loading jobs…
+            </Text>
           </View>
-        ) : filteredJobs.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIconWrap}>
+        ) : filteredJobs.length ===
+          0 ? (
+          <View
+            style={styles.emptyCard}
+          >
+            <View
+              style={
+                styles.emptyIconWrap
+              }
+            >
               <Ionicons
-                name={selectedTab === "completed" ? "checkmark-done-outline" : "briefcase-outline"}
+                name={
+                  selectedTab ===
+                  "completed"
+                    ? "checkmark-done-outline"
+                    : "briefcase-outline"
+                }
                 size={22}
-                color={colors.textSecondary}
+                color={
+                  colors.textSecondary
+                }
               />
             </View>
-            <Text style={styles.emptyTitle}>No jobs found</Text>
-            <Text style={styles.emptyText}>
-              {selectedTab === "completed"
+
+            <Text
+              style={
+                styles.emptyTitle
+              }
+            >
+              No jobs found
+            </Text>
+
+            <Text
+              style={
+                styles.emptyText
+              }
+            >
+              {selectedTab ===
+              "completed"
                 ? "Completed jobs will appear here."
-                : "Accepted customer requests will appear here."}
+                : "Accepted customer requests and manual jobs will appear here."}
             </Text>
           </View>
         ) : (
-          <View style={styles.list}>
-            {filteredJobs.map((job) => (
-              <TouchableOpacity
-                key={job.id}
-                style={styles.jobCard}
-                onPress={() => openJob(job)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.jobTop}>
-                  <View style={styles.iconBox}>
-                    <Ionicons name="construct-outline" size={18} color={colors.primary} />
+          <View
+            style={styles.list}
+          >
+            {filteredJobs.map(
+              (job) => (
+                <TouchableOpacity
+                  key={job.id}
+                  style={
+                    styles.jobCard
+                  }
+                  onPress={() =>
+                    openJob(
+                      job
+                    )
+                  }
+                  activeOpacity={
+                    0.85
+                  }
+                >
+                  <View
+                    style={
+                      styles.jobTop
+                    }
+                  >
+                    <View
+                      style={
+                        styles.iconBox
+                      }
+                    >
+                      <Ionicons
+                        name={
+                          job.source ===
+                          "manual"
+                            ? "create-outline"
+                            : "construct-outline"
+                        }
+                        size={18}
+                        color={
+                          colors.primary
+                        }
+                      />
+                    </View>
+
+                    <View
+                      style={
+                        styles.info
+                      }
+                    >
+                      <View
+                        style={
+                          styles.serviceRow
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.service
+                          }
+                          numberOfLines={
+                            1
+                          }
+                        >
+                          {job.service ||
+                            "Home Service"}
+                        </Text>
+
+                        {job.source ===
+                          "manual" && (
+                          <View
+                            style={
+                              styles.manualBadge
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.manualBadgeText
+                              }
+                            >
+                              MANUAL
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text
+                        style={
+                          styles.customer
+                        }
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {job.customerName ||
+                          "Customer"}
+                      </Text>
+                    </View>
+
+                    <StatusBadge
+                      status={toStatusType(
+                        job.status
+                      )}
+                    />
                   </View>
 
-                  <View style={styles.info}>
-                    <Text style={styles.service} numberOfLines={1}>
-                      {job.service || "Home Service"}
-                    </Text>
-                    <Text style={styles.customer} numberOfLines={1}>
-                      {job.customerName || "Customer"}
-                    </Text>
+                  <View
+                    style={
+                      styles.meta
+                    }
+                  >
+                    <View
+                      style={
+                        styles.metaRow
+                      }
+                    >
+                      <Ionicons
+                        name="calendar-outline"
+                        size={14}
+                        color={
+                          colors.textSecondary
+                        }
+                      />
+
+                      <Text
+                        style={
+                          styles.metaText
+                        }
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {formatWhen(
+                          job.date,
+                          job.time
+                        )}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.metaRow
+                      }
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={14}
+                        color={
+                          colors.textSecondary
+                        }
+                      />
+
+                      <Text
+                        style={
+                          styles.metaText
+                        }
+                        numberOfLines={
+                          2
+                        }
+                      >
+                        {job.address ||
+                          "Location not provided"}
+                      </Text>
+                    </View>
                   </View>
 
-                  <StatusBadge status={toStatusType(job.status)} />
-                </View>
+                  <View
+                    style={
+                      styles.bottom
+                    }
+                  >
+                    <View>
+                      <Text
+                        style={
+                          styles.priceLabel
+                        }
+                      >
+                        Estimated service
+                      </Text>
 
-                <View style={styles.meta}>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {formatWhen(job.date, job.time)}
-                    </Text>
-                  </View>
+                      <Text
+                        style={
+                          styles.price
+                        }
+                      >
+                        {asMoney(
+                          job.servicePrice
+                        )}
+                      </Text>
+                    </View>
 
-                  <View style={styles.metaRow}>
-                    <Ionicons name="location-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.metaText} numberOfLines={2}>
-                      {job.address || "Location not provided"}
-                    </Text>
-                  </View>
-                </View>
+                    <View
+                      style={
+                        styles.ctaRow
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.ctaText
+                        }
+                      >
+                        View
+                      </Text>
 
-                <View style={styles.bottom}>
-                  <View>
-                    <Text style={styles.priceLabel}>Estimated service</Text>
-                    <Text style={styles.price}>{asMoney(job.servicePrice)}</Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={
+                          colors.primary
+                        }
+                      />
+                    </View>
                   </View>
-
-                  <View style={styles.ctaRow}>
-                    <Text style={styles.ctaText}>View</Text>
-                    <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              )
+            )}
           </View>
         )}
       </ScrollView>
@@ -292,195 +768,372 @@ function TabButton({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.9}
-      style={[styles.tab, active && styles.tabActive]}
+      style={[
+        styles.tab,
+        active &&
+          styles.tabActive,
+      ]}
     >
-      <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+      <Text
+        style={[
+          styles.tabText,
+          active &&
+            styles.tabTextActive,
+        ]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        colors.background,
+    },
 
-  scrollContent: {
-    padding: spacing.xl,
-    paddingBottom: spacing.xxxl + 90, // room for bottom nav
-  },
+    scrollContent: {
+      padding:
+        spacing.xl,
+      paddingBottom:
+        spacing.xxxl +
+        90,
+    },
 
-  tabsCard: {
-    flexDirection: "row",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
-    padding: 6,
-    gap: 6,
-  },
+    /* MANUAL JOB */
 
-  tab: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-  },
+    manualJobButton: {
+      marginTop:
+        spacing.lg,
+      marginBottom:
+        spacing.lg,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        colors.surface,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      borderRadius:
+        radius.xl,
+      padding:
+        spacing.md,
+    },
 
-  tabActive: {
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+    manualJobIcon: {
+      width: 46,
+      height: 46,
+      borderRadius:
+        radius.lg,
+      backgroundColor:
+        colors.primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
 
-  tabText: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: colors.textSecondary,
-  },
+    manualJobInfo: {
+      flex: 1,
+      marginLeft:
+        spacing.md,
+      marginRight:
+        spacing.sm,
+    },
 
-  tabTextActive: {
-    color: colors.primary,
-  },
+    manualJobTitle: {
+      fontSize: 14,
+      fontWeight:
+        "900",
+      color:
+        colors.textPrimary,
+    },
 
-  loadingWrap: {
-    marginTop: spacing.xl + 10,
-    alignItems: "center",
-  },
+    manualJobSubtitle: {
+      marginTop: 3,
+      fontSize: 11,
+      lineHeight: 16,
+      color:
+        colors.textSecondary,
+    },
 
-  loadingText: {
-    marginTop: spacing.md,
-    color: colors.textSecondary,
-  },
+    tabsCard: {
+      flexDirection:
+        "row",
+      backgroundColor:
+        colors.surface,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      borderRadius:
+        radius.xl,
+      padding: 6,
+      gap: 6,
+    },
 
-  emptyCard: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    alignItems: "center",
-  },
+    tab: {
+      flex: 1,
+      minHeight: 40,
+      borderRadius:
+        radius.lg,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        spacing.sm,
+    },
 
-  emptyIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.lg,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    tabActive: {
+      backgroundColor:
+        colors.primarySoft,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+    },
 
-  emptyTitle: {
-    marginTop: spacing.md,
-    fontSize: 15,
-    fontWeight: "900",
-    color: colors.textPrimary,
-  },
+    tabText: {
+      fontSize: 12,
+      fontWeight:
+        "800",
+      color:
+        colors.textSecondary,
+    },
 
-  emptyText: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
+    tabTextActive: {
+      color:
+        colors.primary,
+    },
 
-  list: {
-    marginTop: spacing.md,
-    gap: spacing.md,
-  },
+    loadingWrap: {
+      marginTop:
+        spacing.xl +
+        10,
+      alignItems:
+        "center",
+    },
 
-  jobCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
+    loadingText: {
+      marginTop:
+        spacing.md,
+      color:
+        colors.textSecondary,
+    },
 
-  jobTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
+    emptyCard: {
+      marginTop:
+        spacing.lg,
+      backgroundColor:
+        colors.surface,
+      borderRadius:
+        radius.xl,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      padding:
+        spacing.xl,
+      alignItems:
+        "center",
+    },
 
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    emptyIconWrap: {
+      width: 46,
+      height: 46,
+      borderRadius:
+        radius.lg,
+      backgroundColor:
+        colors.background,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
 
-  info: { flex: 1 },
+    emptyTitle: {
+      marginTop:
+        spacing.md,
+      fontSize: 15,
+      fontWeight:
+        "900",
+      color:
+        colors.textPrimary,
+    },
 
-  service: {
-    ...typography.cardTitle,
-    fontWeight: "900",
-  },
+    emptyText: {
+      marginTop:
+        spacing.xs,
+      fontSize: 12,
+      lineHeight: 18,
+      color:
+        colors.textSecondary,
+      textAlign:
+        "center",
+    },
 
-  customer: {
-    marginTop: 3,
-    ...typography.secondary,
-    fontSize: 12,
-  },
+    list: {
+      marginTop:
+        spacing.md,
+      gap:
+        spacing.md,
+    },
 
-  meta: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
+    jobCard: {
+      backgroundColor:
+        colors.surface,
+      borderRadius:
+        radius.xl,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      padding:
+        spacing.lg,
+    },
 
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+    jobTop: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap:
+        spacing.md,
+    },
 
-  metaText: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
+    iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius:
+        radius.lg,
+      backgroundColor:
+        colors.primarySoft,
+      borderWidth: 1,
+      borderColor:
+        colors.border,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
 
-  bottom: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    info: {
+      flex: 1,
+    },
 
-  priceLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
+    serviceRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 6,
+    },
 
-  price: {
-    marginTop: 3,
-    fontSize: 15,
-    fontWeight: "900",
-    color: colors.textPrimary,
-  },
+    service: {
+      ...typography.cardTitle,
+      fontWeight:
+        "900",
+      flexShrink: 1,
+    },
 
-  ctaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
+    manualBadge: {
+      backgroundColor:
+        "#EFF6FF",
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 7,
+      borderWidth: 1,
+      borderColor:
+        "#BFDBFE",
+    },
 
-  ctaText: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: colors.primary,
-  },
-});
+    manualBadgeText: {
+      fontSize: 8,
+      fontWeight:
+        "900",
+      color:
+        "#2563EB",
+      letterSpacing: 0.4,
+    },
+
+    customer: {
+      marginTop: 3,
+      ...typography.secondary,
+      fontSize: 12,
+    },
+
+    meta: {
+      marginTop:
+        spacing.md,
+      gap:
+        spacing.sm,
+    },
+
+    metaRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 8,
+    },
+
+    metaText: {
+      flex: 1,
+      fontSize: 12,
+      color:
+        colors.textSecondary,
+    },
+
+    bottom: {
+      marginTop:
+        spacing.lg,
+      paddingTop:
+        spacing.md,
+      borderTopWidth: 1,
+      borderTopColor:
+        colors.border,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
+
+    priceLabel: {
+      ...typography.caption,
+      color:
+        colors.textSecondary,
+    },
+
+    price: {
+      marginTop: 3,
+      fontSize: 15,
+      fontWeight:
+        "900",
+      color:
+        colors.textPrimary,
+    },
+
+    ctaRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 2,
+    },
+
+    ctaText: {
+      fontSize: 12,
+      fontWeight:
+        "900",
+      color:
+        colors.primary,
+    },
+  });

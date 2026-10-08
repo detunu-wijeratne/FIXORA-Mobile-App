@@ -3,7 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import { useState } from "react";
 
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword
+} from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 import {
@@ -62,7 +64,7 @@ export default function ProviderLoginScreen() {
         return;
       }
 
-      router.replace("/provider/dashboard");
+      // The root protected stack handles the session transition.
     } catch (error: any) {
       console.log("Provider login error:", error);
 
@@ -106,7 +108,7 @@ export default function ProviderLoginScreen() {
         return;
       }
 
-      router.replace("/provider/dashboard");
+      // The root protected stack handles the session transition.
     } catch (error: any) {
       console.log("Quick provider login error:", error);
 
@@ -133,6 +135,15 @@ export default function ProviderLoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
+          <TouchableOpacity
+            onPress={() => router.dismissTo("/role-selection")}
+            accessibilityRole="button"
+            accessibilityLabel="Back to role selection"
+            style={{ alignSelf: "flex-start", padding: spacing.sm, marginBottom: spacing.md }}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+
           <View style={styles.badgeRow}>
             <View style={styles.badgeIcon}>
               <Ionicons name="briefcase-outline" size={14} color={colors.primary} />

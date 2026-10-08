@@ -116,15 +116,7 @@ export default function ProviderCreateAccountScreen() {
         updatedAt: serverTimestamp(),
       });
 
-      // 3) Continue to verification
-      router.replace({
-        pathname: "/provider/verification",
-        params: {
-          providerId: user.uid,
-          name,
-          email,
-        },
-      });
+      // The root protected stack opens verification after the profile is saved.
     } catch (error: any) {
       console.log("Provider registration error:", error);
 

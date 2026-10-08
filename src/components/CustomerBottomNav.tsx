@@ -2,9 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import useMainNavigationBack from "../hooks/useMainNavigationBack";
+
 import { colors, spacing } from "../theme";
 
 export default function CustomerBottomNav() {
+  useMainNavigationBack("/customer-home");
   const pathname = usePathname();
 
   const navItems: {

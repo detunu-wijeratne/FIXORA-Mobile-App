@@ -157,7 +157,7 @@ export default function CustomerProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.replace("/customer-login");
+      // The root protected stack removes account history and opens login.
     } catch (error: any) {
       console.log("Customer logout error:", error);
       alert(error.message || "Unable to log out.");

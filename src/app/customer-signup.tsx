@@ -126,7 +126,7 @@ export default function CustomerSignupScreen() {
         updatedAt: serverTimestamp(),
       });
 
-      router.replace("/customer-home");
+      // The root protected stack handles the session transition.
     } catch (error: any) {
       console.log("Customer signup error:", error);
 

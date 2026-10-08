@@ -262,7 +262,7 @@ export default function ProviderProfileScreen() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.replace("/provider/login");
+      // The root protected stack removes account history and opens login.
     } catch (error: any) {
       console.log("Logout error:", error);
       Alert.alert("Error", error.message || "Unable to log out.");

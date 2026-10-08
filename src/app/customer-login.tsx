@@ -121,7 +121,7 @@ export default function CustomerLoginScreen() {
         return;
       }
 
-      router.replace("/customer-home");
+      // The root protected stack handles the session transition.
     } catch (error: any) {
       console.log("Customer login error:", error);
 
@@ -164,7 +164,7 @@ export default function CustomerLoginScreen() {
         return;
       }
 
-      router.replace("/customer-home");
+      // The root protected stack handles the session transition.
     } catch (error: any) {
       console.log("Quick customer login error:", error);
 
@@ -192,7 +192,7 @@ export default function CustomerLoginScreen() {
           <View style={styles.heroOverlay} />
 
           <SafeAreaView edges={["top"]} style={styles.heroContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.dismissTo("/role-selection")}>
               <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
             </TouchableOpacity>
 

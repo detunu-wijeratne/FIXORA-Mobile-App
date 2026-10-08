@@ -5,6 +5,8 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import useMainNavigationBack from "../hooks/useMainNavigationBack";
+
 import { colors, radius, spacing } from "../theme";
 
 type NavItem = {
@@ -14,6 +16,7 @@ type NavItem = {
 };
 
 export default function ProviderBottomNav() {
+  useMainNavigationBack("/provider/dashboard");
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
