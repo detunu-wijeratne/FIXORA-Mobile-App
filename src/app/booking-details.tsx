@@ -5,10 +5,10 @@ import CustomerBottomNav from "../components/CustomerBottomNav";
 
 
 import {
+  deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
-  serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
 
 import {
@@ -102,30 +102,78 @@ export default function BookingDetailsScreen() {
   }, [bookingId]);
 
   const handleCancelBooking = () => {
-    if (!bookingId) return;
+    if (!bookingId || cancelling) return;
 
     Alert.alert(
       "Cancel Booking",
-      "Are you sure you want to cancel this booking?",
+      "This will permanently delete this booking request. This cannot be undone. Are you sure you want to continue?",
       [
         {
           text: "Keep Booking",
           style: "cancel",
         },
         {
-          text: "Cancel Booking",
+          text: "Delete Booking",
           style: "destructive",
           onPress: async () => {
+            const user = auth.currentUser;
+
+            if (!user) {
+              router.replace("/customer-login");
+              return;
+            }
+
             try {
               setCancelling(true);
 
-              await updateDoc(doc(db, "bookings", bookingId), {
-                status: "cancelled",
-                cancelledAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              });
+              const bookingRef = doc(db, "bookings", bookingId);
 
-              Alert.alert("Booking Cancelled", "Your booking has been cancelled.");
+              /*
+                Re-check the booking's live state right before deleting:
+                the provider may have accepted it (or it may already be
+                gone) while this screen was open.
+              */
+              const latestSnapshot = await getDoc(bookingRef);
+
+              if (!latestSnapshot.exists()) {
+                Alert.alert("Already Removed", "This booking no longer exists.");
+                router.replace("/my-bookings");
+                return;
+              }
+
+              const latestData = latestSnapshot.data();
+
+              if (latestData.customerId !== user.uid) {
+                Alert.alert("Not Allowed", "You can only cancel your own bookings.");
+                return;
+              }
+
+              if (latestData.status !== "pending") {
+                Alert.alert(
+                  "Cannot Cancel",
+                  "This booking has already been accepted or updated by the provider and can no longer be cancelled."
+                );
+                return;
+              }
+
+              /*
+                Real deletion: a pending booking can never have a chat
+                (canChat requires confirmed/in_progress/completed) or a
+                review (canReview requires completed), so removing the
+                document here cannot orphan any linked chat or review data.
+              */
+              await deleteDoc(bookingRef);
+
+              Alert.alert(
+                "Booking Cancelled",
+                "Your booking request has been removed.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => router.replace("/my-bookings"),
+                  },
+                ]
+              );
             } catch (error: any) {
               console.log("Cancel booking error:", error);
 
