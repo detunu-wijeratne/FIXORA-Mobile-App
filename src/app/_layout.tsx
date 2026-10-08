@@ -1,4 +1,5 @@
 import { Stack, useSegments } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { cloneElement, useEffect, useRef, useState } from "react";
@@ -17,6 +18,7 @@ const screens = {
   "role-selection": (<Stack.Screen
           name="role-selection"
           options={{
+            statusBarStyle: "light",
             headerShown:
               false,
           }}
@@ -24,6 +26,7 @@ const screens = {
   "customer-login": (<Stack.Screen
           name="customer-login"
           options={{
+            statusBarStyle: "light",
             title: "Login",
           }}
         />),
@@ -225,6 +228,7 @@ const screens = {
   "customer-signup": (<Stack.Screen
           name="customer-signup"
           options={{
+            statusBarStyle: "light",
             title:
               "Create Account",
           }}
@@ -271,6 +275,10 @@ const screens = {
 
 export default function RootLayout() {
   const segments = useSegments();
+  const route = segments.join("/");
+  const statusBarStyle = ["role-selection", "customer-login", "customer-signup"].includes(route)
+    ? "light"
+    : "dark";
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
   const roleRef = useRef<UserRole>(null);
@@ -326,7 +334,7 @@ export default function RootLayout() {
   }, []);
 
   if (!ready) {
-    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><ActivityIndicator size="large" /></View>;
+    return <View style={{ flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center" }}><StatusBar style="dark" hidden={false} /><ActivityIndicator size="large" /></View>;
   }
   const publicRoutes = ["index","role-selection","customer-login","customer-signup","provider/login","provider/create-account"] as const;
   const customerRoutes = ["customer-home","services","providers","provider-profile","select-date-time","job-details","service-location","booking-summary","booking-confirmation","my-bookings","booking-details","customer-chat","rate-review","customer-profile","customer-edit-profile","saved-locations","edit-booking"] as const;
@@ -336,7 +344,11 @@ export default function RootLayout() {
   const orderedProvider = [...providerRoutes].sort((a, b) => Number(b === providerLanding) - Number(a === providerLanding));
 
   return (
+    <>
+    <StatusBar style={statusBarStyle} hidden={false} />
     <Stack screenOptions={{
+      statusBarStyle: "dark",
+      statusBarHidden: false,
       headerShown: true,
       headerTitleAlign: "center",
       headerShadowVisible: false,
@@ -354,5 +366,6 @@ export default function RootLayout() {
         {orderedProvider.map((name) => cloneElement(screens[name], { key: name }))}
       </Stack.Protected>
     </Stack>
+    </>
   );
 }

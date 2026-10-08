@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import {
   collection,
-  doc,
   onSnapshot,
   query,
   where,
@@ -67,30 +66,17 @@ export default function ProviderProfileScreen() {
   const [rating, setRating] = useState(initialRating);
   const [reviewCount, setReviewCount] = useState(initialReviews);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsError, setReviewsError] = useState("");
 
   useEffect(() => {
     if (!providerId) {
       return;
     }
 
-    const providerRef = doc(db, "users", providerId);
-
-    const unsubscribeProvider = onSnapshot(
-      providerRef,
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          return;
-        }
-
-        const data = snapshot.data();
-
-        setRating(Number(data.rating || 0));
-        setReviewCount(Number(data.reviewCount || 0));
-      },
-      (error) => {
-        console.log("Provider profile error:", error);
-      }
-    );
+    setReviewsError("");
+    setReviews([]);
+    setReviewCount(0);
+    setRating(0);
 
     const reviewsQuery = query(
       collection(db, "reviews"),
@@ -100,9 +86,10 @@ export default function ProviderProfileScreen() {
     const unsubscribeReviews = onSnapshot(
       reviewsQuery,
       (snapshot) => {
+        setReviewsError("");
         const loadedReviews: Review[] = snapshot.docs.map((reviewDoc) => ({
-          id: reviewDoc.id,
           ...reviewDoc.data(),
+          id: reviewDoc.id,
         })) as Review[];
 
         setReviews(loadedReviews);
@@ -126,11 +113,11 @@ export default function ProviderProfileScreen() {
       },
       (error) => {
         console.log("Reviews loading error:", error);
+        setReviewsError("Your reviews could not be loaded. Please try again later.");
       }
     );
 
     return () => {
-      unsubscribeProvider();
       unsubscribeReviews();
     };
   }, [providerId]);
@@ -274,11 +261,15 @@ export default function ProviderProfileScreen() {
               <Text style={styles.sectionTitle}>Reviews</Text>
 
               <Text style={styles.reviewCountText}>
-                {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+                {reviewsError ? "Unavailable" : `${reviewCount} ${reviewCount === 1 ? "review" : "reviews"}`}
               </Text>
             </View>
 
-            {reviews.length === 0 ? (
+            {reviewsError ? (
+              <View style={styles.reviewCard}>
+                <Text style={styles.noReviewText}>{reviewsError}</Text>
+              </View>
+            ) : reviews.length === 0 ? (
               <View style={styles.reviewCard}>
                 <Text style={styles.noReviewText}>
                   Reviews will appear here after customers complete services.

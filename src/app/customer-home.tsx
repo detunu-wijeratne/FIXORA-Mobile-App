@@ -160,8 +160,8 @@ export default function CustomerHomeScreen() {
       (snapshot) => {
         const loaded: Provider[] = snapshot.docs
           .map((providerDoc) => ({
-            id: providerDoc.id,
             ...providerDoc.data(),
+            id: providerDoc.id,
           }))
           .filter(
             (provider: any) => provider.accountStatus !== "disabled"

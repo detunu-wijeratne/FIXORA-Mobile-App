@@ -4,9 +4,12 @@
     "slug": "Fixora",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/AppIcon.png",
     "scheme": "fixora",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "androidStatusBar": {
+      "barStyle": "dark-content"
+    },
     "ios": {
       "icon": "./assets/expo.icon"
     },

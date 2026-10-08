@@ -43,6 +43,7 @@ const formatDate = (review: Review) => {
 export default function ProviderMyReviewsScreen() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -60,9 +61,10 @@ export default function ProviderMyReviewsScreen() {
     const unsubscribe = onSnapshot(
       reviewsQuery,
       (snapshot) => {
+        setReviewsError("");
         const loaded: Review[] = snapshot.docs.map((d) => ({
-          id: d.id,
           ...(d.data() as any),
+          id: d.id,
         })) as Review[];
 
         loaded.sort((a, b) => {
@@ -76,6 +78,7 @@ export default function ProviderMyReviewsScreen() {
       },
       (error) => {
         console.log("Provider reviews loading error:", error);
+        setReviewsError("Your reviews could not be loaded. Please try again later.");
         setLoading(false);
       },
     );
@@ -151,7 +154,7 @@ export default function ProviderMyReviewsScreen() {
           <View style={styles.summaryDivider} />
 
           <View style={styles.summaryRight}>
-            <Text style={styles.summaryValue}>{reviewCount}</Text>
+            <Text style={styles.summaryValue}>{reviewsError ? "—" : reviewCount}</Text>
             <Text style={styles.summaryLabel}>
               {reviewCount === 1 ? "Review" : "Reviews"}
             </Text>
@@ -163,6 +166,11 @@ export default function ProviderMyReviewsScreen() {
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Loading reviews…</Text>
+          </View>
+        ) : reviewsError ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Unable to load reviews</Text>
+            <Text style={styles.emptyText}>{reviewsError}</Text>
           </View>
         ) : reviews.length === 0 ? (
           <View style={styles.emptyCard}>

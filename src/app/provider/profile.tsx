@@ -120,7 +120,10 @@ export default function ProviderProfileScreen() {
         );
         setAverageRating(totalRating / reviews.length);
       },
-      (error) => console.log("Review loading error:", error),
+      (error) => {
+        console.log("Review loading error:", error);
+        Alert.alert("Unable to load reviews", "Your reviews could not be loaded. Please try again later.");
+      },
     );
 
     const bookingsQuery = query(

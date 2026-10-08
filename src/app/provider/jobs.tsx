@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,8 +33,10 @@ import {
 
 import {
   collection,
+  doc,
   onSnapshot,
   query,
+  runTransaction,
   where,
 } from "firebase/firestore";
 
@@ -66,7 +69,8 @@ type Booking = {
 type TabKey =
   | "all"
   | "upcoming"
-  | "completed";
+  | "completed"
+  | "manual";
 
 const asMoney = (value: any) =>
   `Rs. ${Number(
@@ -133,6 +137,34 @@ export default function ProviderJobsScreen() {
 
   const [selectedTab, setSelectedTab] =
     useState<TabKey>("all");
+  const [jobToDelete, setJobToDelete] = useState<Booking | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const deleteManualJob = async () => {
+    const user = auth.currentUser;
+    if (!user || !jobToDelete || deleting) return;
+
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const jobRef = doc(db, "bookings", jobToDelete.id);
+      await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(jobRef);
+        if (!snapshot.exists()) return;
+        const job = snapshot.data();
+        if (job.providerId !== user.uid || job.source !== "manual") {
+          throw new Error("You can only delete your own manual jobs.");
+        }
+        transaction.delete(jobRef);
+      });
+      setJobToDelete(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Unable to delete the manual job. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -235,6 +267,7 @@ export default function ProviderJobsScreen() {
   const {
     upcomingCount,
     completedCount,
+    manualCount,
     filteredJobs,
   } = useMemo(() => {
     const upcoming =
@@ -253,15 +286,20 @@ export default function ProviderJobsScreen() {
           "completed"
       );
 
+    const manual = jobs.filter((job) => job.source === "manual");
+
     const filtered =
       selectedTab === "all"
         ? jobs
+        : selectedTab === "manual"
+          ? manual
         : selectedTab ===
             "upcoming"
           ? upcoming
           : completed;
 
     return {
+      manualCount: manual.length,
       upcomingCount:
         upcoming.length,
 
@@ -465,6 +503,11 @@ export default function ProviderJobsScreen() {
               )
             }
           />
+          <TabButton
+            label={`Manual (${manualCount})`}
+            active={selectedTab === "manual"}
+            onPress={() => setSelectedTab("manual")}
+          />
         </View>
 
         {/* LIST */}
@@ -530,7 +573,9 @@ export default function ProviderJobsScreen() {
               {selectedTab ===
               "completed"
                 ? "Completed jobs will appear here."
-                : "Accepted customer requests and manual jobs will appear here."}
+                : selectedTab === "manual"
+                  ? "Jobs you create manually will appear here."
+                  : "Accepted customer requests and manual jobs will appear here."}
             </Text>
           </View>
         ) : (
@@ -722,11 +767,23 @@ export default function ProviderJobsScreen() {
                       </Text>
                     </View>
 
-                    <View
-                      style={
-                        styles.ctaRow
-                      }
-                    >
+                    <View style={styles.jobActions}>
+                      {job.source === "manual" && (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete manual job for ${job.customerName || "Customer"}`}
+                          style={styles.deleteButton}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            setDeleteError("");
+                            setJobToDelete(job);
+                          }}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#B91C1C" />
+                          <Text style={styles.deleteText}>Delete</Text>
+                        </TouchableOpacity>
+                      )}
+                    <View style={styles.ctaRow}>
                       <Text
                         style={
                           styles.ctaText
@@ -743,6 +800,7 @@ export default function ProviderJobsScreen() {
                         }
                       />
                     </View>
+                    </View>
                   </View>
                 </TouchableOpacity>
               )
@@ -751,6 +809,30 @@ export default function ProviderJobsScreen() {
         )}
       </ScrollView>
 
+      <Modal
+        visible={jobToDelete !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!deleting) setJobToDelete(null); }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.emptyTitle}>Delete manual job?</Text>
+            <Text style={styles.emptyText}>
+              Delete {jobToDelete?.service || "this job"} for {jobToDelete?.customerName || "Customer"}? This cannot be undone.
+            </Text>
+            {!!deleteError && <Text style={styles.deleteText}>{deleteError}</Text>}
+            <View style={styles.jobActions}>
+              <TouchableOpacity style={styles.deleteButton} disabled={deleting} onPress={() => setJobToDelete(null)}>
+                <Text style={styles.ctaText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteButton} disabled={deleting} onPress={deleteManualJob}>
+                {deleting ? <ActivityIndicator color="#B91C1C" /> : <Text style={styles.deleteText}>Delete job</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <ProviderBottomNav />
     </SafeAreaView>
   );
@@ -791,6 +873,37 @@ function TabButton({
 
 const styles =
   StyleSheet.create({
+    jobActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 12,
+      flexWrap: "wrap",
+    },
+    deleteButton: {
+      minHeight: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+      paddingHorizontal: 8,
+    },
+    deleteText: { color: "#B91C1C", fontSize: 12, fontWeight: "800" },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.xl,
+    },
+    modalCard: {
+      width: "100%",
+      maxWidth: 420,
+      backgroundColor: colors.surface,
+      borderRadius: radius.xl,
+      padding: spacing.xl,
+      gap: spacing.md,
+    },
     container: {
       flex: 1,
       backgroundColor:
@@ -865,6 +978,7 @@ const styles =
     },
 
     tabsCard: {
+      flexWrap: "wrap",
       flexDirection:
         "row",
       backgroundColor:
@@ -879,7 +993,8 @@ const styles =
     },
 
     tab: {
-      flex: 1,
+      flexGrow: 1,
+      flexBasis: "45%",
       minHeight: 40,
       borderRadius:
         radius.lg,
