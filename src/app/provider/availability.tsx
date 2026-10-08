@@ -19,7 +19,7 @@ import SecondaryButton from "../../components/SecondaryButton";
 import { auth, db } from "../../services/firebase";
 import { colors, radius, spacing, typography } from "../../theme";
 
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 type DayAvailability = {
   enabled: boolean;
@@ -48,6 +48,26 @@ const DEFAULT_AVAILABILITY: Availability = {
 
 const cloneDefault = (): Availability => JSON.parse(JSON.stringify(DEFAULT_AVAILABILITY));
 
+/*
+  Used only after a real deletion, so the screen visibly shows
+  "nothing saved" rather than quietly reappearing with the
+  pre-filled Mon-Fri template (which would look like a schedule
+  still exists). Distinct from DEFAULT_AVAILABILITY / the
+  existing "Reset" button, which intentionally still offers the
+  prefilled template as a starting point for first-time setup.
+*/
+const EMPTY_AVAILABILITY: Availability = {
+  monday: { enabled: false, slots: [] },
+  tuesday: { enabled: false, slots: [] },
+  wednesday: { enabled: false, slots: [] },
+  thursday: { enabled: false, slots: [] },
+  friday: { enabled: false, slots: [] },
+  saturday: { enabled: false, slots: [] },
+  sunday: { enabled: false, slots: [] },
+};
+
+const cloneEmpty = (): Availability => JSON.parse(JSON.stringify(EMPTY_AVAILABILITY));
+
 const dayLabels: { key: keyof Availability; label: string; short: string }[] = [
   { key: "monday", label: "Monday", short: "Mon" },
   { key: "tuesday", label: "Tuesday", short: "Tue" },
@@ -67,6 +87,14 @@ export default function ProviderAvailabilityScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  /*
+    Tracks whether a providerAvailability/{uid} document currently
+    exists in Firestore, independent of what's shown in the local
+    form. Controls whether "Delete Availability" is shown at all.
+  */
+  const [hasSavedAvailability, setHasSavedAvailability] = useState(false);
 
   useEffect(() => {
     loadAvailability();
@@ -98,6 +126,9 @@ export default function ProviderAvailabilityScreen() {
         if (data?.availability) {
           setAvailability(data.availability as Availability);
         }
+        setHasSavedAvailability(true);
+      } else {
+        setHasSavedAvailability(false);
       }
     } catch (error: any) {
       console.log("Load availability error:", error);
@@ -128,6 +159,8 @@ export default function ProviderAvailabilityScreen() {
         { merge: true },
       );
 
+      setHasSavedAvailability(true);
+
       Alert.alert("Saved", "Your availability has been updated successfully.");
     } catch (error: any) {
       console.log("Save availability error:", error);
@@ -135,6 +168,49 @@ export default function ProviderAvailabilityScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const deleteAvailability = () => {
+    if (deleting || saving) return;
+
+    Alert.alert(
+      "Delete Availability",
+      "This will permanently remove your saved weekly schedule. Customers will no longer see any availability for you until you save a new one. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const user = auth.currentUser;
+
+            if (!user) {
+              Alert.alert("Login Required", "Please log in again.");
+              return;
+            }
+
+            try {
+              setDeleting(true);
+
+              await deleteDoc(doc(db, "providerAvailability", user.uid));
+
+              setAvailability(cloneEmpty());
+              setHasSavedAvailability(false);
+
+              Alert.alert(
+                "Deleted",
+                "Your availability schedule has been permanently removed.",
+              );
+            } catch (error: any) {
+              console.log("Delete availability error:", error);
+              Alert.alert("Error", error.message || "Unable to delete availability.");
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const toggleDay = (day: keyof Availability) => {
@@ -469,10 +545,28 @@ export default function ProviderAvailabilityScreen() {
             title={saving ? "Saving..." : "Save availability"}
             onPress={saveAvailability}
             loading={saving}
+            disabled={deleting}
             icon="save-outline"
             style={{ flex: 1 }}
           />
         </View>
+
+        {hasSavedAvailability ? (
+          <TouchableOpacity
+            style={[
+              styles.deleteAvailabilityBtn,
+              (deleting || saving) && styles.deleteAvailabilityBtnDisabled,
+            ]}
+            onPress={deleteAvailability}
+            disabled={deleting || saving}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+            <Text style={styles.deleteAvailabilityText}>
+              {deleting ? "Deleting..." : "Delete Availability"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <Text style={styles.bottomHint}>
           Customers will only see slots on days that are ON.
@@ -810,6 +904,25 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: "row",
     gap: spacing.sm,
+  },
+  deleteAvailabilityBtn: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm + 2,
+  },
+  deleteAvailabilityBtnDisabled: {
+    opacity: 0.6,
+  },
+  deleteAvailabilityText: {
+    color: colors.error,
+    fontWeight: "800",
+    fontSize: 13,
   },
   bottomHint: {
     marginTop: spacing.sm,
