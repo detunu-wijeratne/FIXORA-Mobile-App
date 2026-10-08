@@ -20,11 +20,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppTextInput from "../../components/AppTextInput";
-import PrimaryButton from "../../components/PrimaryButton";
-import ScreenHeader from "../../components/ScreenHeader";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import ProviderHero from "../../components/ProviderHero";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 export default function ProviderLoginScreen() {
   const [email, setEmail] = useState("");
@@ -135,28 +135,8 @@ export default function ProviderLoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
-          <TouchableOpacity
-            onPress={() => router.dismissTo("/role-selection")}
-            accessibilityRole="button"
-            accessibilityLabel="Back to role selection"
-            style={{ alignSelf: "flex-start", padding: spacing.sm, marginBottom: spacing.md }}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-
-          <View style={styles.badgeRow}>
-            <View style={styles.badgeIcon}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.primary} />
-            </View>
-            <Text style={styles.badgeText}>Service Provider</Text>
-          </View>
-
-          <ScreenHeader
-            eyebrow="FIXORA PARTNER"
-            title="Provider login"
-            subtitle="Log in to manage requests, jobs, schedule and earnings."
-          />
-
+          <ProviderHero title={"Your craft.\nYour next chapter."} subtitle="Great work starts here. Manage your jobs, customers and earnings in one place." onBack={() => router.dismissTo("/role-selection")} />
+          <View style={styles.formHeading}><Text style={styles.formTitle}>Welcome back</Text><Text style={styles.formSubtitle}>Sign in to your partner workspace.</Text></View>
           <View style={styles.card}>
             <AppTextInput
               label="Email address"
@@ -187,7 +167,7 @@ export default function ProviderLoginScreen() {
             </TouchableOpacity>
 
             <PrimaryButton
-              title={loading ? "Logging in..." : "Log in"}
+              title={loading ? "Signing in..." : "Sign in to workspace"}
               onPress={handleLogin}
               loading={loading}
               disabled={quickLoading}
@@ -204,14 +184,10 @@ export default function ProviderLoginScreen() {
             <View style={styles.devCard}>
               <View style={styles.devHeader}>
                 <Ionicons name="flask-outline" size={16} color={colors.textSecondary} />
-                <Text style={styles.devTitle}>Development & testing</Text>
+                <Text style={styles.devTitle}>Development access</Text>
               </View>
 
-              <Text style={styles.devCaption}>
-                Quick login is for development only. Disable it for production.
-              </Text>
-
-              <SecondaryButton
+<SecondaryButton
                 title="Quick provider login"
                 onPress={handleQuickProviderLogin}
                 loading={quickLoading}
@@ -240,6 +216,9 @@ export default function ProviderLoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  formHeading: { marginBottom: 20 },
+  formTitle: { fontSize: 25, fontWeight: "800", letterSpacing: -0.6, color: colors.textPrimary },
+  formSubtitle: { fontSize: 14, lineHeight: 21, color: colors.textSecondary, marginTop: 5 },
 
   scrollContent: {
     padding: spacing.xl,

@@ -1,3 +1,5 @@
+import ProviderBackdrop from "../../components/ProviderBackdrop";
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/service-form.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -15,8 +17,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import AppTextInput from "../../components/AppTextInput";
 import LoadingState from "../../components/LoadingState";
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth } from "../../services/firebase";
 import {
   SERVICE_CATEGORIES,
@@ -24,7 +26,7 @@ import {
   getServiceById,
   updateService,
 } from "../../services/providerServices";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 function notify(title: string, message: string) {
   if (Platform.OS === "web") {
@@ -195,6 +197,8 @@ export default function ServiceFormScreen() {
           ]}
         >
           <View style={styles.headerCard}>
+            <ProviderBackdrop variant="page" />
+            <ProviderIllustration kind="services" size={76} />
             <Text style={styles.pageTitle}>
               {isEdit ? "Update your service" : "Create a new service"}
             </Text>
@@ -367,23 +371,26 @@ const styles = StyleSheet.create({
   },
 
   headerCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
+borderRadius: radius.xl,
+borderWidth: 1,
+borderColor: colors.border,
+padding: spacing.lg,
+overflow: "hidden",
+backgroundColor: colors.primary
+},
 
   pageTitle: {
-    ...typography.sectionHeading,
-    fontSize: 18,
-    fontWeight: "900",
-  },
+...typography.sectionHeading,
+fontSize: 18,
+fontWeight: "900",
+color: colors.white
+},
 
   pageSub: {
     marginTop: spacing.xs,
     ...typography.secondary,
     fontSize: 13,
+    color: colors.white,
   },
 
   errorCard: {

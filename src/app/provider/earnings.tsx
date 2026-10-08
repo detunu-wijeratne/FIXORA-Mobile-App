@@ -1,3 +1,4 @@
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/earnings.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
@@ -20,9 +21,9 @@ import {
 } from "firebase/firestore";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import ScreenHeader from "../../components/ScreenHeader";
+import ScreenHeader from "../../components/ProviderPageHeader";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 type Booking = {
   id: string;
@@ -207,12 +208,12 @@ export default function ProviderEarningsScreen() {
         <View style={styles.totalCard}>
           <View style={styles.totalTopRow}>
             <View style={styles.totalIcon}>
-              <Ionicons name="wallet-outline" size={18} color={colors.white} />
+              <ProviderIllustration kind="earnings" size={72} />
             </View>
 
             <View style={{ flex: 1 }}>
               <Text style={styles.totalLabel}>Total earnings</Text>
-              <Text style={styles.totalValue}>{asMoney(totalEarnings)}</Text>
+
               <Text style={styles.totalHint}>
                 {completedJobs.length} completed{" "}
                 {completedJobs.length === 1 ? "job" : "jobs"}
@@ -220,6 +221,7 @@ export default function ProviderEarningsScreen() {
             </View>
           </View>
 
+          <Text style={styles.totalValue}>{asMoney(totalEarnings)}</Text>
           <View style={styles.totalPillsRow}>
             <View style={styles.totalPill}>
               <Text style={styles.pillLabel}>This week</Text>
@@ -352,25 +354,27 @@ const styles = StyleSheet.create({
   },
 
   totalCard: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-  },
+borderRadius: radius.xl,
+padding: 22,
+backgroundColor: "#102A40",
+borderWidth: 1,
+borderColor: "#29465E"
+},
 
   totalTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-  },
+flexDirection: "row",
+gap: spacing.md,
+alignItems: "center"
+},
 
   totalIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+borderRadius: radius.lg,
+alignItems: "center",
+justifyContent: "center",
+width: 72,
+height: 72,
+backgroundColor: "transparent"
+},
 
   totalLabel: {
     fontSize: 12,
@@ -379,11 +383,13 @@ const styles = StyleSheet.create({
   },
 
   totalValue: {
-    marginTop: 6,
-    fontSize: 30,
-    fontWeight: "900",
-    color: colors.white,
-  },
+fontWeight: "900",
+color: colors.white,
+fontSize: 34,
+lineHeight: 43,
+letterSpacing: -0.8,
+marginTop: 12
+},
 
   totalHint: {
     marginTop: 6,
@@ -393,17 +399,21 @@ const styles = StyleSheet.create({
   },
 
   totalPillsRow: {
-    marginTop: spacing.lg,
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
+marginTop: spacing.lg,
+flexDirection: "row",
+gap: spacing.sm,
+flexWrap: "wrap"
+},
 
   totalPill: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
+flex: 1,
+borderRadius: radius.lg,
+padding: spacing.md,
+minWidth: 110,
+borderWidth: 1,
+borderColor: "rgba(240,199,122,0.18)",
+backgroundColor: "rgba(255,255,255,0.06)"
+},
 
   pillLabel: {
     fontSize: 11,
@@ -412,11 +422,12 @@ const styles = StyleSheet.create({
   },
 
   pillValue: {
-    marginTop: 4,
-    fontSize: 14,
-    fontWeight: "900",
-    color: colors.white,
-  },
+marginTop: 4,
+fontWeight: "900",
+fontSize: 18,
+lineHeight: 25,
+color: colors.accent
+},
 
   sectionHeader: {
     marginTop: spacing.xl,

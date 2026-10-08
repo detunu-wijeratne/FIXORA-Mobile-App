@@ -15,10 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import ScreenHeader from "../../components/ScreenHeader";
+import ScreenHeader from "../../components/ProviderPageHeader";
 import StatusBadge from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 type Booking = {
   id: string;

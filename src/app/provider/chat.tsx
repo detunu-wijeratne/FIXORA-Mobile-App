@@ -1,6 +1,6 @@
 // src/app/provider/chat.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, Stack } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -25,7 +25,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 type ChatMessage = {
   id: string;
@@ -46,13 +46,15 @@ export default function ProviderChatScreen() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const sendingRef = useRef(false);
 
   const insets = useSafeAreaInsets();
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId) { setChatError("Open chat from a booking to start messaging."); return; }
 
     const messagesQuery = query(
       collection(db, "chats", bookingId, "messages"),
@@ -62,6 +64,7 @@ export default function ProviderChatScreen() {
     const unsubscribe = onSnapshot(
       messagesQuery,
       (snapshot) => {
+        setChatError("");
         const loadedMessages: ChatMessage[] = snapshot.docs.map((messageDoc) => ({
           id: messageDoc.id,
           ...(messageDoc.data() as any),
@@ -75,6 +78,7 @@ export default function ProviderChatScreen() {
       },
       (error) => {
         console.log("Provider chat listener error:", error);
+        setChatError(error.code === "permission-denied" ? "You do not have permission to read this chat." : "Messages could not load. Please reopen this chat and try again.");
       },
     );
 
@@ -96,7 +100,9 @@ export default function ProviderChatScreen() {
 
     if (!message.trim()) return;
 
+    if (sendingRef.current) return;
     try {
+      sendingRef.current = true;
       setSending(true);
 
       await addDoc(collection(db, "chats", bookingId, "messages"), {
@@ -111,6 +117,7 @@ export default function ProviderChatScreen() {
       console.log("Send provider message error:", error);
       alert(error.message || "Unable to send message.");
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -129,10 +136,11 @@ export default function ProviderChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         style={styles.safe}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 2 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
       >
         {/* Subtle background decoration (UI only) */}
         <View pointerEvents="none" style={styles.bgDecor}>
@@ -143,6 +151,7 @@ export default function ProviderChatScreen() {
         {/* Header (keeps existing info: customer + "Booking Chat") */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
+            <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/provider/jobs")} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} style={{ padding: 6, marginRight: 8 }}><Ionicons name="chevron-back" size={22} color={colors.primary} /></TouchableOpacity>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
@@ -166,14 +175,18 @@ export default function ProviderChatScreen() {
           </View>
         </View>
 
+        {!!chatError && <Text accessibilityRole="alert" style={{ color: colors.error, paddingHorizontal: 20, paddingVertical: 12 }}>{chatError}</Text>}
         <FlatList
           ref={flatListRef}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           data={messages}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: 14 + 64 + bottomPad },
+            { paddingBottom: 16 },
             messages.length === 0 && styles.listEmptyGrow,
           ]}
           onContentSizeChange={() =>
@@ -232,6 +245,9 @@ export default function ProviderChatScreen() {
               value={message}
               onChangeText={setMessage}
               multiline
+              editable
+              accessibilityLabel="Message to customer"
+              textAlignVertical="top"
             />
           </View>
 
@@ -452,46 +468,54 @@ const styles = StyleSheet.create({
   },
 
   inputBar: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-  },
+borderTopWidth: 1,
+borderTopColor: colors.border,
+backgroundColor: colors.surface,
+paddingTop: spacing.sm,
+flexDirection: "row",
+alignItems: "flex-end",
+gap: 10,
+flexShrink: 0,
+paddingHorizontal: 16
+},
 
   inputWrap: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    flex: 1,
-  },
+flexDirection: "row",
+alignItems: "flex-end",
+gap: spacing.sm,
+backgroundColor: colors.background,
+borderWidth: 1,
+borderColor: colors.borderStrong,
+borderRadius: radius.xl,
+paddingHorizontal: spacing.md,
+paddingVertical: spacing.sm,
+flex: 1,
+minHeight: 48,
+flexShrink: 1
+},
 
   input: {
-    flex: 1,
-    maxHeight: 120,
-    color: colors.textPrimary,
-    fontSize: 14,
-    paddingVertical: 0,
-  },
+flex: 1,
+maxHeight: 120,
+color: colors.textPrimary,
+minHeight: 32,
+fontSize: 16,
+paddingVertical: 5,
+paddingHorizontal: 4
+},
 
   sendBtn: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 46,
-  },
+backgroundColor: colors.primary,
+borderRadius: radius.xl,
+paddingVertical: 12,
+flexDirection: "row",
+alignItems: "center",
+gap: 8,
+marginTop: 0,
+minHeight: 48,
+justifyContent: "center",
+paddingHorizontal: 14
+},
 
   sendBtnDisabled: {
     opacity: 0.55,

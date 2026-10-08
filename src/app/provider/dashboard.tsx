@@ -1,3 +1,6 @@
+import NewRequestAlert from "../../components/NewRequestAlert";
+import ProviderIllustration from "../../components/ProviderIllustration";
+import ProviderBackdrop from "../../components/ProviderBackdrop";
 // src/app/provider/dashboard.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -23,11 +26,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import SecondaryButton from "../../components/SecondaryButton";
-import PrimaryButton from "../../components/PrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
 import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 type Booking = {
   id: string;
@@ -221,9 +224,10 @@ export default function ProviderDashboardScreen() {
       >
         {/* PREMIUM BLUE HEADER */}
         <View style={styles.headerHero}>
+          <ProviderBackdrop />
           <View style={styles.headerTopRow}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={styles.brand}>FIXORA</Text>
+              <Text style={[styles.brand, { color: colors.accent, fontSize: 12, letterSpacing: 2 }]}>FIXORA PARTNER</Text>
 
               <View style={styles.headerLocationRow}>
                 <Ionicons
@@ -295,7 +299,7 @@ export default function ProviderDashboardScreen() {
             activeOpacity={0.9}
           >
             <View style={styles.statIconWrap}>
-              <Ionicons name="briefcase-outline" size={18} color={colors.primary} />
+              <ProviderIllustration kind="jobs" size={58} />
             </View>
             <Text style={styles.statValue}>
               {loadingBookings ? "..." : String(upcomingJobs.length)}
@@ -309,7 +313,7 @@ export default function ProviderDashboardScreen() {
             activeOpacity={0.9}
           >
             <View style={[styles.statIconWrap, { backgroundColor: colors.warningLight }]}>
-              <Ionicons name="clipboard-outline" size={18} color={colors.warning} />
+              <ProviderIllustration kind="requests" size={58} />
             </View>
 
             <View style={styles.pendingValueRow}>
@@ -333,7 +337,7 @@ export default function ProviderDashboardScreen() {
             activeOpacity={0.9}
           >
             <View style={[styles.statIconWrap, { backgroundColor: colors.successLight }]}>
-              <Ionicons name="cash-outline" size={18} color={colors.success} />
+              <ProviderIllustration kind="earnings" size={58} />
             </View>
 
             <Text style={styles.statValue}>
@@ -346,7 +350,7 @@ export default function ProviderDashboardScreen() {
 
         {/* NEW REQUEST */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>New request</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><Text style={styles.sectionTitle}>New request</Text><NewRequestAlert count={loadingBookings ? 0 : pendingRequests.length} /></View>
 
           <TouchableOpacity
             onPress={() => router.push("/provider/requests")}
@@ -543,7 +547,7 @@ const styles = StyleSheet.create({
 
   // subtle decorative background (light only)
   bgDecor: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: "hidden",
   },
   blobA: {
@@ -584,7 +588,7 @@ const styles = StyleSheet.create({
 
   /* Header hero */
   headerHero: {
-    backgroundColor: "#0B2F9F",
+    backgroundColor: colors.primary,
     borderRadius: 18,
     padding: spacing.lg,
     borderWidth: 1,
@@ -722,52 +726,60 @@ const styles = StyleSheet.create({
   },
 
   statCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    ...(shadow as any),
-  },
+flex: 1,
+backgroundColor: colors.surface,
+borderRadius: radius.xl,
+borderWidth: 1,
+borderColor: colors.border,
+...(shadow as any),
+padding: 12,
+minWidth: 0,
+shadowOpacity: 0.06,
+shadowRadius: 14,
+shadowOffset: { width: 0, height: 5 }
+},
 
   statIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+borderRadius: radius.md,
+borderColor: colors.border,
+alignItems: "center",
+justifyContent: "center",
+width: 58,
+height: 58,
+borderWidth: 0,
+backgroundColor: "transparent"
+},
 
   pendingValueRow: {
-    marginTop: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
+flexDirection: "row",
+alignItems: "center",
+flexWrap: "wrap",
+gap: 4,
+marginTop: 0
+},
 
   statValue: {
-    marginTop: spacing.sm,
-    fontSize: 16,
-    fontWeight: "900",
-    color: colors.textPrimary,
-  },
+marginTop: spacing.sm,
+color: colors.textPrimary,
+fontSize: 19,
+lineHeight: 25,
+fontWeight: "800"
+},
 
   statLabel: {
-    marginTop: 4,
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
+marginTop: 4,
+...typography.caption,
+color: colors.textSecondary,
+fontSize: 11,
+lineHeight: 16
+},
 
   newBadge: {
-    backgroundColor: colors.warningLight,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
+backgroundColor: colors.warningLight,
+borderRadius: radius.pill,
+paddingHorizontal: 5,
+paddingVertical: 2
+},
 
   newBadgeText: {
     fontSize: 10,

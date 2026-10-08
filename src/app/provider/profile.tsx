@@ -1,3 +1,4 @@
+import ProviderBackdrop from "../../components/ProviderBackdrop";
 // src/app/provider/profile.tsx
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -27,7 +28,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 const CLOUDINARY_CLOUD_NAME = "yuoh84r1";
 const CLOUDINARY_UPLOAD_PRESET = "fixora_uploads";
@@ -286,6 +287,7 @@ export default function ProviderProfileScreen() {
       >
         {/* Header Card */}
         <View style={styles.headerCard}>
+          <ProviderBackdrop variant="page" />
           <View style={styles.headerTopRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.pageTitle}>Profile</Text>
@@ -346,7 +348,7 @@ export default function ProviderProfileScreen() {
                 <Ionicons
                   name="location-outline"
                   size={14}
-                  color={colors.textSecondary}
+                  color="#D7E1EA"
                 />
                 <Text style={styles.locationText} numberOfLines={1}>
                   {provider?.district || "Service area not set"}
@@ -533,12 +535,13 @@ const styles = StyleSheet.create({
   },
 
   headerCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
+backgroundColor: colors.primary,
+borderRadius: radius.xl,
+borderWidth: 1,
+borderColor: colors.border,
+padding: spacing.lg,
+overflow: "hidden"
+},
 
   headerTopRow: {
     flexDirection: "row",
@@ -549,12 +552,14 @@ const styles = StyleSheet.create({
 
   pageTitle: {
     ...typography.sectionHeading,
+    color: colors.accent,
     fontSize: 20,
     fontWeight: "900",
   },
   pageSubtitle: {
     marginTop: spacing.xs,
     ...typography.secondary,
+    color: "#D7E1EA",
     fontSize: 13,
   },
 
@@ -608,8 +613,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  name: { fontSize: 18, fontWeight: "900", color: colors.textPrimary },
-  category: { marginTop: 3, ...typography.secondary, fontSize: 13 },
+  name: { fontSize: 20, fontWeight: "800", color: colors.white },
+  category: { marginTop: 3, ...typography.secondary, color: "#D7E1EA", fontSize: 13 },
 
   locationRow: {
     marginTop: spacing.sm,
@@ -617,7 +622,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  locationText: { flex: 1, fontSize: 12, color: colors.textSecondary },
+  locationText: { flex: 1, fontSize: 12, color: "#D7E1EA" },
 
   verifyPill: {
     marginTop: spacing.sm,

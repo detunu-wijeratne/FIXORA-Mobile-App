@@ -1,3 +1,5 @@
+import ProviderBackdrop from "../../components/ProviderBackdrop";
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/availability.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
@@ -14,10 +16,10 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
@@ -323,6 +325,8 @@ export default function ProviderAvailabilityScreen() {
         ]}
       >
         <View style={styles.headerCard}>
+            <ProviderBackdrop variant="page" />
+            <ProviderIllustration kind="schedule" size={76} />
           <Text style={styles.pageTitle}>Manage availability</Text>
           <Text style={styles.pageSub}>
             Choose days you work and add the time slots customers can book.
@@ -619,22 +623,25 @@ const styles = StyleSheet.create({
   },
 
   headerCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
+borderRadius: radius.xl,
+borderWidth: 1,
+borderColor: colors.border,
+padding: spacing.lg,
+overflow: "hidden",
+backgroundColor: colors.primary
+},
   pageTitle: {
-    ...typography.sectionHeading,
-    fontSize: 18,
-    fontWeight: "900",
-  },
+...typography.sectionHeading,
+fontSize: 18,
+fontWeight: "900",
+color: colors.white
+},
   pageSub: {
-    marginTop: spacing.xs,
-    ...typography.secondary,
-    fontSize: 13,
-  },
+marginTop: spacing.xs,
+...typography.secondary,
+fontSize: 13,
+color: colors.white
+},
   tipRow: {
     marginTop: spacing.md,
     flexDirection: "row",

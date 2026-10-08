@@ -1,3 +1,4 @@
+import ProviderHero from "../../components/ProviderHero";
 // src/app/provider/create-account.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
@@ -17,10 +18,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppTextInput from "../../components/AppTextInput";
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 function passwordStrength(pw: string) {
   const v = pw.trim();
@@ -147,44 +148,11 @@ export default function ProviderCreateAccountScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Top bar */}
-          <View style={styles.topBar}>
-            <TouchableOpacity
-              style={styles.topBtn}
-              onPress={() => router.back()}
-              activeOpacity={0.85}
-              hitSlop={10}
-            >
-              <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
-            </TouchableOpacity>
-
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={styles.stepText}>Step 1 of 2</Text>
-            </View>
-
-            <View style={styles.proPill}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.white} />
-              <Text style={styles.proPillText}>PRO</Text>
-            </View>
-          </View>
-
-          {/* Hero */}
-          <View style={styles.heroCard}>
-            <Text style={styles.heroEyebrow}>FIXORA PARTNER</Text>
-            <Text style={styles.heroTitle}>Join Fixora as a Pro Partner</Text>
-            <Text style={styles.heroSub}>
-              Earn from verified local jobs and grow your service business.
-            </Text>
-
-            <View style={styles.progressTrack}>
-              <View style={styles.progressFill} />
-            </View>
-
-            <View style={styles.progressLabels}>
-              <Text style={styles.progressActive}>1. Basic profile</Text>
-              <Text style={styles.progressInactive}>2. Verification docs</Text>
-            </View>
-          </View>
+          <ProviderHero title={"Build a business.\nMake a difference."} subtitle="Bring your skills. Find your next opportunity with Fixora." onBack={() => router.dismissTo("/provider/login")}>
+            <View style={styles.signupProgress}><View style={styles.signupStep}><Text style={styles.signupStepNumber}>01</Text><Text style={styles.progressActive}>Your profile</Text></View><View style={styles.signupProgressLine} /><View style={styles.signupStep}><Text style={styles.signupStepMuted}>02</Text><Text style={styles.progressInactive}>Verification</Text></View></View>
+          </ProviderHero>
+          <Text style={styles.signupFormTitle}>Let's get to know you</Text>
+          <Text style={styles.signupFormSubtitle}>Create your professional profile to get started.</Text>
 
           {/* Form */}
           <View style={styles.card}>
@@ -326,6 +294,13 @@ export default function ProviderCreateAccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  signupProgress: { flexDirection: "row", alignItems: "center", marginTop: 24, gap: 12 },
+  signupStep: { flexDirection: "row", alignItems: "center", gap: 8 },
+  signupStepNumber: { fontSize: 12, fontWeight: "900", color: colors.primary, backgroundColor: colors.accent, padding: 7, borderRadius: 9 },
+  signupStepMuted: { fontSize: 12, fontWeight: "800", color: "#CBD5DF" },
+  signupProgressLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.3)" },
+  signupFormTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.6 },
+  signupFormSubtitle: { color: colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 6 },
 
   scrollContent: {
     padding: spacing.xl,

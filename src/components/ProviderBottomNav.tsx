@@ -1,3 +1,4 @@
+import ProviderIllustration, { ProviderIllustrationKind } from "./ProviderIllustration";
 // src/components/ProviderBottomNav.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
@@ -7,12 +8,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import useMainNavigationBack from "../hooks/useMainNavigationBack";
 
-import { colors, radius, spacing } from "../theme";
+import { colors, radius, spacing } from "../theme/provider";
 
 type NavItem = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route: string;
+  illustration?: ProviderIllustrationKind;
+  route: "/provider/dashboard" | "/provider/jobs" | "/provider/schedule" | "/provider/earnings" | "/provider/profile";
 };
 
 export default function ProviderBottomNav() {
@@ -21,11 +23,11 @@ export default function ProviderBottomNav() {
   const insets = useSafeAreaInsets();
 
   const navItems: NavItem[] = [
-    { label: "Home", icon: "home-outline", route: "/provider/dashboard" },
-    { label: "Jobs", icon: "briefcase-outline", route: "/provider/jobs" },
-    { label: "Schedule", icon: "calendar-outline", route: "/provider/schedule" },
-    { label: "Earnings", icon: "cash-outline", route: "/provider/earnings" },
-    { label: "Profile", icon: "person-outline", route: "/provider/profile" },
+    { label: "Home", illustration: "home", icon: "home-outline", route: "/provider/dashboard" },
+    { label: "Jobs", illustration: "jobs", icon: "briefcase-outline", route: "/provider/jobs" },
+    { label: "Schedule", illustration: "schedule", icon: "calendar-outline", route: "/provider/schedule" },
+    { label: "Earnings", illustration: "earnings", icon: "cash-outline", route: "/provider/earnings" },
+    { label: "Profile", illustration: "profile", icon: "person-outline", route: "/provider/profile" },
   ];
 
   return (
@@ -47,11 +49,7 @@ export default function ProviderBottomNav() {
             hitSlop={10}
           >
             <View style={[styles.iconWrap, active && styles.iconWrapActive]}>
-              <Ionicons
-                name={item.icon}
-                size={20}
-                color={active ? colors.primary : colors.textMuted}
-              />
+              {item.illustration ? <ProviderIllustration kind={item.illustration} size={34} /> : <Ionicons name={item.icon} size={22} color={active ? colors.accent : "#B7C5D2"} />}
             </View>
 
             <Text style={[styles.label, active && styles.labelActive]}>
@@ -69,9 +67,9 @@ export default function ProviderBottomNav() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primary,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: "rgba(255,255,255,0.08)",
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.md,
 
@@ -98,18 +96,18 @@ const styles = StyleSheet.create({
   },
 
   iconWrapActive: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: "rgba(240,199,122,0.12)",
   },
 
   label: {
     marginTop: 4,
     fontSize: 11,
-    color: colors.textMuted,
+    color: "#B7C5D2",
     fontWeight: "600",
   },
 
   labelActive: {
-    color: colors.primary,
+    color: colors.accent,
     fontWeight: "800",
   },
 
@@ -122,6 +120,6 @@ const styles = StyleSheet.create({
   },
 
   activeDotOn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
   },
 });

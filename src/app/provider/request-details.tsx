@@ -1,3 +1,4 @@
+import ProviderPageHeader from "../../components/ProviderPageHeader";
 // src/app/provider/request-details.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -15,11 +16,11 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 const asMoney = (value: any) => `Rs. ${Number(value || 0).toLocaleString()}`;
 
@@ -190,9 +191,7 @@ export default function ProviderRequestDetailsScreen() {
           Request details
         </Text>
 
-        <View style={{ width: 40, alignItems: "flex-end" }}>
-          <StatusBadge status={toStatusType(status)} />
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -206,34 +205,15 @@ export default function ProviderRequestDetailsScreen() {
         ]}
       >
         {/* Summary */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryTop}>
-            <View style={styles.summaryIcon}>
-              <Ionicons name="clipboard-outline" size={18} color={colors.warning} />
-            </View>
-
-            <View style={{ flex: 1, marginLeft: spacing.md }}>
-              <Text style={styles.serviceTitle} numberOfLines={1}>
-                {service}
-              </Text>
-              <Text style={styles.whenText} numberOfLines={1}>
-                {formatWhen(date, time)}
-              </Text>
-            </View>
-
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={styles.serviceMoney}>{asMoney(price)}</Text>
-              <Text style={styles.moneyCaption}>Est. payout</Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryBottom}>
-            <View style={styles.summaryPill}>
-              <Ionicons name="cash-outline" size={14} color={colors.primary} />
-              <Text style={styles.summaryPillText}>
-                Customer total: {asMoney(totalAmount)}
-              </Text>
-            </View>
+        <View>
+          <ProviderPageHeader title={service} eyebrow="REQUEST OVERVIEW" illustration="requests" subtitle="Review the work before accepting." badge={<StatusBadge status={toStatusType(status)} />} />
+          <View style={styles.summaryCard}>
+            <Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }}>SCHEDULED FOR</Text>
+            <Text style={styles.whenText}>{formatWhen(date, time)}</Text>
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 18 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Your estimated payout</Text>
+            <Text style={styles.serviceMoney}>{asMoney(price)}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 7 }}>Customer total: {asMoney(totalAmount)}</Text>
           </View>
         </View>
 
@@ -426,24 +406,28 @@ const styles = StyleSheet.create({
   },
 
   topBarTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "900",
-    color: colors.textPrimary,
-    textAlign: "center",
-  },
+flex: 1,
+fontWeight: "900",
+color: colors.textPrimary,
+fontSize: 18,
+textAlign: "left"
+},
 
   scrollContent: {
     padding: spacing.xl,
   },
 
   summaryCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
+backgroundColor: colors.surface,
+borderRadius: radius.xl,
+borderWidth: 1,
+padding: 22,
+borderColor: "#DCE5ED",
+shadowColor: "#17334D",
+shadowOpacity: 0.05,
+shadowRadius: 15,
+shadowOffset: { width: 0, height: 5 }
+},
 
   summaryTop: {
     flexDirection: "row",
@@ -467,16 +451,22 @@ const styles = StyleSheet.create({
   },
 
   whenText: {
-    marginTop: 3,
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
+...typography.caption,
+fontSize: 20,
+lineHeight: 29,
+fontWeight: "800",
+color: colors.textPrimary,
+marginTop: 8
+},
 
   serviceMoney: {
-    fontSize: 16,
-    fontWeight: "900",
-    color: colors.primary,
-  },
+fontWeight: "900",
+color: colors.primary,
+fontSize: 30,
+lineHeight: 39,
+marginTop: 7,
+letterSpacing: -0.5
+},
 
   moneyCaption: {
     marginTop: 2,

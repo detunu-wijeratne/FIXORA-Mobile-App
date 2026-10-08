@@ -1,3 +1,4 @@
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/jobs.tsx
 
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import ScreenHeader from "../../components/ScreenHeader";
+import ScreenHeader from "../../components/ProviderPageHeader";
 import StatusBadge, {
   StatusType,
 } from "../../components/StatusBadge";
@@ -27,7 +28,7 @@ import {
   radius,
   spacing,
   typography,
-} from "../../theme";
+} from "../../theme/provider";
 
 import {
   collection,

@@ -1,3 +1,4 @@
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/services-pricing.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
@@ -16,16 +17,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Card from "../../components/Card";
 import EmptyState from "../../components/EmptyState";
 import LoadingState from "../../components/LoadingState";
-import PrimaryButton from "../../components/PrimaryButton";
-import ScreenHeader from "../../components/ScreenHeader";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import ScreenHeader from "../../components/ProviderPageHeader";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth } from "../../services/firebase";
 import {
   ProviderService,
   deleteService,
   subscribeToMyServices,
 } from "../../services/providerServices";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 const formatPrice = (value: number) =>
   `Rs. ${Math.round(value)
@@ -137,9 +138,7 @@ export default function ProviderServicesPricingScreen() {
 
         {/* Summary */}
         <View style={styles.summaryCard}>
-          <View style={styles.summaryIcon}>
-            <Ionicons name="construct-outline" size={18} color={colors.primary} />
-          </View>
+          <ProviderIllustration kind="services" size={62} />
 
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <Text style={styles.summaryTitle}>

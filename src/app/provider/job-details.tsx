@@ -1,3 +1,4 @@
+import ProviderPageHeader from "../../components/ProviderPageHeader";
 // src/app/provider/job-details.tsx
 
 import { Ionicons } from "@expo/vector-icons";
@@ -19,8 +20,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import StatusBadge, {
   StatusType,
 } from "../../components/StatusBadge";
@@ -32,7 +33,7 @@ import {
   radius,
   spacing,
   typography,
-} from "../../theme";
+} from "../../theme/provider";
 
 const asMoney = (value: any) =>
   `Rs. ${Number(value || 0).toLocaleString()}`;
@@ -307,17 +308,7 @@ export default function ProviderJobDetailsScreen() {
           Job details
         </Text>
 
-        <View
-          style={
-            styles.statusWrap
-          }
-        >
-          <StatusBadge
-            status={toStatusType(
-              status
-            )}
-          />
-        </View>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -339,112 +330,15 @@ export default function ProviderJobDetailsScreen() {
       >
         {/* SUMMARY */}
 
-        <View
-          style={
-            styles.summaryCard
-          }
-        >
-          <View
-            style={
-              styles.summaryTop
-            }
-          >
-            <View
-              style={
-                styles.summaryIcon
-              }
-            >
-              <Ionicons
-                name="construct-outline"
-                size={18}
-                color={
-                  colors.primary
-                }
-              />
-            </View>
-
-            <View
-              style={{
-                flex: 1,
-                marginLeft:
-                  spacing.md,
-              }}
-            >
-              <Text
-                style={
-                  styles.serviceTitle
-                }
-                numberOfLines={1}
-              >
-                {service}
-              </Text>
-
-              <Text
-                style={
-                  styles.whenText
-                }
-                numberOfLines={1}
-              >
-                {formatWhen(
-                  date,
-                  time
-                )}
-              </Text>
-            </View>
-
-            <View
-              style={{
-                alignItems:
-                  "flex-end",
-              }}
-            >
-              <Text
-                style={
-                  styles.serviceMoney
-                }
-              >
-                {asMoney(price)}
-              </Text>
-
-              <Text
-                style={
-                  styles.moneyCaption
-                }
-              >
-                Service price
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={
-              styles.summaryBottom
-            }
-          >
-            <View
-              style={
-                styles.summaryPill
-              }
-            >
-              <Ionicons
-                name="cash-outline"
-                size={14}
-                color={
-                  colors.primary
-                }
-              />
-
-              <Text
-                style={
-                  styles.summaryPillText
-                }
-              >
-                Customer total:{" "}
-                {asMoney(
-                  totalAmount
-                )}
-              </Text>
-            </View>
+        <View>
+          <ProviderPageHeader title={service} eyebrow="JOB OVERVIEW" illustration="jobs" subtitle="Your job, clearly laid out." badge={<StatusBadge status={toStatusType(status)} />} />
+          <View style={styles.summaryCard}>
+            <Text style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "800", letterSpacing: 1.3 }}>SCHEDULED FOR</Text>
+            <Text style={styles.whenText}>{formatWhen(date, time)}</Text>
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 18 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Your service price</Text>
+            <Text style={styles.serviceMoney}>{asMoney(price)}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 7 }}>Customer total: {asMoney(totalAmount)}</Text>
           </View>
         </View>
 
@@ -873,17 +767,16 @@ const styles =
     },
 
     topBarTitle: {
-      flex: 1,
-      fontSize: 16,
-      fontWeight:
+flex: 1,
+fontWeight:
         "900",
-      color:
+color:
         colors.textPrimary,
-      textAlign:
-        "center",
-      marginHorizontal:
+marginHorizontal:
         spacing.sm,
-    },
+fontSize: 18,
+textAlign: "left"
+},
 
     statusWrap: {
       minWidth: 88,
@@ -899,16 +792,18 @@ const styles =
     },
 
     summaryCard: {
-      backgroundColor:
+backgroundColor:
         colors.surface,
-      borderRadius:
+borderRadius:
         radius.xl,
-      borderWidth: 1,
-      borderColor:
-        colors.border,
-      padding:
-        spacing.lg,
-    },
+borderWidth: 1,
+padding: 22,
+borderColor: "#DCE5ED",
+shadowColor: "#17334D",
+shadowOpacity: 0.05,
+shadowRadius: 15,
+shadowOffset: { width: 0, height: 5 }
+},
 
     summaryTop: {
       flexDirection:
@@ -940,19 +835,24 @@ const styles =
     },
 
     whenText: {
-      marginTop: 3,
-      ...typography.caption,
-      color:
-        colors.textSecondary,
-    },
+...typography.caption,
+fontSize: 20,
+lineHeight: 29,
+fontWeight: "800",
+color: colors.textPrimary,
+marginTop: 8
+},
 
     serviceMoney: {
-      fontSize: 16,
-      fontWeight:
+fontWeight:
         "900",
-      color:
+color:
         colors.primary,
-    },
+fontSize: 30,
+lineHeight: 39,
+marginTop: 7,
+letterSpacing: -0.5
+},
 
     moneyCaption: {
       marginTop: 2,

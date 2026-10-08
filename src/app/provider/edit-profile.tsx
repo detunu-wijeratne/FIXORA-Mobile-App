@@ -20,10 +20,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppTextInput from "../../components/AppTextInput";
-import PrimaryButton from "../../components/PrimaryButton";
-import ScreenHeader from "../../components/ScreenHeader";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import ScreenHeader from "../../components/ProviderPageHeader";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 export default function ProviderEditProfileScreen() {
   const [name, setName] = useState("");

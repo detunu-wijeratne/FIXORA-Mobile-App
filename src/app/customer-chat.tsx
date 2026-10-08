@@ -47,11 +47,14 @@ export default function CustomerChatScreen() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState("");
+  const sendingRef = useRef(false);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
     if (!bookingId) {
+      setChatError("Open chat from a booking to start messaging.");
       return;
     }
 
@@ -63,6 +66,7 @@ export default function CustomerChatScreen() {
     const unsubscribe = onSnapshot(
       messagesQuery,
       (snapshot) => {
+        setChatError("");
         const loadedMessages: ChatMessage[] = snapshot.docs.map(
           (messageDoc) => ({
             id: messageDoc.id,
@@ -78,6 +82,7 @@ export default function CustomerChatScreen() {
       },
       (error) => {
         console.log("Customer chat listener error:", error);
+        setChatError(error.code === "permission-denied" ? "You do not have permission to read this chat." : "Messages could not load. Please reopen this chat and try again.");
       }
     );
 
@@ -101,7 +106,9 @@ export default function CustomerChatScreen() {
       return;
     }
 
+    if (sendingRef.current) return;
     try {
+      sendingRef.current = true;
       setSending(true);
 
       await addDoc(collection(db, "chats", bookingId, "messages"), {
@@ -116,6 +123,7 @@ export default function CustomerChatScreen() {
       console.log("Send customer message error:", error);
       alert(error.message || "Unable to send message.");
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -127,7 +135,7 @@ export default function CustomerChatScreen() {
       <SafeAreaView style={styles.container} edges={["bottom"]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.providerHeader}>
           <View style={styles.avatar}>
@@ -140,8 +148,12 @@ export default function CustomerChatScreen() {
           </View>
         </View>
 
+        {!!chatError && <Text accessibilityRole="alert" style={{ color: colors.error, paddingHorizontal: 20, paddingVertical: 12 }}>{chatError}</Text>}
         <FlatList
           ref={flatListRef}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[
@@ -200,6 +212,9 @@ export default function CustomerChatScreen() {
             value={message}
             onChangeText={setMessage}
             multiline
+            editable
+            accessibilityLabel="Message to provider"
+            textAlignVertical="top"
           />
 
           <TouchableOpacity
@@ -350,6 +365,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     maxHeight: 110,
+    minHeight: 48,
+    fontSize: 16,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.borderStrong,

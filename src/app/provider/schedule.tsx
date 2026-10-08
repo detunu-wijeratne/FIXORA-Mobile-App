@@ -1,3 +1,4 @@
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/schedule.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
@@ -15,10 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import ScreenHeader from "../../components/ScreenHeader";
+import ScreenHeader from "../../components/ProviderPageHeader";
 import StatusBadge, { StatusType } from "../../components/StatusBadge";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 type Booking = {
   id: string;
@@ -149,12 +150,12 @@ export default function ProviderScheduleScreen() {
         <View style={styles.highlightCard}>
           <View style={styles.highlightTop}>
             <View style={styles.highlightIcon}>
-              <Ionicons name="time-outline" size={18} color={colors.primary} />
+              <ProviderIllustration kind="schedule" size={54} />
             </View>
 
             <View style={{ flex: 1, marginLeft: spacing.md }}>
               <Text style={styles.highlightTitle}>Next job</Text>
-              <Text style={styles.highlightSub} numberOfLines={1}>
+              <Text style={styles.highlightSub}>
                 {nextJob
                   ? `${nextJob.service || "Home Service"} • ${formatWhen(
                       nextJob.date,
@@ -173,6 +174,7 @@ export default function ProviderScheduleScreen() {
             )}
           </View>
 
+          {nextJob && <Text style={{ fontSize: 22, lineHeight: 30, fontWeight: "800", color: colors.primary, marginTop: 16 }}>{nextJob.time || "Time to be confirmed"}</Text>}
           {nextJob ? (
             <TouchableOpacity
               style={styles.highlightBtn}
@@ -228,11 +230,11 @@ export default function ProviderScheduleScreen() {
               >
                 <View style={styles.jobTop}>
                   <View style={styles.timeBox}>
-                    <Ionicons name="alarm-outline" size={14} color={colors.primary} />
-                    <Text style={styles.timeText} numberOfLines={1}>
+                    <Ionicons name="alarm-outline" size={19} color={colors.accent} />
+                    <Text style={styles.timeText}>
                       {job.time || "—"}
                     </Text>
-                    <Text style={styles.dateText} numberOfLines={1}>
+                    <Text style={styles.dateText}>
                       {job.date ? (String(job.date).match(/^\d+$/) ? `Day ${job.date}` : job.date) : "—"}
                     </Text>
                   </View>
@@ -276,7 +278,7 @@ export default function ProviderScheduleScreen() {
 
         <View style={styles.availabilityCard}>
           <View style={styles.availabilityIcon}>
-            <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
+            <ProviderIllustration kind="schedule" size={42} />
           </View>
 
           <View style={styles.availabilityInfo}>
@@ -318,20 +320,22 @@ const styles = StyleSheet.create({
   },
 
   highlightTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+flexDirection: "row",
+alignItems: "center",
+flexWrap: "wrap",
+rowGap: 12
+},
 
   highlightIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+borderRadius: radius.lg,
+borderWidth: 1,
+borderColor: colors.border,
+alignItems: "center",
+justifyContent: "center",
+width: 54,
+height: 54,
+backgroundColor: "transparent"
+},
 
   highlightTitle: {
     fontSize: 13,
@@ -458,37 +462,40 @@ const styles = StyleSheet.create({
   },
 
   jobTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
+flexDirection: "column",
+alignItems: "stretch",
+gap: 16
+},
 
   timeBox: {
-    width: 92,
-    minHeight: 82,
-    borderRadius: radius.xl,
-    backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-  },
+borderRadius: radius.xl,
+borderWidth: 1,
+alignItems: "center",
+justifyContent: "center",
+paddingHorizontal: spacing.sm,
+backgroundColor: colors.primary,
+paddingVertical: 12,
+borderColor: colors.primary,
+width: "100%",
+minHeight: 98
+},
 
   timeText: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    fontWeight: "900",
-    color: colors.primary,
-    textAlign: "center",
-  },
+marginTop: spacing.xs,
+fontWeight: "900",
+textAlign: "center",
+fontSize: 17,
+lineHeight: 23,
+color: colors.white
+},
 
   dateText: {
-    marginTop: 3,
-    fontSize: 10,
-    color: colors.textSecondary,
-    textAlign: "center",
-  },
+textAlign: "center",
+fontSize: 12,
+lineHeight: 17,
+color: colors.accent,
+marginTop: 7
+},
 
   jobInfo: { flex: 1 },
 

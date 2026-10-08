@@ -28,7 +28,7 @@ import {
     colors,
     radius,
     spacing,
-} from "../../theme";
+} from "../../theme/provider";
 
 export default function CreateManualJobScreen() {
   const [customerName, setCustomerName] =

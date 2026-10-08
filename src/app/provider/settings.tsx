@@ -15,8 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
-import ScreenHeader from "../../components/ScreenHeader";
-import { colors, radius, spacing, typography } from "../../theme";
+import ScreenHeader from "../../components/ProviderPageHeader";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 export default function ProviderSettingsScreen() {
   const [jobNotifications, setJobNotifications] = useState(true);

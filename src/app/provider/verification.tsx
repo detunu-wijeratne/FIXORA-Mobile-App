@@ -1,3 +1,5 @@
+import ProviderBackdrop from "../../components/ProviderBackdrop";
+import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/verification.tsx
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -19,10 +21,10 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import PrimaryButton from "../../components/PrimaryButton";
-import SecondaryButton from "../../components/SecondaryButton";
+import PrimaryButton from "../../components/ProviderPrimaryButton";
+import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth, db } from "../../services/firebase";
-import { colors, radius, spacing, typography } from "../../theme";
+import { colors, radius, spacing, typography } from "../../theme/provider";
 
 const CLOUDINARY_CLOUD_NAME = "yuoh84r1";
 const CLOUDINARY_UPLOAD_PRESET = "fixora_uploads";
@@ -299,6 +301,8 @@ export default function ProviderVerificationScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 + bottomPad }]}
       >
         <View style={styles.heroCard}>
+            <ProviderBackdrop variant="page" />
+            <ProviderIllustration kind="profile" size={76} />
           <Text style={styles.heroTitle}>Partner verification</Text>
           <Text style={styles.heroSub}>
             Upload documents to get verified and unlock more bookings.
@@ -494,17 +498,22 @@ const styles = StyleSheet.create({
   scrollContent: { padding: spacing.xl },
 
   heroCard: {
-    backgroundColor: colors.textPrimary,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-  },
-  heroTitle: { fontSize: 18, fontWeight: "900", color: colors.white },
+borderRadius: radius.xl,
+padding: spacing.lg,
+overflow: "hidden",
+backgroundColor: colors.primary
+},
+  heroTitle: {
+fontSize: 18,
+fontWeight: "900",
+color: colors.white
+},
   heroSub: {
-    marginTop: spacing.xs,
-    fontSize: 13,
-    lineHeight: 19,
-    color: "rgba(255,255,255,0.75)",
-  },
+marginTop: spacing.xs,
+fontSize: 13,
+lineHeight: 19,
+color: colors.white
+},
   progressRow: { marginTop: spacing.md, flexDirection: "row", justifyContent: "space-between" },
   progressText: { fontSize: 12, fontWeight: "800", color: "rgba(255,255,255,0.75)" },
   progressTrack: {
