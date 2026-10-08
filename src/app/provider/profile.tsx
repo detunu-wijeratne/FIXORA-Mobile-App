@@ -1,11 +1,8 @@
+// src/app/provider/profile.tsx
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-
-import { File } from "expo-file-system";
-import { fetch } from "expo/fetch";
-
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
-
 import {
   collection,
   doc,
@@ -15,9 +12,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-
-import { useEffect, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,9 +23,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import ProviderBottomNav from "../../components/ProviderBottomNav";
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 const CLOUDINARY_CLOUD_NAME = "yuoh84r1";
 const CLOUDINARY_UPLOAD_PRESET = "fixora_uploads";
@@ -41,7 +38,7 @@ type ProviderData = {
   district?: string;
   phone?: string;
   email?: string;
-  verificationStatus?: string;
+  verificationStatus?: "not_submitted" | "pending" | "approved" | string;
   profileImageUrl?: string;
 };
 
@@ -55,24 +52,25 @@ type Booking = {
   providerId?: string | null;
 };
 
+function getInitials(name?: string) {
+  if (!name) return "PR";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 export default function ProviderProfileScreen() {
-  const [provider, setProvider] =
-    useState<ProviderData | null>(null);
+  const [provider, setProvider] = useState<ProviderData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [uploadingPhoto, setUploadingPhoto] =
-    useState(false);
-
-  const [reviewCount, setReviewCount] =
-    useState(0);
-
-  const [averageRating, setAverageRating] =
-    useState(0);
-
-  const [completedJobs, setCompletedJobs] =
-    useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
+  const [completedJobs, setCompletedJobs] = useState(0);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -84,32 +82,14 @@ export default function ProviderProfileScreen() {
 
     const loadProvider = async () => {
       try {
-        const providerDoc =
-          await getDoc(
-            doc(
-              db,
-              "users",
-              user.uid
-            )
-          );
-
+        const providerDoc = await getDoc(doc(db, "users", user.uid));
         if (!providerDoc.exists()) {
-          console.log(
-            "Provider profile not found."
-          );
-
           setLoading(false);
           return;
         }
-
-        setProvider(
-          providerDoc.data() as ProviderData
-        );
+        setProvider(providerDoc.data() as ProviderData);
       } catch (error) {
-        console.log(
-          "Error loading provider profile:",
-          error
-        );
+        console.log("Error loading provider profile:", error);
       } finally {
         setLoading(false);
       }
@@ -118,98 +98,46 @@ export default function ProviderProfileScreen() {
     loadProvider();
 
     const reviewsQuery = query(
-      collection(
-        db,
-        "reviews"
-      ),
-      where(
-        "providerId",
-        "==",
-        user.uid
-      )
+      collection(db, "reviews"),
+      where("providerId", "==", user.uid),
     );
 
-    const unsubscribeReviews =
-      onSnapshot(
-        reviewsQuery,
-        (snapshot) => {
-          const reviews =
-            snapshot.docs.map(
-              (reviewDoc) =>
-                reviewDoc.data() as Review
-            );
+    const unsubscribeReviews = onSnapshot(
+      reviewsQuery,
+      (snapshot) => {
+        const reviews = snapshot.docs.map((r) => r.data() as Review);
+        setReviewCount(reviews.length);
 
-          setReviewCount(
-            reviews.length
-          );
-
-          if (reviews.length === 0) {
-            setAverageRating(0);
-            return;
-          }
-
-          const totalRating =
-            reviews.reduce(
-              (total, review) =>
-                total +
-                Number(
-                  review.rating || 0
-                ),
-              0
-            );
-
-          setAverageRating(
-            totalRating /
-              reviews.length
-          );
-        },
-        (error) => {
-          console.log(
-            "Review loading error:",
-            error
-          );
+        if (reviews.length === 0) {
+          setAverageRating(0);
+          return;
         }
-      );
+
+        const totalRating = reviews.reduce(
+          (total, r) => total + Number(r.rating || 0),
+          0,
+        );
+        setAverageRating(totalRating / reviews.length);
+      },
+      (error) => console.log("Review loading error:", error),
+    );
 
     const bookingsQuery = query(
-      collection(
-        db,
-        "bookings"
-      ),
-      where(
-        "providerId",
-        "==",
-        user.uid
-      )
+      collection(db, "bookings"),
+      where("providerId", "==", user.uid),
     );
 
-    const unsubscribeBookings =
-      onSnapshot(
-        bookingsQuery,
-        (snapshot) => {
-          const jobs =
-            snapshot.docs
-              .map(
-                (bookingDoc) =>
-                  bookingDoc.data() as Booking
-              )
-              .filter(
-                (booking) =>
-                  booking.status ===
-                  "completed"
-              );
+    const unsubscribeBookings = onSnapshot(
+      bookingsQuery,
+      (snapshot) => {
+        const completed = snapshot.docs
+          .map((b) => b.data() as Booking)
+          .filter((b) => b.status === "completed");
 
-          setCompletedJobs(
-            jobs.length
-          );
-        },
-        (error) => {
-          console.log(
-            "Completed jobs loading error:",
-            error
-          );
-        }
-      );
+        setCompletedJobs(completed.length);
+      },
+      (error) => console.log("Completed jobs loading error:", error),
+    );
 
     return () => {
       unsubscribeReviews();
@@ -217,53 +145,68 @@ export default function ProviderProfileScreen() {
     };
   }, []);
 
-  const uploadProfilePhotoToCloudinary = async (
-    uri: string
-  ) => {
-    const file =
-      new File(uri);
+  const verificationUI = useMemo(() => {
+    const status = provider?.verificationStatus;
 
-    const formData =
-      new FormData();
+    if (status === "approved") {
+      return {
+        label: "Verified provider",
+        icon: "shield-checkmark-outline" as const,
+        bg: colors.successLight,
+        fg: colors.success,
+        hint: "Your account is verified.",
+      };
+    }
 
+    if (status === "pending") {
+      return {
+        label: "Verification pending",
+        icon: "time-outline" as const,
+        bg: colors.warningLight,
+        fg: colors.warning,
+        hint: "We’re reviewing your documents.",
+      };
+    }
+
+    return {
+      label: "Not verified",
+      icon: "alert-circle-outline" as const,
+      bg: colors.primarySoft,
+      fg: colors.primary,
+      hint: "Submit documents to get verified.",
+    };
+  }, [provider?.verificationStatus]);
+
+  const uploadProfilePhotoToCloudinary = async (uri: string) => {
+    const formData = new FormData();
+
+    // RN/Expo file object
     formData.append(
       "file",
-      file as any
+      {
+        uri,
+        name: "profile.jpg",
+        type: "image/jpeg",
+      } as any,
     );
 
-    formData.append(
-      "upload_preset",
-      CLOUDINARY_UPLOAD_PRESET
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData },
     );
 
-    const response =
-      await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-    const data: any =
-      await response.json();
-
-    console.log(
-      "Provider profile Cloudinary response:",
-      data
-    );
+    const data: any = await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data?.error?.message ||
-          "Profile photo upload failed."
+        data?.error?.message || "Profile photo upload failed.",
       );
     }
 
     if (!data?.secure_url) {
-      throw new Error(
-        "Cloudinary did not return an image URL."
-      );
+      throw new Error("Cloudinary did not return an image URL.");
     }
 
     return data.secure_url as string;
@@ -271,731 +214,517 @@ export default function ProviderProfileScreen() {
 
   const chooseProfilePhoto = async () => {
     try {
-      const user =
-        auth.currentUser;
-
+      const user = auth.currentUser;
       if (!user) {
-        router.replace(
-          "/provider/login"
-        );
-
+        router.replace("/provider/login");
         return;
       }
 
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
           "Photo Permission Required",
-          "Please allow photo access to choose a profile picture."
+          "Please allow photo access to choose a profile picture.",
         );
-
         return;
       }
 
-      const result =
-        await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-        });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
 
-      if (
-        result.canceled ||
-        result.assets.length === 0
-      ) {
-        return;
-      }
+      if (result.canceled || result.assets.length === 0) return;
 
-      setUploadingPhoto(
-        true
-      );
+      setUploadingPhoto(true);
 
-      const selectedUri =
-        result.assets[0].uri;
+      const selectedUri = result.assets[0].uri;
+      const imageUrl = await uploadProfilePhotoToCloudinary(selectedUri);
 
-      const imageUrl =
-        await uploadProfilePhotoToCloudinary(
-          selectedUri
-        );
+      await updateDoc(doc(db, "users", user.uid), { profileImageUrl: imageUrl });
 
-      await updateDoc(
-        doc(
-          db,
-          "users",
-          user.uid
-        ),
-        {
-          profileImageUrl:
-            imageUrl,
-        }
-      );
+      setProvider((current) => ({
+        ...(current || {}),
+        profileImageUrl: imageUrl,
+      }));
 
-      setProvider(
-        (current) => ({
-          ...(current || {}),
-          profileImageUrl:
-            imageUrl,
-        })
-      );
-
-      Alert.alert(
-        "Profile Updated",
-        "Your profile picture was updated successfully."
-      );
+      Alert.alert("Profile Updated", "Your profile picture was updated.");
     } catch (error: any) {
-      console.log(
-        "Provider profile photo error:",
-        error
-      );
-
-      Alert.alert(
-        "Upload Failed",
-        error?.message ||
-          "Unable to update your profile picture."
-      );
+      console.log("Provider profile photo error:", error);
+      Alert.alert("Upload Failed", error?.message || "Unable to update photo.");
     } finally {
-      setUploadingPhoto(
-        false
-      );
+      setUploadingPhoto(false);
     }
   };
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-
-      router.replace(
-        "/provider/login"
-      );
+      router.replace("/provider/login");
     } catch (error: any) {
-      console.log(
-        "Logout error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to log out."
-      );
+      console.log("Logout error:", error);
+      Alert.alert("Error", error.message || "Unable to log out.");
     }
   };
 
   if (loading) {
     return (
-      <View
-        style={
-          styles.loadingContainer
-        }
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={styles.loadingText}
-        >
-          Loading profile...
-        </Text>
-      </View>
+      <SafeAreaView style={styles.loadingContainer} edges={["top"]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading profile…</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View
-          style={styles.profileHeader}
-        >
-          <TouchableOpacity
-            style={
-              styles.avatarWrapper
-            }
-            onPress={
-              chooseProfilePhoto
-            }
-            disabled={
-              uploadingPhoto
-            }
-            activeOpacity={0.8}
-          >
-            {provider?.profileImageUrl ? (
-              <Image
-                source={{
-                  uri:
-                    provider.profileImageUrl,
-                }}
-                style={
-                  styles.avatarImage
-                }
-                resizeMode="cover"
-              />
-            ) : (
-              <View
-                style={styles.avatar}
-              >
-                <Text
-                  style={
-                    styles.avatarText
-                  }
-                >
-                  👨‍🔧
-                </Text>
-              </View>
-            )}
-
-            <View
-              style={
-                styles.cameraBadge
-              }
-            >
-              {uploadingPhoto ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#FFFFFF"
-                />
-              ) : (
-                <Text
-                  style={
-                    styles.cameraBadgeText
-                  }
-                >
-                  📷
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={
-              chooseProfilePhoto
-            }
-            disabled={
-              uploadingPhoto
-            }
-          >
-            <Text
-              style={
-                styles.changePhotoText
-              }
-            >
-              {uploadingPhoto
-                ? "Uploading..."
-                : "Change Profile Photo"}
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={styles.name}>
-            {provider?.name ||
-              "Provider"}
-          </Text>
-
-          <Text
-            style={styles.service}
-          >
-            {provider?.category ||
-              "Service Provider"}
-          </Text>
-
-          <Text
-            style={styles.district}
-          >
-            📍{" "}
-            {provider?.district ||
-              "Service area not set"}
-          </Text>
-
-          <View
-            style={[
-              styles.verifiedBadge,
-              provider?.verificationStatus !==
-                "approved" &&
-                styles.pendingBadge,
-            ]}
-          >
-            <Text
-              style={[
-                styles.verifiedText,
-                provider?.verificationStatus !==
-                  "approved" &&
-                  styles.pendingText,
-              ]}
-            >
-              {provider?.verificationStatus ===
-              "approved"
-                ? "✓ Verified Provider"
-                : "Verification Pending"}
-            </Text>
-          </View>
-
-          <View
-            style={styles.statsRow}
-          >
-            <View
-              style={styles.statItem}
-            >
-              <Text
-                style={styles.statValue}
-              >
-                {averageRating > 0
-                  ? averageRating.toFixed(
-                      1
-                    )
-                  : "0.0"}
-              </Text>
-
-              <Text
-                style={styles.statLabel}
-              >
-                Rating
+        {/* Header Card */}
+        <View style={styles.headerCard}>
+          <View style={styles.headerTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pageTitle}>Profile</Text>
+              <Text style={styles.pageSubtitle} numberOfLines={2}>
+                Keep your details updated for customer trust and better matches.
               </Text>
             </View>
-
-            <View
-              style={styles.divider}
-            />
 
             <TouchableOpacity
-              style={styles.statItem}
-              activeOpacity={0.7}
-              onPress={() =>
-                router.push(
-                  "/provider/my-reviews"
-                )
-              }
+              style={styles.headerIconBtn}
+              onPress={() => router.push("/provider/settings")}
+              activeOpacity={0.85}
+              hitSlop={10}
             >
-              <Text
-                style={styles.statValue}
-              >
-                {reviewCount}
-              </Text>
+              <Ionicons name="settings-outline" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
-              <Text
-                style={styles.statLabel}
-              >
-                Reviews
-              </Text>
+          <View style={styles.profileRow}>
+            <TouchableOpacity
+              style={styles.avatarWrap}
+              onPress={chooseProfilePhoto}
+              disabled={uploadingPhoto}
+              activeOpacity={0.88}
+            >
+              {provider?.profileImageUrl ? (
+                <Image
+                  source={{ uri: provider.profileImageUrl }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarInitials}>
+                    {getInitials(provider?.name)}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.cameraBadge}>
+                {uploadingPhoto ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Ionicons name="camera-outline" size={14} color={colors.white} />
+                )}
+              </View>
             </TouchableOpacity>
 
-            <View
-              style={styles.divider}
-            />
-
-            <View
-              style={styles.statItem}
-            >
-              <Text
-                style={styles.statValue}
-              >
-                {completedJobs}
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.name} numberOfLines={1}>
+                {provider?.name || "Provider"}
               </Text>
 
-              <Text
-                style={styles.statLabel}
-              >
-                Jobs
+              <Text style={styles.category} numberOfLines={1}>
+                {provider?.category || "Service Provider"}
               </Text>
+
+              <View style={styles.locationRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {provider?.district || "Service area not set"}
+                </Text>
+              </View>
+
+              <View style={[styles.verifyPill, { backgroundColor: verificationUI.bg }]}>
+                <Ionicons name={verificationUI.icon} size={14} color={verificationUI.fg} />
+                <Text style={[styles.verifyText, { color: verificationUI.fg }]}>
+                  {verificationUI.label}
+                </Text>
+              </View>
             </View>
+          </View>
+
+          <View style={styles.quickActions}>
+            <TouchableOpacity
+              style={styles.quickActionBtn}
+              onPress={() => router.push("/provider/edit-profile")}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="create-outline" size={16} color={colors.primary} />
+              <Text style={styles.quickActionText}>Edit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionBtn}
+              onPress={() => router.push("/provider/verification")}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary} />
+              <Text style={styles.quickActionText}>Verify</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionBtn}
+              onPress={() => router.push("/provider/services-pricing")}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+              <Text style={styles.quickActionText}>Services</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.item}
-            onPress={() =>
-              router.push(
-                "/provider/edit-profile"
-              )
-            }
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              👤
+        {/* Stats */}
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {averageRating > 0 ? averageRating.toFixed(1) : "0.0"}
             </Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </View>
 
-            <Text
-              style={styles.itemText}
-            >
-              Edit Profile
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.statDivider} />
 
           <TouchableOpacity
-            style={styles.item}
-            onPress={() =>
-              router.push(
-                "/provider/availability"
-              )
-            }
+            style={styles.statItem}
+            activeOpacity={0.75}
+            onPress={() => router.push("/provider/my-reviews")}
           >
-            <Text
-              style={styles.itemIcon}
-            >
-              📅
-            </Text>
-
-            <Text
-              style={styles.itemText}
-            >
-              Manage Availability
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
+            <Text style={styles.statValue}>{reviewCount}</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.item}
-            onPress={() =>
-              router.push(
-                "/provider/services-pricing"
-              )
-            }
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              🛠️
-            </Text>
+          <View style={styles.statDivider} />
 
-            <Text
-              style={styles.itemText}
-            >
-              Services & Pricing
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.item}
-            onPress={() =>
-              router.push(
-                "/provider/verification"
-              )
-            }
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              📄
-            </Text>
-
-            <Text
-              style={styles.itemText}
-            >
-              Verification Documents
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{completedJobs}</Text>
+            <Text style={styles.statLabel}>Jobs</Text>
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.item}
-            onPress={() =>
-              router.push(
-                "/provider/settings"
-              )
-            }
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              ⚙️
-            </Text>
-
-            <Text
-              style={styles.itemText}
-            >
-              Settings
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.item}
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              🔔
-            </Text>
-
-            <Text
-              style={styles.itemText}
-            >
-              Notifications
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.item}
-          >
-            <Text
-              style={styles.itemIcon}
-            >
-              ❓
-            </Text>
-
-            <Text
-              style={styles.itemText}
-            >
-              Help & Support
-            </Text>
-
-            <Text style={styles.arrow}>
-              ›
-            </Text>
-          </TouchableOpacity>
+        {/* Menu */}
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.menuCard}>
+          <MenuItem
+            icon="person-outline"
+            title="Edit profile"
+            subtitle="Update your name, phone, category and area"
+            onPress={() => router.push("/provider/edit-profile")}
+          />
+          <MenuItem
+            icon="calendar-outline"
+            title="Availability"
+            subtitle="Control when customers can book you"
+            onPress={() => router.push("/provider/availability")}
+          />
+          <MenuItem
+            icon="pricetag-outline"
+            title="Services & pricing"
+            subtitle="Manage what you offer and your starting prices"
+            onPress={() => router.push("/provider/services-pricing")}
+          />
+          <MenuItem
+            icon="shield-checkmark-outline"
+            title="Verification"
+            subtitle={verificationUI.hint}
+            onPress={() => router.push("/provider/verification")}
+            last
+          />
         </View>
 
+        <Text style={styles.sectionTitle}>Support</Text>
+        <View style={styles.menuCard}>
+          <MenuItem
+            icon="settings-outline"
+            title="Settings"
+            subtitle="Notifications and preferences"
+            onPress={() => router.push("/provider/settings")}
+          />
+          <MenuItem
+            icon="help-circle-outline"
+            title="Help & support"
+            subtitle="Get assistance with Fixora"
+            onPress={() => Alert.alert("Coming soon", "Help & Support will be added soon.")}
+            last
+          />
+        </View>
+
+        {/* Logout */}
         <TouchableOpacity
-          style={styles.logoutButton}
+          style={styles.logoutBtn}
           onPress={handleLogout}
+          activeOpacity={0.9}
         >
-          <Text
-            style={styles.logoutText}
-          >
-            Log Out
-          </Text>
+          <Ionicons name="log-out-outline" size={18} color={colors.error} />
+          <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
       </ScrollView>
 
       <ProviderBottomNav />
-    </View>
+    </SafeAreaView>
+  );
+}
+
+function MenuItem({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  last,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[styles.menuItem, !last && styles.menuItemDivider]}
+    >
+      <View style={styles.menuIconWrap}>
+        <Ionicons name={icon} size={18} color={colors.primary} />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        {subtitle ? <Text style={styles.menuSubtitle}>{subtitle}</Text> : null}
+      </View>
+
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
-  },
+  container: { flex: 1, backgroundColor: colors.background },
 
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#F7F7FC",
+    backgroundColor: colors.background,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  loadingText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: "#64748B",
-  },
+  loadingText: { marginTop: spacing.md, color: colors.textSecondary },
 
   scrollContent: {
-    padding: 18,
-    paddingBottom: 30,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + 90, // room for bottom nav
   },
 
-  profileHeader: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
+  headerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
   },
 
-  avatarWrapper: {
-    position: "relative",
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
 
-  avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "#DBEAFE",
+  pageTitle: {
+    ...typography.sectionHeading,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  pageSubtitle: {
+    marginTop: spacing.xs,
+    ...typography.secondary,
+    fontSize: 13,
+  },
+
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  avatarImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: "#DBEAFE",
-  },
+  profileRow: { marginTop: spacing.lg, flexDirection: "row", alignItems: "center" },
 
-  avatarText: {
-    fontSize: 42,
+  avatarWrap: { position: "relative" },
+  avatarImage: {
+    width: 78,
+    height: 78,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
+  },
+  avatarFallback: {
+    width: 78,
+    height: 78,
+    borderRadius: radius.xl,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitials: {
+    color: colors.primary,
+    fontWeight: "900",
+    fontSize: 18,
   },
 
   cameraBadge: {
     position: "absolute",
-    right: -2,
-    bottom: -2,
-    width: 31,
-    height: 31,
-    borderRadius: 16,
-    backgroundColor: "#2563EB",
+    right: -6,
+    bottom: -6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
     borderWidth: 3,
-    borderColor: "#FFFFFF",
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
 
-  cameraBadgeText: {
-    fontSize: 13,
-  },
+  name: { fontSize: 18, fontWeight: "900", color: colors.textPrimary },
+  category: { marginTop: 3, ...typography.secondary, fontSize: 13 },
 
-  changePhotoText: {
-    marginTop: 10,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-
-  name: {
-    marginTop: 14,
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#0F172A",
-  },
-
-  service: {
-    marginTop: 4,
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
-
-  district: {
-    marginTop: 6,
-    fontSize: 11,
-    color: "#64748B",
-    textAlign: "center",
-  },
-
-  verifiedBadge: {
-    marginTop: 10,
-    backgroundColor: "#DBEAFE",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-
-  verifiedText: {
-    fontSize: 11,
-    color: "#1D4ED8",
-    fontWeight: "700",
-  },
-
-  pendingBadge: {
-    backgroundColor: "#FEF3C7",
-  },
-
-  pendingText: {
-    color: "#92400E",
-  },
-
-  statsRow: {
-    marginTop: 22,
-    width: "100%",
+  locationRow: {
+    marginTop: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
   },
+  locationText: { flex: 1, fontSize: 12, color: colors.textSecondary },
 
-  statItem: {
-    flex: 1,
+  verifyPill: {
+    marginTop: spacing.sm,
+    alignSelf: "flex-start",
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 1,
   },
+  verifyText: { fontSize: 12, fontWeight: "800" },
 
-  statValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0F172A",
+  quickActions: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    gap: spacing.sm,
   },
-
-  statLabel: {
-    marginTop: 3,
-    fontSize: 10,
-    color: "#64748B",
-  },
-
-  divider: {
-    width: 1,
-    height: 34,
-    backgroundColor: "#E2E8F0",
-  },
-
-  section: {
-    marginTop: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
   },
+  quickActionText: { color: colors.primary, fontSize: 13, fontWeight: "900" },
 
-  item: {
-    minHeight: 60,
+  statsCard: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+  },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 18, fontWeight: "900", color: colors.textPrimary },
+  statLabel: { marginTop: 4, ...typography.caption, color: colors.textSecondary },
+  statDivider: { width: 1, height: 34, backgroundColor: colors.border },
+
+  sectionTitle: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    ...typography.sectionHeading,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  menuCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+
+  menuItem: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md + 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+
+  menuItemDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: colors.border,
   },
 
-  itemIcon: {
-    width: 34,
-    fontSize: 20,
+  menuIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
-  itemText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#0F172A",
+  menuTitle: { fontSize: 14, fontWeight: "900", color: colors.textPrimary },
+  menuSubtitle: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textSecondary,
   },
 
-  arrow: {
-    fontSize: 24,
-    color: "#94A3B8",
-  },
-
-  logoutButton: {
-    marginTop: 16,
-    backgroundColor: "#FEF2F2",
+  logoutBtn: {
+    marginTop: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.errorLight,
+    borderRadius: radius.xl,
+    paddingVertical: spacing.lg,
     borderWidth: 1,
     borderColor: "#FCA5A5",
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: "center",
   },
-
-  logoutText: {
-    color: "#DC2626",
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  logoutText: { color: colors.error, fontWeight: "900", fontSize: 14 },
 });

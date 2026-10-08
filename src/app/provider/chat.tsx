@@ -1,5 +1,7 @@
+// src/app/provider/chat.tsx
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addDoc,
@@ -20,8 +22,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { auth, db } from "../../services/firebase";
+import { colors, radius, spacing, typography } from "../../theme";
 
 type ChatMessage = {
   id: string;
@@ -34,59 +38,44 @@ export default function ProviderChatScreen() {
   const params = useLocalSearchParams();
 
   const bookingId =
-    typeof params.bookingId === "string"
-      ? params.bookingId
-      : "";
+    typeof params.bookingId === "string" ? params.bookingId : "";
 
   const customer =
-    typeof params.customer === "string"
-      ? params.customer
-      : "Customer";
+    typeof params.customer === "string" ? params.customer : "Customer";
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
 
+  const insets = useSafeAreaInsets();
+
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
-    if (!bookingId) {
-      return;
-    }
+    if (!bookingId) return;
 
     const messagesQuery = query(
-      collection(
-        db,
-        "chats",
-        bookingId,
-        "messages"
-      ),
-      orderBy("createdAt", "asc")
+      collection(db, "chats", bookingId, "messages"),
+      orderBy("createdAt", "asc"),
     );
 
     const unsubscribe = onSnapshot(
       messagesQuery,
       (snapshot) => {
-        const loadedMessages: ChatMessage[] =
-          snapshot.docs.map((messageDoc) => ({
-            id: messageDoc.id,
-            ...messageDoc.data(),
-          })) as ChatMessage[];
+        const loadedMessages: ChatMessage[] = snapshot.docs.map((messageDoc) => ({
+          id: messageDoc.id,
+          ...(messageDoc.data() as any),
+        })) as ChatMessage[];
 
         setMessages(loadedMessages);
 
         setTimeout(() => {
-          flatListRef.current?.scrollToEnd({
-            animated: true,
-          });
+          flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       },
       (error) => {
-        console.log(
-          "Provider chat listener error:",
-          error
-        );
-      }
+        console.log("Provider chat listener error:", error);
+      },
     );
 
     return () => unsubscribe();
@@ -105,285 +94,346 @@ export default function ProviderChatScreen() {
       return;
     }
 
-    if (!message.trim()) {
-      return;
-    }
+    if (!message.trim()) return;
 
     try {
       setSending(true);
 
-      await addDoc(
-        collection(
-          db,
-          "chats",
-          bookingId,
-          "messages"
-        ),
-        {
-          text: message.trim(),
-          sender: "provider",
-          senderId: user.uid,
-          createdAt: serverTimestamp(),
-        }
-      );
+      await addDoc(collection(db, "chats", bookingId, "messages"), {
+        text: message.trim(),
+        sender: "provider",
+        senderId: user.uid,
+        createdAt: serverTimestamp(),
+      });
 
       setMessage("");
     } catch (error: any) {
-      console.log(
-        "Send provider message error:",
-        error
-      );
-
-      alert(
-        error.message ||
-          "Unable to send message."
-      );
+      console.log("Send provider message error:", error);
+      alert(error.message || "Unable to send message.");
     } finally {
       setSending(false);
     }
   };
 
-  const getInitials = () => {
+  const initials = useMemo(() => {
     return customer
       .split(" ")
-      .map((word) => word[0])
+      .filter(Boolean)
+      .map((w) => w[0])
       .join("")
       .slice(0, 2)
       .toUpperCase();
-  };
+  }, [customer]);
+
+  const bottomPad = Math.max(insets.bottom, spacing.sm);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={
-        Platform.OS === "ios"
-          ? "padding"
-          : undefined
-      }
-    >
-      <View style={styles.customerHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {getInitials()}
-          </Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.safe}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 2 : 0}
+      >
+        {/* Subtle background decoration (UI only) */}
+        <View pointerEvents="none" style={styles.bgDecor}>
+          <View style={styles.blobA} />
+          <View style={styles.blobB} />
         </View>
 
-        <View>
-          <Text style={styles.customerName}>
-            {customer}
-          </Text>
+        {/* Header (keeps existing info: customer + "Booking Chat") */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
 
-          <Text style={styles.onlineText}>
-            Booking Chat
-          </Text>
-        </View>
-      </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.customerName} numberOfLines={1}>
+                {customer}
+              </Text>
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.messageList,
-          messages.length === 0 &&
-            styles.emptyMessageList,
-        ]}
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({
-            animated: true,
-          })
-        }
-        renderItem={({ item }) => {
-          const isProvider =
-            item.sender === "provider";
-
-          return (
-            <View
-              style={[
-                styles.messageRow,
-                isProvider
-                  ? styles.providerMessageRow
-                  : styles.customerMessageRow,
-              ]}
-            >
-              <View
-                style={[
-                  styles.messageBubble,
-                  isProvider
-                    ? styles.providerBubble
-                    : styles.customerBubble,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.messageText,
-                    isProvider
-                      ? styles.providerMessageText
-                      : styles.customerMessageText,
-                  ]}
-                >
-                  {item.text}
-                </Text>
+              <View style={styles.subRow}>
+                <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.success} />
+                <Text style={styles.subText}>Booking chat</Text>
               </View>
             </View>
-          );
-        }}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>
-              💬
-            </Text>
-
-            <Text style={styles.emptyTitle}>
-              No messages yet
-            </Text>
-
-            <Text style={styles.emptyText}>
-              Send a message to start the
-              conversation.
-            </Text>
           </View>
-        }
-      />
 
-      <View style={styles.inputArea}>
-        <TextInput
-          style={styles.input}
-          placeholder="Type a message..."
-          placeholderTextColor="#94A3B8"
-          value={message}
-          onChangeText={setMessage}
-          multiline
+          {/* Visual-only badge (does not add new functionality) */}
+          <View style={styles.headerBadge}>
+            <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+            <Text style={styles.headerBadgeText}>Fixora</Text>
+          </View>
+        </View>
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 14 + 64 + bottomPad },
+            messages.length === 0 && styles.listEmptyGrow,
+          ]}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+          renderItem={({ item }) => {
+            const isProvider = item.sender === "provider";
+
+            return (
+              <View
+                style={[
+                  styles.messageRow,
+                  isProvider ? styles.rowRight : styles.rowLeft,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.bubble,
+                    isProvider ? styles.bubbleProvider : styles.bubbleCustomer,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isProvider ? styles.textProvider : styles.textCustomer,
+                    ]}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
+              </View>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="chatbubbles-outline" size={22} color={colors.textSecondary} />
+              </View>
+
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyText}>
+                Send a message to start the conversation with the customer.
+              </Text>
+            </View>
+          }
         />
 
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (!message.trim() || sending) &&
-              styles.disabledButton,
-          ]}
-          onPress={sendMessage}
-          disabled={
-            !message.trim() || sending
-          }
-        >
-          <Text style={styles.sendText}>
-            {sending ? "..." : "Send"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        {/* Input Bar */}
+        <View style={[styles.inputBar, { paddingBottom: bottomPad }]}>
+          <View style={styles.inputWrap}>
+            <Ionicons name="chatbox-ellipses-outline" size={18} color={colors.textMuted} />
+            <TextInput
+              style={styles.input}
+              placeholder="Type a message..."
+              placeholderTextColor={colors.textMuted}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              (!message.trim() || sending) && styles.sendBtnDisabled,
+            ]}
+            onPress={sendMessage}
+            disabled={!message.trim() || sending}
+            activeOpacity={0.9}
+          >
+            {sending ? (
+              <Text style={styles.sendText}>...</Text>
+            ) : (
+              <>
+                <Ionicons name="send" size={16} color={colors.white} />
+                <Text style={styles.sendText}>Send</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F7F7FC",
+  safe: { flex: 1, backgroundColor: colors.background },
+
+  /* subtle background */
+  bgDecor: {
+    ...(StyleSheet.absoluteFill as any),
+    overflow: "hidden",
+  },
+  blobA: {
+    position: "absolute",
+    top: -120,
+    right: -160,
+    width: 360,
+    height: 360,
+    borderRadius: 180,
+    backgroundColor: colors.primarySoft,
+    opacity: 0.55,
+  },
+  blobB: {
+    position: "absolute",
+    bottom: -140,
+    left: -170,
+    width: 380,
+    height: 380,
+    borderRadius: 190,
+    backgroundColor: "#ECFEFF",
+    opacity: 0.35,
   },
 
-  customerHeader: {
+  header: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+
+  headerLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
   },
 
   avatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: "#DBEAFE",
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
 
   avatarText: {
     fontSize: 12,
-    fontWeight: "800",
-    color: "#1D4ED8",
+    fontWeight: "900",
+    color: colors.primary,
   },
 
   customerName: {
-    marginLeft: 12,
     fontSize: 15,
+    fontWeight: "900",
+    color: colors.textPrimary,
+  },
+
+  subRow: {
+    marginTop: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  subText: {
+    fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.success,
   },
 
-  onlineText: {
-    marginLeft: 12,
-    marginTop: 2,
-    fontSize: 11,
-    color: "#16A34A",
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
   },
 
-  messageList: {
-    padding: 16,
-    paddingBottom: 24,
+  headerBadgeText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
   },
 
-  emptyMessageList: {
+  listContent: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+  },
+
+  listEmptyGrow: {
     flexGrow: 1,
+    justifyContent: "center",
   },
 
-  emptyContainer: {
-    flex: 1,
+  emptyWrap: {
+    alignItems: "center",
+    paddingHorizontal: 26,
+    paddingVertical: 18,
+  },
+
+  emptyIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 30,
-  },
-
-  emptyIcon: {
-    fontSize: 36,
   },
 
   emptyTitle: {
-    marginTop: 10,
+    marginTop: spacing.md,
     fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontWeight: "900",
+    color: colors.textPrimary,
   },
 
   emptyText: {
-    marginTop: 5,
+    marginTop: spacing.xs,
     fontSize: 12,
+    lineHeight: 18,
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   messageRow: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
     flexDirection: "row",
   },
 
-  providerMessageRow: {
+  rowRight: {
     justifyContent: "flex-end",
   },
 
-  customerMessageRow: {
+  rowLeft: {
     justifyContent: "flex-start",
   },
 
-  messageBubble: {
+  bubble: {
     maxWidth: "78%",
-    borderRadius: 16,
+    borderRadius: radius.xl,
     paddingHorizontal: 14,
     paddingVertical: 10,
-  },
-
-  providerBubble: {
-    backgroundColor: "#1D4ED8",
-    borderBottomRightRadius: 4,
-  },
-
-  customerBubble: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderBottomLeftRadius: 4,
+  },
+
+  bubbleProvider: {
+    backgroundColor: colors.primary,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderBottomRightRadius: 8,
+  },
+
+  bubbleCustomer: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderBottomLeftRadius: 8,
   },
 
   messageText: {
@@ -391,50 +441,65 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  providerMessageText: {
-    color: "#FFFFFF",
+  textProvider: {
+    color: colors.white,
+    fontWeight: "600",
   },
 
-  customerMessageText: {
-    color: "#0F172A",
+  textCustomer: {
+    color: colors.textPrimary,
+    fontWeight: "500",
   },
 
-  inputArea: {
+  inputBar: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+  },
+
+  inputWrap: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 10,
-    padding: 12,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flex: 1,
   },
 
   input: {
     flex: 1,
-    maxHeight: 110,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: "#0F172A",
+    maxHeight: 120,
+    color: colors.textPrimary,
+    fontSize: 14,
+    paddingVertical: 0,
   },
 
-  sendButton: {
-    backgroundColor: "#1D4ED8",
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
+  sendBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 46,
+  },
+
+  sendBtnDisabled: {
+    opacity: 0.55,
   },
 
   sendText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
+    ...typography.button,
     fontSize: 14,
-  },
-
-  disabledButton: {
-    opacity: 0.5,
+    fontWeight: "900",
   },
 });
