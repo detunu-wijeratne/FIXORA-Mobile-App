@@ -6,13 +6,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -32,6 +38,7 @@ type ChatMessage = {
   text: string;
   sender: "customer" | "provider";
   senderId?: string;
+  edited?: boolean;
 };
 
 export default function ProviderChatScreen() {
@@ -49,40 +56,100 @@ export default function ProviderChatScreen() {
   const [chatError, setChatError] = useState("");
   const sendingRef = useRef(false);
 
+  /*
+    null = still checking; true = verified participant; false = blocked.
+    Gates loading the message listener and sending messages, so access
+    is never decided by the bookingId route param alone.
+  */
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
+
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const insets = useSafeAreaInsets();
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/provider/jobs"));
+
   useEffect(() => {
-    if (!bookingId) { setChatError("Open chat from a booking to start messaging."); return; }
+    let active = true;
+    let unsubscribeMessages: (() => void) | undefined;
 
-    const messagesQuery = query(
-      collection(db, "chats", bookingId, "messages"),
-      orderBy("createdAt", "asc"),
-    );
+    const start = async () => {
+      const user = auth.currentUser;
 
-    const unsubscribe = onSnapshot(
-      messagesQuery,
-      (snapshot) => {
-        setChatError("");
-        const loadedMessages: ChatMessage[] = snapshot.docs.map((messageDoc) => ({
-          id: messageDoc.id,
-          ...(messageDoc.data() as any),
-        })) as ChatMessage[];
+      if (!user) {
+        router.replace("/provider/login");
+        return;
+      }
 
-        setMessages(loadedMessages);
+      if (!bookingId) {
+        setChatError("Open chat from a booking to start messaging.");
+        setAuthorized(false);
+        return;
+      }
 
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      },
-      (error) => {
-        console.log("Provider chat listener error:", error);
-        setChatError(error.code === "permission-denied" ? "You do not have permission to read this chat." : "Messages could not load. Please reopen this chat and try again.");
-      },
-    );
+      try {
+        const bookingSnapshot = await getDoc(doc(db, "bookings", bookingId));
 
-    return () => unsubscribe();
+        if (!active) {
+          return;
+        }
+
+        if (!bookingSnapshot.exists() || bookingSnapshot.data().providerId !== user.uid) {
+          setAuthorized(false);
+          return;
+        }
+
+        setAuthorized(true);
+
+        const messagesQuery = query(
+          collection(db, "chats", bookingId, "messages"),
+          orderBy("createdAt", "asc"),
+        );
+
+        unsubscribeMessages = onSnapshot(
+          messagesQuery,
+          (snapshot) => {
+            if (!active) return;
+
+            setChatError("");
+            const loadedMessages: ChatMessage[] = snapshot.docs.map((messageDoc) => ({
+              id: messageDoc.id,
+              ...(messageDoc.data() as any),
+            })) as ChatMessage[];
+
+            setMessages(loadedMessages);
+
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          },
+          (error) => {
+            console.log("Provider chat listener error:", error);
+            setChatError(
+              error.code === "permission-denied"
+                ? "You do not have permission to read this chat."
+                : "Messages could not load. Please reopen this chat and try again."
+            );
+          },
+        );
+      } catch (error) {
+        console.log("Booking access check error:", error);
+        if (active) {
+          setAuthorized(false);
+        }
+      }
+    };
+
+    start();
+
+    return () => {
+      active = false;
+      unsubscribeMessages?.();
+    };
   }, [bookingId]);
 
   const sendMessage = async () => {
@@ -93,8 +160,8 @@ export default function ProviderChatScreen() {
       return;
     }
 
-    if (!bookingId) {
-      alert("Booking ID not found.");
+    if (!bookingId || authorized !== true) {
+      alert("You don't have access to this conversation.");
       return;
     }
 
@@ -122,6 +189,122 @@ export default function ProviderChatScreen() {
     }
   };
 
+  const openMessageMenu = (item: ChatMessage) => {
+    if (item.senderId !== auth.currentUser?.uid) {
+      return;
+    }
+
+    Alert.alert("Message options", undefined, [
+      { text: "Edit", onPress: () => startEditing(item) },
+      { text: "Delete", style: "destructive", onPress: () => confirmDeleteMessage(item) },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const startEditing = (item: ChatMessage) => {
+    setEditingMessageId(item.id);
+    setEditingText(item.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText("");
+  };
+
+  const handleSaveEdit = async () => {
+    const user = auth.currentUser;
+
+    if (!user || !editingMessageId || !bookingId) {
+      return;
+    }
+
+    const trimmed = editingText.trim();
+
+    if (!trimmed) {
+      Alert.alert("Empty message", "Message cannot be empty.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+
+      const messageRef = doc(db, "chats", bookingId, "messages", editingMessageId);
+
+      /*
+        Re-fetch immediately before writing so the ownership check can
+        never be fooled by stale local state.
+      */
+      const latestSnapshot = await getDoc(messageRef);
+
+      if (!latestSnapshot.exists()) {
+        Alert.alert("Message Removed", "This message no longer exists.");
+        handleCancelEdit();
+        return;
+      }
+
+      if (latestSnapshot.data().senderId !== user.uid) {
+        Alert.alert("Not Allowed", "You can only edit your own messages.");
+        handleCancelEdit();
+        return;
+      }
+
+      await updateDoc(messageRef, {
+        text: trimmed,
+        edited: true,
+        updatedAt: serverTimestamp(),
+      });
+
+      handleCancelEdit();
+    } catch (error: any) {
+      console.log("Edit message error:", error);
+      Alert.alert("Error", error.message || "Unable to update message.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const confirmDeleteMessage = (item: ChatMessage) => {
+    Alert.alert(
+      "Delete Message",
+      "Are you sure you want to delete this message? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => handleDeleteMessage(item) },
+      ]
+    );
+  };
+
+  const handleDeleteMessage = async (item: ChatMessage) => {
+    const user = auth.currentUser;
+
+    if (!user || !bookingId) {
+      return;
+    }
+
+    try {
+      const messageRef = doc(db, "chats", bookingId, "messages", item.id);
+      const latestSnapshot = await getDoc(messageRef);
+
+      if (!latestSnapshot.exists()) {
+        return;
+      }
+
+      if (latestSnapshot.data().senderId !== user.uid) {
+        Alert.alert("Not Allowed", "You can only delete your own messages.");
+        return;
+      }
+
+      await deleteDoc(messageRef);
+
+      if (editingMessageId === item.id) {
+        handleCancelEdit();
+      }
+    } catch (error: any) {
+      console.log("Delete message error:", error);
+      Alert.alert("Error", error.message || "Unable to delete message.");
+    }
+  };
+
   const initials = useMemo(() => {
     return customer
       .split(" ")
@@ -133,6 +316,33 @@ export default function ProviderChatScreen() {
   }, [customer]);
 
   const bottomPad = Math.max(insets.bottom, spacing.sm);
+
+  if (authorized === null) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.centerText}>Checking access...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authorized === false) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centerContainer}>
+          <Ionicons name="lock-closed-outline" size={40} color={colors.textMuted} />
+          <Text style={styles.centerTitle}>You don't have access to this conversation.</Text>
+          <TouchableOpacity style={styles.backToJobsBtn} onPress={goBack} activeOpacity={0.9}>
+            <Text style={styles.backToJobsText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -151,7 +361,7 @@ export default function ProviderChatScreen() {
         {/* Header (keeps existing info: customer + "Booking Chat") */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/provider/jobs")} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} style={{ padding: 6, marginRight: 8 }}><Ionicons name="chevron-back" size={22} color={colors.primary} /></TouchableOpacity>
+            <TouchableOpacity onPress={goBack} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10} style={{ padding: 6, marginRight: 8 }}><Ionicons name="chevron-back" size={22} color={colors.primary} /></TouchableOpacity>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initials}</Text>
             </View>
@@ -194,6 +404,7 @@ export default function ProviderChatScreen() {
           }
           renderItem={({ item }) => {
             const isProvider = item.sender === "provider";
+            const isOwn = item.senderId === auth.currentUser?.uid;
 
             return (
               <View
@@ -202,7 +413,11 @@ export default function ProviderChatScreen() {
                   isProvider ? styles.rowRight : styles.rowLeft,
                 ]}
               >
-                <View
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={!isOwn}
+                  delayLongPress={300}
+                  onLongPress={() => openMessageMenu(item)}
                   style={[
                     styles.bubble,
                     isProvider ? styles.bubbleProvider : styles.bubbleCustomer,
@@ -216,7 +431,18 @@ export default function ProviderChatScreen() {
                   >
                     {item.text}
                   </Text>
-                </View>
+
+                  {item.edited && (
+                    <Text
+                      style={[
+                        styles.editedTag,
+                        isProvider ? styles.editedTagOnProvider : styles.editedTagOnCustomer,
+                      ]}
+                    >
+                      (edited)
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
             );
           }}
@@ -235,40 +461,80 @@ export default function ProviderChatScreen() {
         />
 
         {/* Input Bar */}
-        <View style={[styles.inputBar, { paddingBottom: bottomPad }]}>
-          <View style={styles.inputWrap}>
-            <Ionicons name="chatbox-ellipses-outline" size={18} color={colors.textMuted} />
-            <TextInput
-              style={styles.input}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.textMuted}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              editable
-              accessibilityLabel="Message to customer"
-              textAlignVertical="top"
-            />
-          </View>
+        <View style={styles.inputBarOuter}>
+          {editingMessageId && (
+            <View style={styles.editingBanner}>
+              <Ionicons name="create-outline" size={13} color={colors.primary} />
+              <Text style={styles.editingBannerText}>Editing message</Text>
+            </View>
+          )}
 
-          <TouchableOpacity
-            style={[
-              styles.sendBtn,
-              (!message.trim() || sending) && styles.sendBtnDisabled,
-            ]}
-            onPress={sendMessage}
-            disabled={!message.trim() || sending}
-            activeOpacity={0.9}
-          >
-            {sending ? (
-              <Text style={styles.sendText}>...</Text>
+          <View style={[styles.inputBar, { paddingBottom: bottomPad }]}>
+            <View style={styles.inputWrap}>
+              <Ionicons name="chatbox-ellipses-outline" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder={editingMessageId ? "Edit your message..." : "Type a message..."}
+                placeholderTextColor={colors.textMuted}
+                value={editingMessageId ? editingText : message}
+                onChangeText={editingMessageId ? setEditingText : setMessage}
+                multiline
+                editable
+                accessibilityLabel={editingMessageId ? "Edit message" : "Message to customer"}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {editingMessageId ? (
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={styles.cancelEditBtn}
+                  onPress={handleCancelEdit}
+                  disabled={savingEdit}
+                >
+                  <Text style={styles.cancelEditText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.sendBtn,
+                    (!editingText.trim() || savingEdit) && styles.sendBtnDisabled,
+                  ]}
+                  onPress={handleSaveEdit}
+                  disabled={!editingText.trim() || savingEdit}
+                  activeOpacity={0.9}
+                >
+                  {savingEdit ? (
+                    <Text style={styles.sendText}>...</Text>
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={16} color={colors.white} />
+                      <Text style={styles.sendText}>Save</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             ) : (
-              <>
-                <Ionicons name="send" size={16} color={colors.white} />
-                <Text style={styles.sendText}>Send</Text>
-              </>
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  (!message.trim() || sending) && styles.sendBtnDisabled,
+                ]}
+                onPress={sendMessage}
+                disabled={!message.trim() || sending}
+                activeOpacity={0.9}
+              >
+                {sending ? (
+                  <Text style={styles.sendText}>...</Text>
+                ) : (
+                  <>
+                    <Ionicons name="send" size={16} color={colors.white} />
+                    <Text style={styles.sendText}>Send</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -277,6 +543,40 @@ export default function ProviderChatScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xxl,
+  },
+
+  centerText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+  },
+
+  centerTitle: {
+    marginTop: spacing.md,
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    textAlign: "center",
+  },
+
+  backToJobsBtn: {
+    marginTop: spacing.xl,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+
+  backToJobsText: {
+    color: colors.white,
+    fontWeight: "800",
+    fontSize: 14,
+  },
 
   /* subtle background */
   bgDecor: {
@@ -467,11 +767,42 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
+  editedTag: {
+    marginTop: 3,
+    fontSize: 10,
+    fontStyle: "italic",
+  },
+
+  editedTagOnProvider: {
+    color: "rgba(255,255,255,0.75)",
+  },
+
+  editedTagOnCustomer: {
+    color: colors.textMuted,
+  },
+
+  inputBarOuter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingTop: spacing.sm,
+  },
+
+  editingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    marginBottom: spacing.xs,
+  },
+
+  editingBannerText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+
   inputBar: {
-borderTopWidth: 1,
-borderTopColor: colors.border,
-backgroundColor: colors.surface,
-paddingTop: spacing.sm,
 flexDirection: "row",
 alignItems: "flex-end",
 gap: 10,
@@ -503,6 +834,25 @@ fontSize: 16,
 paddingVertical: 5,
 paddingHorizontal: 4
 },
+
+  editActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+
+  cancelEditBtn: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm + 2,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+
+  cancelEditText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
 
   sendBtn: {
 backgroundColor: colors.primary,
