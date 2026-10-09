@@ -250,6 +250,13 @@ const screens = {
               "Saved Locations",
           }}
         />),
+  "favourite-providers": (<Stack.Screen
+          name="favourite-providers"
+          options={{
+            title:
+              "Favourite Providers",
+          }}
+        />),
   "provider/services-pricing": (<Stack.Screen
           name="provider/services-pricing"
           options={{
@@ -329,7 +336,7 @@ export default function RootLayout() {
     return <View style={{ flex: 1, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center" }}><ActivityIndicator size="large" /></View>;
   }
   const publicRoutes = ["index","role-selection","customer-login","customer-signup","provider/login","provider/create-account"] as const;
-  const customerRoutes = ["customer-home","services","providers","provider-profile","select-date-time","job-details","service-location","booking-summary","booking-confirmation","my-bookings","booking-details","customer-chat","rate-review","customer-profile","customer-edit-profile","saved-locations","edit-booking"] as const;
+  const customerRoutes = ["customer-home","services","providers","provider-profile","select-date-time","job-details","service-location","booking-summary","booking-confirmation","my-bookings","booking-details","customer-chat","rate-review","customer-profile","customer-edit-profile","saved-locations","favourite-providers","edit-booking"] as const;
   const providerRoutes = ["provider/dashboard","provider/requests","provider/request-details","provider/jobs","provider/schedule","provider/earnings","provider/profile","provider/job-details","provider/chat","provider/availability","provider/settings","provider/verification","provider/edit-profile","provider/services-pricing","provider/create-manual-job","provider/my-reviews","provider/service-form"] as const;
   const orderedPublic = [...publicRoutes].sort((a, b) => Number(b === loginRoute) - Number(a === loginRoute));
   const providerLanding = providerSignup ? "provider/verification" : "provider/dashboard";

@@ -4,12 +4,19 @@ import { useEffect, useState } from "react";
 
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   query,
+  serverTimestamp,
+  setDoc,
+  deleteDoc,
   where,
 } from "firebase/firestore";
 
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -20,7 +27,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import PrimaryButton from "../components/PrimaryButton";
-import { db } from "../services/firebase";
+import { auth, db } from "../services/firebase";
 import { colors, radius, spacing, typography } from "../theme";
 
 type Review = {
@@ -67,6 +74,130 @@ export default function ProviderProfileScreen() {
   const [reviewCount, setReviewCount] = useState(initialReviews);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsError, setReviewsError] = useState("");
+
+  /*
+    Favourite Providers (Ranmith). isFavourite reflects whether
+    users/{customerUid}/favourites/{providerId} currently exists.
+    checkingFavourite covers the initial read; togglingFavourite
+    guards the add/remove action itself against double-taps.
+  */
+  const [isFavourite, setIsFavourite] = useState(false);
+  const [checkingFavourite, setCheckingFavourite] = useState(true);
+  const [togglingFavourite, setTogglingFavourite] = useState(false);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user || !providerId) {
+      setCheckingFavourite(false);
+      return;
+    }
+
+    let active = true;
+
+    getDoc(doc(db, "users", user.uid, "favourites", providerId))
+      .then((snapshot) => {
+        if (active) {
+          setIsFavourite(snapshot.exists());
+        }
+      })
+      .catch((error) => {
+        console.log("Check favourite error:", error);
+      })
+      .finally(() => {
+        if (active) {
+          setCheckingFavourite(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [providerId]);
+
+  const handleToggleFavourite = async () => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert("Login Required", "Please log in to save favourite providers.");
+      router.replace("/customer-login");
+      return;
+    }
+
+    if (!providerId || togglingFavourite) {
+      return;
+    }
+
+    const favouriteRef = doc(db, "users", user.uid, "favourites", providerId);
+
+    if (isFavourite) {
+      Alert.alert(
+        "Remove Favourite",
+        "Remove this provider from your favourites?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                setTogglingFavourite(true);
+                await deleteDoc(favouriteRef);
+                setIsFavourite(false);
+              } catch (error: any) {
+                console.log("Remove favourite error:", error);
+                Alert.alert("Error", error.message || "Unable to remove favourite.");
+              } finally {
+                setTogglingFavourite(false);
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    try {
+      setTogglingFavourite(true);
+
+      /*
+        Validate the provider actually exists and is still a real
+        provider account before saving anything.
+      */
+      const providerSnapshot = await getDoc(doc(db, "users", providerId));
+
+      if (!providerSnapshot.exists() || providerSnapshot.data()?.role !== "provider") {
+        Alert.alert("Unable to Save", "This provider could not be found.");
+        return;
+      }
+
+      /*
+        Guard against duplicates / re-creating an existing favourite:
+        if the document already exists (e.g. a stale local isFavourite
+        state), do nothing rather than overwriting createdAt or note.
+      */
+      const existingSnapshot = await getDoc(favouriteRef);
+
+      if (existingSnapshot.exists()) {
+        setIsFavourite(true);
+        return;
+      }
+
+      await setDoc(favouriteRef, {
+        providerId,
+        note: "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setIsFavourite(true);
+    } catch (error: any) {
+      console.log("Add favourite error:", error);
+      Alert.alert("Error", error.message || "Unable to save this provider.");
+    } finally {
+      setTogglingFavourite(false);
+    }
+  };
 
   useEffect(() => {
     if (!providerId) {
@@ -144,7 +275,23 @@ export default function ProviderProfileScreen() {
             Provider Profile
           </Text>
 
-          <View style={{ width: 40 }} />
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={handleToggleFavourite}
+            activeOpacity={0.85}
+            hitSlop={10}
+            disabled={checkingFavourite || togglingFavourite}
+          >
+            {checkingFavourite || togglingFavourite ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons
+                name={isFavourite ? "heart" : "heart-outline"}
+                size={20}
+                color={isFavourite ? colors.error : colors.textPrimary}
+              />
+            )}
+          </TouchableOpacity>
         </View>
 
         <ScrollView

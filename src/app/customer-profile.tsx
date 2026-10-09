@@ -243,7 +243,7 @@ export default function CustomerProfileScreen() {
 
           <TouchableOpacity
             style={styles.item}
-            onPress={() => alert("Favourite Providers can be added later.")}
+            onPress={() => router.push("/favourite-providers")}
           >
             <Ionicons name="heart-outline" size={20} color={colors.textSecondary} style={styles.itemIcon} />
             <Text style={styles.itemText}>Favourite Providers</Text>
