@@ -29,6 +29,7 @@ export default function ProviderEditProfileScreen() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [category, setCategory] = useState("");
+  const [price, setPrice] = useState("");
   const [district, setDistrict] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,7 @@ export default function ProviderEditProfileScreen() {
         setName(data.name || "");
         setPhone(data.phone || "");
         setCategory(data.category || "");
+        setPrice(String(data.primaryPrice ?? data.price ?? 2500));
         setDistrict(data.district || "");
       } catch (error: any) {
         console.log("Error loading provider profile:", error);
@@ -73,6 +75,11 @@ export default function ProviderEditProfileScreen() {
     if (!phone.trim()) return alert("Please enter your phone number.");
     if (!category.trim()) return alert("Please enter your service category.");
     if (!district.trim()) return alert("Please enter your service area.");
+    const priceText = price.trim();
+    const primaryPrice = Number(priceText);
+    if (!/^\d+(\.\d{1,2})?$/.test(priceText) || !Number.isFinite(primaryPrice) || primaryPrice <= 0) {
+      return alert("Please enter a primary starting price greater than 0, with up to two decimal places.");
+    }
 
     try {
       setSaving(true);
@@ -87,6 +94,8 @@ export default function ProviderEditProfileScreen() {
         name: name.trim(),
         phone: phone.trim(),
         category: category.trim(),
+        primaryPrice,
+        price: primaryPrice,
         district: district.trim(),
         updatedAt: serverTimestamp(),
       });
@@ -159,6 +168,14 @@ export default function ProviderEditProfileScreen() {
             />
 
             <AppTextInput
+              label="Primary category starting price (Rs.)"
+              placeholder="Example: 2500"
+              keyboardType="decimal-pad"
+              value={price}
+              onChangeText={setPrice}
+            />
+
+            <AppTextInput
               label="Service coverage / district"
               placeholder="Example: Colombo District (Zones 01–15)"
               value={district}
@@ -177,7 +194,7 @@ export default function ProviderEditProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.noteTitle}>Visible to customers</Text>
                 <Text style={styles.noteText}>
-                  Your name, category and coverage area appear in search results
+                  Your name, category, starting price and coverage area appear in search results
                   and booking pages. Keep them accurate for better matches.
                 </Text>
               </View>

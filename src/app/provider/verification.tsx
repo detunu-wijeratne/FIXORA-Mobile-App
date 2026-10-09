@@ -1,3 +1,5 @@
+import { File as ExpoFile } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 import ProviderBackdrop from "../../components/ProviderBackdrop";
 import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/verification.tsx
@@ -51,36 +53,138 @@ function notify(title: string, message: string) {
   Alert.alert(title, message);
 }
 
-async function cloudinaryUpload(asset: PickedAsset) {
-  const name = asset.name || "upload";
-  const mimeType = asset.mimeType || "application/octet-stream";
+async function cloudinaryUpload(
+  asset: PickedAsset
+) {
+  const name =
+    asset.name || "upload";
+
+  const mimeType =
+    asset.mimeType ||
+    "application/octet-stream";
 
   const isPdf =
-    mimeType === "application/pdf" || name.toLowerCase().endsWith(".pdf");
+    mimeType === "application/pdf" ||
+    name
+      .toLowerCase()
+      .endsWith(".pdf");
 
-  const resource = isPdf ? "raw" : "image";
-  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resource}/upload`;
+  const resource =
+    isPdf ? "raw" : "image";
 
-  const form = new FormData();
+  const endpoint =
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resource}/upload`;
 
+  const form =
+    new FormData();
+
+  /*
+    WEB
+  */
   if (Platform.OS === "web") {
-    if (asset.file instanceof File) {
-      form.append("file", asset.file);
+    if (
+      asset.file instanceof File
+    ) {
+      form.append(
+        "file",
+        asset.file
+      );
     } else {
-      const blob = await (await fetch(asset.uri)).blob();
-      form.append("file", blob, name);
+      const blob =
+        await (
+          await fetch(
+            asset.uri
+          )
+        ).blob();
+
+      form.append(
+        "file",
+        blob,
+        name
+      );
     }
-  } else {
-    form.append("file", { uri: asset.uri, name, type: mimeType } as any);
+
+    form.append(
+      "upload_preset",
+      CLOUDINARY_UPLOAD_PRESET
+    );
+
+    const res =
+      await fetch(
+        endpoint,
+        {
+          method: "POST",
+          body: form,
+        }
+      );
+
+    const data: any =
+      await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data?.error?.message ||
+          "Upload failed."
+      );
+    }
+
+    if (!data?.secure_url) {
+      throw new Error(
+        "Upload succeeded but no URL returned."
+      );
+    }
+
+    return data.secure_url as string;
   }
 
-  form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  /*
+    ANDROID / IOS
+  */
 
-  const res = await fetch(endpoint, { method: "POST", body: form });
-  const data: any = await res.json();
+  const file =
+    new ExpoFile(
+      asset.uri
+    );
 
-  if (!res.ok) throw new Error(data?.error?.message || "Upload failed.");
-  if (!data?.secure_url) throw new Error("Upload succeeded but no URL returned.");
+  form.append(
+    "file",
+    file as any
+  );
+
+  form.append(
+    "upload_preset",
+    CLOUDINARY_UPLOAD_PRESET
+  );
+
+  const res =
+    await expoFetch(
+      endpoint,
+      {
+        method: "POST",
+        body: form,
+      }
+    );
+
+  const data: any =
+    await res.json();
+
+  console.log(
+    "Cloudinary verification upload:",
+    data
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      data?.error?.message ||
+        "Upload failed."
+    );
+  }
+
+  if (!data?.secure_url) {
+    throw new Error(
+      "Upload succeeded but no URL returned."
+    );
+  }
 
   return data.secure_url as string;
 }
@@ -113,7 +217,7 @@ export default function ProviderVerificationScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const requiredDone = !!frontNIC.url && !!backNIC.url && !!certificate.url;
+  const requiredDone = !!frontNIC.url && !!backNIC.url;
 
   const progress = useMemo(() => {
     const done =

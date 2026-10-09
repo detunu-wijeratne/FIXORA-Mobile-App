@@ -50,6 +50,8 @@ export default function ProviderProfileScreen() {
 
   const service =
     typeof params.service === "string" ? params.service : "Home Service";
+  const bookingService =
+    typeof params.bookingService === "string" ? params.bookingService : service;
 
   const district =
     typeof params.district === "string" ? params.district : "Location not set";
@@ -476,7 +478,7 @@ export default function ProviderProfileScreen() {
                 params: {
                   providerId,
                   name,
-                  service,
+                  service: bookingService,
                   price,
                 },
               })

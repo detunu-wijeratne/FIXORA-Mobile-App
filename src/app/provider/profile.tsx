@@ -1,8 +1,10 @@
 import ProviderBackdrop from "../../components/ProviderBackdrop";
 // src/app/provider/profile.tsx
 import { Ionicons } from "@expo/vector-icons";
+import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
+import { fetch } from "expo/fetch";
 import { signOut } from "firebase/auth";
 import {
   collection,
@@ -181,40 +183,54 @@ export default function ProviderProfileScreen() {
     };
   }, [provider?.verificationStatus]);
 
-  const uploadProfilePhotoToCloudinary = async (uri: string) => {
-    const formData = new FormData();
+  const uploadProfilePhotoToCloudinary = async (
+    uri: string
+) => {
+  const file = new File(uri);
 
-    // RN/Expo file object
-    formData.append(
-      "file",
-      {
-        uri,
-        name: "profile.jpg",
-        type: "image/jpeg",
-      } as any,
-    );
+  const formData = new FormData();
 
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append(
+    "file",
+    file as any
+  );
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
-      { method: "POST", body: formData },
-    );
+  formData.append(
+    "upload_preset",
+    CLOUDINARY_UPLOAD_PRESET
+  );
 
-    const data: any = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error?.message || "Profile photo upload failed.",
-      );
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    {
+      method: "POST",
+      body: formData,
     }
+  );
 
-    if (!data?.secure_url) {
-      throw new Error("Cloudinary did not return an image URL.");
-    }
+  const data: any =
+    await response.json();
 
-    return data.secure_url as string;
-  };
+  console.log(
+    "Provider profile Cloudinary response:",
+    data
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      data?.error?.message ||
+        "Profile photo upload failed."
+    );
+  }
+
+  if (!data?.secure_url) {
+    throw new Error(
+      "Cloudinary did not return an image URL."
+    );
+  }
+
+  return data.secure_url as string;
+};
 
   const chooseProfilePhoto = async () => {
     try {

@@ -769,6 +769,18 @@ export default function ProviderJobsScreen() {
 
                     <View style={styles.jobActions}>
                       {job.source === "manual" && (
+                        <TouchableOpacity accessibilityRole="button"
+                          accessibilityLabel={`Edit manual job for ${job.customerName || "Customer"}`}
+                          style={styles.ctaRow}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            router.push({ pathname: "/provider/create-manual-job", params: { jobId: job.id } });
+                          }}>
+                          <Ionicons name="create-outline" size={16} color={colors.primary} />
+                          <Text style={styles.ctaText}>Edit</Text>
+                        </TouchableOpacity>
+                      )}
+                      {job.source === "manual" && (
                         <TouchableOpacity
                           accessibilityRole="button"
                           accessibilityLabel={`Delete manual job for ${job.customerName || "Customer"}`}

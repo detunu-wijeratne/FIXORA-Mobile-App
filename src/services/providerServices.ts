@@ -28,6 +28,7 @@ export const SERVICE_CATEGORIES = [
   "Painting",
   "Carpentry",
   "Appliance Repair",
+  "Gardening",
   "Other",
 ];
 
@@ -56,12 +57,14 @@ const requireUid = () => {
 };
 
 /**
- * Keeps users/{uid}.price equal to the cheapest service so the existing
- * customer-side provider cards ("From Rs. X") keep working.
+ * Keeps legacy profiles' card price in sync with their cheapest service.
+ * An explicitly saved primary price takes precedence over additional services.
  * Failure here must never break the CRUD action itself.
  */
 const syncStartingPrice = async (uid: string) => {
   try {
+    const profile = await getDoc(doc(db, "users", uid));
+    if (profile.exists() && typeof profile.data().primaryPrice === "number") return;
     const snap = await getDocs(
       query(servicesRef, where("providerId", "==", uid)),
     );

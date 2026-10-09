@@ -21,6 +21,7 @@ import AppTextInput from "../../components/AppTextInput";
 import PrimaryButton from "../../components/ProviderPrimaryButton";
 import SecondaryButton from "../../components/ProviderSecondaryButton";
 import { auth, db } from "../../services/firebase";
+import { SERVICE_CATEGORIES } from "../../services/providerServices";
 import { colors, radius, spacing, typography } from "../../theme/provider";
 
 function passwordStrength(pw: string) {
@@ -42,7 +43,6 @@ export default function ProviderCreateAccountScreen() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
 
-  // Keep these as text inputs for now (works everywhere)
   const [category, setCategory] = useState("");
   const [district, setDistrict] = useState("");
 
@@ -66,8 +66,17 @@ export default function ProviderCreateAccountScreen() {
       return;
     }
 
-    if (!category.trim()) {
-      Alert.alert("Missing details", "Please enter your primary trade category.");
+    const phoneDigits = phone.trim().replace(/[\s-]/g, "");
+    if (!/^0?7\d{8}$/.test(phoneDigits)) {
+      Alert.alert(
+        "Invalid phone number",
+        "Enter 9 digits after +94 (e.g. 771234567), or 10 digits starting with 07 (e.g. 0771234567).",
+      );
+      return;
+    }
+
+    if (!SERVICE_CATEGORIES.includes(category)) {
+      Alert.alert("Missing details", "Please select your primary trade category.");
       return;
     }
 
@@ -175,10 +184,15 @@ export default function ProviderCreateAccountScreen() {
                   onChangeText={setPhone}
                   keyboardType="phone-pad"
                   placeholder="77 123 4567"
+                  onBlur={() => setPhone((value) => value.trim())}
                   style={styles.phoneInputInner}
                 />
               </View>
             </View>
+
+            <Text style={styles.categoryHint}>
+              9 digits after +94, or 10 digits starting with 07.
+            </Text>
 
             <AppTextInput
               label="Email address *"
@@ -189,12 +203,28 @@ export default function ProviderCreateAccountScreen() {
               placeholder="you@example.com"
             />
 
-            <AppTextInput
-              label="Primary trade category *"
-              value={category}
-              onChangeText={setCategory}
-              placeholder="Example: Plumbing, Electrical, AC Repair"
-            />
+            <Text style={styles.inlineLabel}>Primary trade category *</Text>
+            <Text style={styles.categoryHint}>
+              Choose your main trade. You can add more services after signing up.
+            </Text>
+            <View style={styles.categoryOptions}>
+              {SERVICE_CATEGORIES.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: category === item, disabled: loading }}
+                  disabled={loading}
+                  style={[styles.categoryOption, category === item && styles.categoryOptionSelected]}
+                  onPress={() => setCategory(item)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.categoryOptionText, category === item && styles.categoryOptionTextSelected]}>
+                    {item}
+                  </Text>
+                  {category === item && <Ionicons name="checkmark" size={16} color={colors.white} />}
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <AppTextInput
               label="Service coverage / district *"
@@ -419,6 +449,42 @@ const styles = StyleSheet.create({
     ...typography.label,
     marginTop: spacing.md + 2,
     marginBottom: spacing.sm,
+  },
+
+  categoryHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  categoryOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  categoryOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.background,
+  },
+  categoryOptionSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryOptionText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  categoryOptionTextSelected: {
+    color: colors.white,
   },
 
   phoneRow: {

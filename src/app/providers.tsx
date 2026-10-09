@@ -25,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
 import LoadingState from "../components/LoadingState";
 import { db } from "../services/firebase";
+import { matchesServiceCategory } from "../services/serviceCategories";
 import { colors, radius, spacing, typography } from "../theme";
 
 type Provider = {
@@ -54,13 +55,16 @@ type ReviewStats = {
 export default function ProvidersScreen() {
   const { service } = useLocalSearchParams();
 
-  const selectedService =
-    typeof service === "string" ? service : "Service Providers";
+  const selectedCategory = typeof service === "string" ? service : "";
+  const selectedService = selectedCategory || "Service Providers";
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [reviewStats, setReviewStats] = useState<Record<string, ReviewStats>>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [serviceCategories, setServiceCategories] = useState<Record<string, string[]>>({});
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState("");
 
   useEffect(() => {
     /*
@@ -93,6 +97,26 @@ export default function ProvidersScreen() {
         alert(error.message || "Unable to load providers.");
         setLoading(false);
       }
+    );
+
+    const unsubscribeServices = onSnapshot(
+      collection(db, "provider_services"),
+      (snapshot) => {
+        const categories: Record<string, string[]> = {};
+        snapshot.docs.forEach((serviceDoc) => {
+          const data = serviceDoc.data();
+          if (typeof data.providerId !== "string" || typeof data.category !== "string") return;
+          (categories[data.providerId] ??= []).push(data.category);
+        });
+        setServiceCategories(categories);
+        setServicesError("");
+        setServicesLoading(false);
+      },
+      (error) => {
+        console.log("Error loading provider services:", error);
+        setServicesError("Unable to load additional provider services. Please try again later.");
+        setServicesLoading(false);
+      },
     );
 
     /*
@@ -139,6 +163,7 @@ export default function ProvidersScreen() {
 
     return () => {
       unsubscribeProviders();
+      unsubscribeServices();
       unsubscribeReviews();
     };
   }, []);
@@ -147,6 +172,9 @@ export default function ProvidersScreen() {
     FILTER PROVIDERS
   */
   const filteredProviders = providers
+    .filter((provider) => matchesServiceCategory(
+      selectedCategory, provider.category, serviceCategories[provider.id],
+    ))
     .filter((provider) => {
       const searchText = search.trim().toLowerCase();
 
@@ -157,6 +185,7 @@ export default function ProvidersScreen() {
       return (
         provider.name?.toLowerCase().includes(searchText) ||
         provider.category?.toLowerCase().includes(searchText) ||
+        serviceCategories[provider.id]?.some((category) => category.toLowerCase().includes(searchText)) ||
         provider.district?.toLowerCase().includes(searchText)
       );
     })
@@ -223,10 +252,11 @@ export default function ProvidersScreen() {
             </TouchableOpacity>
           </View>
 
-          {loading ? (
+          {loading || servicesLoading ? (
             <LoadingState label="Loading providers..." />
           ) : (
             <>
+              {!!servicesError && <Text style={styles.subtitle}>{servicesError}</Text>}
               <View style={styles.resultsHeader}>
                 <Text style={styles.resultsText}>
                   <Text style={styles.resultsCount}>{filteredProviders.length}</Text>{" "}
@@ -243,7 +273,9 @@ export default function ProvidersScreen() {
                 <EmptyState
                   icon="people-outline"
                   title="No providers found"
-                  description="Try another search term or clear the search box."
+                  description={search.trim()
+                    ? "Try another search term or clear the search box."
+                    : `No providers currently offer ${selectedService}. Try another category.`}
                 />
               ) : (
                 <View style={styles.providerList}>
@@ -265,6 +297,7 @@ export default function ProvidersScreen() {
                           providerId: provider.id,
                           name: provider.name || "Service Provider",
                           service: provider.category || selectedService,
+                          bookingService: selectedCategory || provider.category || "Home Service",
                           category: provider.category || "",
                           district: provider.district || "",
                           email: provider.email || "",
