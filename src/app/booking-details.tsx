@@ -1,3 +1,4 @@
+import NotificationMessage from "../components/NotificationMessage";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -239,6 +240,7 @@ export default function BookingDetailsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        <NotificationMessage role="customer" />
         <View style={styles.headerRow}>
           <Text style={styles.title}>Booking Details</Text>
           <StatusBadge status={status} />

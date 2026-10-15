@@ -69,6 +69,7 @@ export default function ProviderChatScreen() {
 
   const insets = useSafeAreaInsets();
 
+  const targetMessageId = typeof params.messageId === "string" ? params.messageId : "";
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/provider/jobs"));
@@ -124,7 +125,7 @@ export default function ProviderChatScreen() {
             setMessages(loadedMessages);
 
             setTimeout(() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
+              if (!targetMessageId) flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
           },
           (error) => {
@@ -399,9 +400,15 @@ export default function ProviderChatScreen() {
             { paddingBottom: 16 },
             messages.length === 0 && styles.listEmptyGrow,
           ]}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => {
+            const index = messages.findIndex((item) => item.id === targetMessageId);
+            if (index >= 0) flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+            else flatListRef.current?.scrollToEnd({ animated: true });
+          }}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            flatListRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }), 200);
+          }}
           renderItem={({ item }) => {
             const isProvider = item.sender === "provider";
             const isOwn = item.senderId === auth.currentUser?.uid;

@@ -1,3 +1,4 @@
+import NotificationMessage from "../../components/NotificationMessage";
 import ProviderPageHeader from "../../components/ProviderPageHeader";
 // src/app/provider/job-details.tsx
 
@@ -328,6 +329,7 @@ export default function ProviderJobDetailsScreen() {
           },
         ]}
       >
+        <NotificationMessage role="provider" />
         {/* SUMMARY */}
 
         <View>

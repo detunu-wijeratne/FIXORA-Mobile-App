@@ -1,3 +1,4 @@
+import MessageNotifications from "../components/MessageNotifications";
 import { Ionicons } from "@expo/vector-icons";
 
 import { router } from "expo-router";
@@ -337,10 +338,7 @@ export default function CustomerHomeScreen() {
             </View>
 
             <View style={styles.heroActions}>
-              <TouchableOpacity style={styles.notificationButton}>
-                <Ionicons name="notifications-outline" size={20} color={colors.white} />
-                <View style={styles.notificationDot} />
-              </TouchableOpacity>
+              <MessageNotifications role="customer" />
 
               <TouchableOpacity
                 style={styles.profileCircle}

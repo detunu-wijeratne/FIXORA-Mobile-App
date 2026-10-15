@@ -69,6 +69,7 @@ export default function CustomerChatScreen() {
   const [editingText, setEditingText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const targetMessageId = typeof params.messageId === "string" ? params.messageId : "";
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export default function CustomerChatScreen() {
             setMessages(loadedMessages);
 
             setTimeout(() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
+              if (!targetMessageId) flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
           },
           (error) => {
@@ -339,7 +340,7 @@ export default function CustomerChatScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -374,9 +375,15 @@ export default function CustomerChatScreen() {
             styles.messageList,
             messages.length === 0 && styles.emptyMessageList,
           ]}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => {
+            const index = messages.findIndex((item) => item.id === targetMessageId);
+            if (index >= 0) flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+            else flatListRef.current?.scrollToEnd({ animated: true });
+          }}
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            flatListRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+            setTimeout(() => flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }), 200);
+          }}
           renderItem={({ item }) => {
             const isCustomer = item.sender === "customer";
             const isOwn = item.senderId === auth.currentUser?.uid;

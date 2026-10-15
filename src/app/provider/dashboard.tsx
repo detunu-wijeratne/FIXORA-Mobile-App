@@ -1,3 +1,4 @@
+import MessageNotifications from "../../components/MessageNotifications";
 import NewRequestAlert from "../../components/NewRequestAlert";
 import ProviderIllustration from "../../components/ProviderIllustration";
 import ProviderBackdrop from "../../components/ProviderBackdrop";
@@ -241,14 +242,7 @@ export default function ProviderDashboardScreen() {
               </View>
             </View>
 
-            {/* Notification -> Settings (as you requested) */}
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              activeOpacity={0.85}
-              onPress={() => router.push("/provider/settings")}
-            >
-              <Ionicons name="notifications-outline" size={20} color={colors.white} />
-            </TouchableOpacity>
+            <MessageNotifications role="provider" />
 
             {/* Profile/avatar -> /provider/profile */}
             <TouchableOpacity
