@@ -62,7 +62,7 @@ export default function BookingDetailsScreen() {
   const [cancelling, setCancelling] = useState(false);
 
   // ========================================
-  // CRUD - READ: CUSTOMER BOOKING
+  // CRUD - READ: CUSTOMER BOOKING  
   // Loads one specific booking live, using its bookingId, so this
   // screen updates automatically if the provider changes its status.
   // ========================================
@@ -110,7 +110,7 @@ export default function BookingDetailsScreen() {
   }, [bookingId]);
 
   // ========================================
-  // CRUD - DELETE: CUSTOMER BOOKING
+  // CRUD - DELETE: CUSTOMER BOOKING pending 
   // handleCancelBooking() permanently removes an eligible ("pending")
   // booking from Firestore after the customer confirms.
   // ========================================

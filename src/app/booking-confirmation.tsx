@@ -10,7 +10,7 @@ import SecondaryButton from "../components/SecondaryButton";
 import { colors, radius, spacing, typography } from "../theme";
 
 // ========================================
-// BOOKING CONFIRMATION
+// BOOKING CONFIRMATION message
 // Pure display screen shown after a booking is created - it does not
 // read or write Firestore itself; it only shows the params it was
 // handed by booking-summary.tsx.
