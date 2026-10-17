@@ -142,6 +142,12 @@ export default function BookingSummaryScreen() {
   const platformFee = 250;
   const totalAmount = numericPrice + platformFee;
 
+  // ========================================
+  // CRUD - CREATE: CUSTOMER BOOKING
+  // handleConfirm() runs when the customer taps "Confirm Booking".
+  // This is the single place where a booking is actually written to
+  // Firestore.
+  // ========================================
   const handleConfirm = async () => {
     const user = auth.currentUser;
 
@@ -152,6 +158,10 @@ export default function BookingSummaryScreen() {
     }
 
     try {
+      // VALIDATION / duplicate prevention:
+      // loading is set to true immediately, and the "Confirm Booking"
+      // button below is disabled while loading is true, so the booking
+      // cannot be created twice from a double tap.
       setLoading(true);
 
       /*
@@ -176,6 +186,13 @@ export default function BookingSummaryScreen() {
         in Firestore and can be used from
         another device.
       */
+      // ----------------------------------------
+      // CRUD - CREATE: CUSTOMER BOOKING
+      // addDoc() creates a brand-new document in the "bookings"
+      // collection. Stores: customer info, provider info, service,
+      // date/time/description/address, price breakdown, optional photo
+      // URL, and status.
+      // ----------------------------------------
       const bookingRef = await addDoc(collection(db, "bookings"), {
         customerId: user.uid,
         customerName,
@@ -201,6 +218,10 @@ export default function BookingSummaryScreen() {
         imageUrl: imageUrl || "",
         hasPhotoAttachment: Boolean(imageUrl),
 
+        // why status starts as "pending":
+        // The booking has only been requested by the customer; the
+        // provider has not accepted it yet, so it starts as "pending"
+        // until the provider confirms, declines, or it is cancelled/edited.
         status: "pending",
 
         createdAt: serverTimestamp(),
@@ -213,6 +234,9 @@ export default function BookingSummaryScreen() {
       /*
         Pass image URL to confirmation too.
       */
+      // NAVIGATION: after Firestore confirms the booking was
+      // created, this function defines where to go next
+      // (booking-confirmation.tsx) once the success animation finishes.
       const goToConfirmation = () => {
         router.replace({
           pathname: "/booking-confirmation",
@@ -238,6 +262,10 @@ export default function BookingSummaryScreen() {
       setShowSuccess(true);
       playSuccessAnimation(goToConfirmation);
     } catch (error: any) {
+      // error handling:
+      // If addDoc (or the earlier customer lookup) fails, the error is
+      // shown to the customer and loading is reset so they can try again.
+      // No booking document is created if this branch runs.
       console.log("Booking creation error:", error);
       alert(error.message || "Unable to create booking.");
       setLoading(false);
@@ -393,6 +421,9 @@ export default function BookingSummaryScreen() {
 
       {/* CONFIRM BUTTON */}
 
+      {/* VALIDATION: the button shows "Creating Booking..." and
+          is disabled while loading is true (see PrimaryButton), which
+          prevents the customer from tapping Confirm more than once. */}
       <View style={styles.bottomBar}>
         <PrimaryButton
           title={loading ? "Creating Booking..." : "Confirm Booking"}
@@ -401,6 +432,10 @@ export default function BookingSummaryScreen() {
         />
       </View>
 
+      {/* BOOKING CONFIRMATION: this overlay plays a short success
+          animation on-screen, then navigates to booking-confirmation.tsx
+          (see goToConfirmation above) once Firestore has already saved
+          the booking. */}
       {showSuccess && (
         <View style={styles.successOverlay}>
           <Animated.View

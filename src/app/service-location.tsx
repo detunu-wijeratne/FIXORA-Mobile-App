@@ -63,6 +63,12 @@ export default function ServiceLocationScreen() {
   const [address, setAddress] = useState("");
   const [loadingLocations, setLoadingLocations] = useState(true);
 
+  // ========================================
+  // SERVICE LOCATION
+  // Loads this customer's saved addresses live from Firestore
+  // (users/{uid}/locations), the same data saved-locations.tsx manages,
+  // so they can be picked here instead of retyped.
+  // ========================================
   useEffect(() => {
     const user = auth.currentUser;
 
@@ -101,12 +107,19 @@ export default function ServiceLocationScreen() {
     return () => unsubscribe();
   }, []);
 
+  // SERVICE LOCATION: tapping a saved address fills the address
+  // field with that location's address and marks it as selected.
   const selectSavedLocation = (location: SavedLocation) => {
     setSelectedLocation(location.id);
     setAddress(location.address || "");
   };
 
+  // SERVICE LOCATION / VALIDATION
+  // Requires a non-empty address before continuing; otherwise shows an
+  // alert. Passes the chosen address forward to booking-summary.tsx.
   const handleContinue = () => {
+    // VALIDATION: blocks continuing with an empty/whitespace-only
+    // address.
     if (!address.trim()) {
       alert("Please enter a service address.");
       return;
@@ -245,6 +258,8 @@ export default function ServiceLocationScreen() {
           placeholder="Enter the service address"
           placeholderTextColor={colors.textMuted}
           value={address}
+          // SERVICE LOCATION: typing a new address here manually
+          // sets selectedLocation to "custom", deselecting any saved card.
           onChangeText={(value) => {
             setSelectedLocation("custom");
             setAddress(value);

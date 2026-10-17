@@ -44,6 +44,11 @@ export default function JobDetailsScreen() {
 
   const time = typeof params.time === "string" ? params.time : "9:30 AM";
 
+  // JOB DESCRIPTION
+  // description is stored in local React state as the customer types;
+  // it is only sent anywhere once "Continue" is pressed.
+  // VALIDATION: there is no required-field check on description
+  // here - the customer can continue with an empty description.
   const [description, setDescription] = useState("");
   const [photoUri, setPhotoUri] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -54,6 +59,13 @@ export default function JobDetailsScreen() {
     Uses Expo's File + expo/fetch instead of
     React Native's old FormData file object.
   */
+  // ========================================
+  // PHOTO UPLOAD
+  // Uploads the selected photo to Cloudinary (an external image-hosting
+  // service) and returns the HTTPS URL Cloudinary gives back.
+  // This step does NOT touch Firestore - only the returned URL (a
+  // plain text string) is later saved into the booking document.
+  // ========================================
   const uploadPhotoToCloudinary = async () => {
     if (!photoUri) {
       return "";
@@ -69,6 +81,8 @@ export default function JobDetailsScreen() {
 
       console.log("Starting Cloudinary upload...");
 
+      // PHOTO UPLOAD: sends the photo file to Cloudinary's
+      // upload API; Cloudinary stores the actual image file.
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
         {
@@ -81,6 +95,9 @@ export default function JobDetailsScreen() {
 
       console.log("Cloudinary response:", data);
 
+      // PHOTO UPLOAD error handling: if Cloudinary responds
+      // with a failure, an error is thrown with Cloudinary's own
+      // message so the caller (handleContinue) can show it to the user.
       if (!response.ok) {
         throw new Error(
           data?.error?.message || "Cloudinary upload failed."
@@ -91,6 +108,9 @@ export default function JobDetailsScreen() {
         throw new Error("Cloudinary did not return an image URL.");
       }
 
+      // PHOTO UPLOAD: secure_url is the HTTPS link Cloudinary
+      // returns for the uploaded image - this URL (not the image
+      // itself) is what eventually gets saved in Firestore.
       return data.secure_url as string;
     } catch (error) {
       console.log("Cloudinary upload error:", error);
@@ -101,6 +121,8 @@ export default function JobDetailsScreen() {
   /*
     TAKE PHOTO
   */
+  // PHOTO UPLOAD: uses Expo's ImagePicker.launchCameraAsync to
+  // let the customer take a new photo with the device camera.
   const takePhoto = async () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -137,6 +159,8 @@ export default function JobDetailsScreen() {
   /*
     CHOOSE PHOTO
   */
+  // PHOTO UPLOAD: uses Expo's ImagePicker.launchImageLibraryAsync
+  // to let the customer pick an existing photo from their device gallery.
   const choosePhoto = async () => {
     try {
       const permission =
@@ -187,12 +211,20 @@ export default function JobDetailsScreen() {
     Then pass the returned HTTPS URL
     to Service Location.
   */
+  // ========================================
+  // PHOTO UPLOAD / NAVIGATION
+  // If a photo was picked, uploads it to Cloudinary first and waits
+  // for the returned URL, then passes description + that image URL
+  // forward to service-location.tsx as navigation params.
+  // ========================================
   const handleContinue = async () => {
     try {
       setUploading(true);
 
       let imageUrl = "";
 
+      // PHOTO UPLOAD: only runs the Cloudinary upload if the
+      // customer actually attached a photo (photoUri is not empty).
       if (photoUri) {
         imageUrl = await uploadPhotoToCloudinary();
 
@@ -213,6 +245,9 @@ export default function JobDetailsScreen() {
         },
       });
     } catch (error: any) {
+      // error handling: if the Cloudinary upload fails, the
+      // customer sees an alert and stays on this screen instead of
+      // moving forward with a broken/missing photo URL.
       console.log("Continue / upload error:", error);
 
       Alert.alert(

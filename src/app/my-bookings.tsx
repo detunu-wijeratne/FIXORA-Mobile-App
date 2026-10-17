@@ -44,6 +44,12 @@ export default function MyBookingsScreen() {
   const [selectedTab, setSelectedTab] =
     useState<"all" | "active" | "completed">("all");
 
+  // ========================================
+  // CRUD - READ: CUSTOMER BOOKING
+  // Loads all of the logged-in customer's bookings from Firestore in
+  // real time using onSnapshot, so this list updates automatically
+  // whenever a booking's status changes.
+  // ========================================
   useEffect(() => {
     const user = auth.currentUser;
 
@@ -52,11 +58,16 @@ export default function MyBookingsScreen() {
       return;
     }
 
+    // CRUD - READ: filters bookings down to only this customer's own
+    // bookings by matching the "customerId" field to the logged-in user.
     const bookingsQuery = query(
       collection(db, "bookings"),
       where("customerId", "==", user.uid)
     );
 
+    // CRUD - READ: onSnapshot subscribes to live updates for the query
+    // above; the callback re-runs automatically every time matching
+    // bookings change in Firestore.
     const unsubscribe = onSnapshot(
       bookingsQuery,
       (snapshot) => {

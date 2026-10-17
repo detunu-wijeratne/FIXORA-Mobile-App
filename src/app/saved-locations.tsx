@@ -55,6 +55,10 @@ export default function SavedLocationsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // ========================================
+  // CRUD - READ: SAVED LOCATIONS
+  // Loads this customer's saved addresses in real time using onSnapshot.
+  // ========================================
   useEffect(() => {
     const user = auth.currentUser;
 
@@ -70,6 +74,8 @@ export default function SavedLocationsScreen() {
       "locations"
     );
 
+    // CRUD - READ: onSnapshot keeps this list updated automatically
+    // whenever a location is added, edited, or deleted.
     const unsubscribe = onSnapshot(
       locationsRef,
       (snapshot) => {
@@ -106,6 +112,12 @@ export default function SavedLocationsScreen() {
     setEditingId(null);
   };
 
+  // ========================================
+  // CRUD - CREATE / CRUD - UPDATE: SAVED LOCATIONS
+  // handleSave() does both jobs: if editingId is empty it creates a new
+  // saved location; if editingId holds a location's id, it updates that
+  // same location instead of creating a new one.
+  // ========================================
   const handleSave = async () => {
     if (!label.trim()) {
       alert("Please enter a location name.");
@@ -128,6 +140,9 @@ export default function SavedLocationsScreen() {
       setSaving(true);
 
       if (editingId) {
+        // CRUD - UPDATE: editingId identifies which saved location to
+        // update - it was set earlier by handleEdit() when the customer
+        // tapped "Edit" on that specific location.
         await updateDoc(
           doc(
             db,
@@ -145,6 +160,9 @@ export default function SavedLocationsScreen() {
 
         alert("Location updated successfully.");
       } else {
+        // CRUD - CREATE: SAVED LOCATIONS
+        // addDoc() saves this new address as a new document under
+        // this customer's own users/{uid}/locations subcollection.
         await addDoc(
           collection(
             db,
@@ -179,12 +197,20 @@ export default function SavedLocationsScreen() {
     }
   };
 
+  // how editingId works: handleEdit() copies the tapped
+  // location's label/address into the form and stores its id in
+  // editingId, so the next Save call knows to update instead of create.
   const handleEdit = (location: SavedLocation) => {
     setEditingId(location.id);
     setLabel(location.label || "");
     setAddress(location.address || "");
   };
 
+  // ========================================
+  // CRUD - DELETE: SAVED LOCATIONS
+  // handleDelete() asks for confirmation, then permanently removes
+  // this saved location document from Firestore.
+  // ========================================
   const handleDelete = (location: SavedLocation) => {
     const user = auth.currentUser;
 
@@ -205,6 +231,8 @@ export default function SavedLocationsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              // CRUD - DELETE: deleteDoc() permanently removes this
+              // location document from users/{uid}/locations.
               await deleteDoc(
                 doc(
                   db,

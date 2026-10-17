@@ -29,6 +29,10 @@ export default function SelectDateTimeScreen() {
 
   const price = typeof params.price === "string" ? params.price : "2500";
 
+  // DATE TIME
+  // dates and timeSlots are a fixed, hardcoded list of options shown
+  // to every customer - there is no real-time check against a
+  // provider's actual availability.
   const dates = [
     { day: "Mon", date: "5" },
     { day: "Tue", date: "6" },
@@ -47,6 +51,12 @@ export default function SelectDateTimeScreen() {
     "4:00 PM",
   ];
 
+  // VIVA - DATE TIME
+  // selectedDate/selectedTime hold the customer's choice temporarily
+  // in local React state - nothing is saved to Firestore yet at this step.
+  // VIVA - VALIDATION: there is no extra validation here - selectedDate
+  // and selectedTime always start with a default value, so a date and
+  // time are always considered "selected" before continuing.
   const [selectedDate, setSelectedDate] = useState("5");
   const [selectedTime, setSelectedTime] = useState("9:30 AM");
 
@@ -140,6 +150,10 @@ export default function SelectDateTimeScreen() {
         </View>
       </ScrollView>
 
+      {/* NAVIGATION: the chosen date/time, plus everything
+          already known about the provider, is passed forward to
+          job-details.tsx as navigation params - nothing is saved to
+          Firestore yet. */}
       <View style={styles.bottomBar}>
         <PrimaryButton
           title="Continue"

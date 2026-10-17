@@ -92,6 +92,9 @@ export default function EditBookingScreen() {
           not-yet-accepted state) may be edited. This mirrors
           booking-details.tsx's canCancel check exactly.
         */
+        // why only "pending" bookings are editable: this mirrors
+        // booking-details.tsx's canCancel check, so editing is blocked
+        // the moment a provider has accepted the booking.
         if (data.status !== "pending") {
           setNotEditable(true);
           setLoading(false);
@@ -115,6 +118,11 @@ export default function EditBookingScreen() {
     return () => unsubscribe();
   }, [bookingId]);
 
+  // ========================================
+  // CRUD - UPDATE: CUSTOMER BOOKING
+  // handleSave() saves the customer's edited date/time/description/
+  // address back to this same booking document in Firestore.
+  // ========================================
   const handleSave = async () => {
     if (!address.trim()) {
       Alert.alert("Missing Address", "Please enter a service address.");
@@ -135,6 +143,9 @@ export default function EditBookingScreen() {
         Re-check the booking's live status right before saving.
         The provider may have accepted it while this screen was open.
       */
+      // CRUD - UPDATE: re-checks the booking's live status right
+      // before saving, in case the provider accepted it while this
+      // screen was open.
       const latestSnapshot = await getDoc(bookingRef);
 
       if (!latestSnapshot.exists()) {
@@ -154,6 +165,9 @@ export default function EditBookingScreen() {
         return;
       }
 
+      // CRUD - UPDATE: updateDoc() changes only these four fields
+      // (date, time, description, address) on the existing booking
+      // document - the provider, price and status are never touched here.
       await updateDoc(bookingRef, {
         date: selectedDate,
         time: selectedTime,

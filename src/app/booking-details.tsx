@@ -61,6 +61,11 @@ export default function BookingDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
 
+  // ========================================
+  // CRUD - READ: CUSTOMER BOOKING
+  // Loads one specific booking live, using its bookingId, so this
+  // screen updates automatically if the provider changes its status.
+  // ========================================
   useEffect(() => {
     const user = auth.currentUser;
 
@@ -74,6 +79,8 @@ export default function BookingDetailsScreen() {
       return;
     }
 
+    // CRUD - READ: onSnapshot on doc(db,"bookings",bookingId) retrieves
+    // this single booking's data using its booking ID.
     const unsubscribe = onSnapshot(
       doc(db, "bookings", bookingId),
       (snapshot) => {
@@ -102,9 +109,16 @@ export default function BookingDetailsScreen() {
     return () => unsubscribe();
   }, [bookingId]);
 
+  // ========================================
+  // CRUD - DELETE: CUSTOMER BOOKING
+  // handleCancelBooking() permanently removes an eligible ("pending")
+  // booking from Firestore after the customer confirms.
+  // ========================================
   const handleCancelBooking = () => {
     if (!bookingId || cancelling) return;
 
+    // VIVA - VALIDATION: shows a confirmation dialog before deleting,
+    // so a cancel can never happen from a single accidental tap.
     Alert.alert(
       "Cancel Booking",
       "This will permanently delete this booking request. This cannot be undone. Are you sure you want to continue?",
@@ -134,6 +148,9 @@ export default function BookingDetailsScreen() {
                 the provider may have accepted it (or it may already be
                 gone) while this screen was open.
               */
+              // CRUD - DELETE: re-checks the booking's current status
+              // right before deleting, in case the provider accepted it
+              // while this screen was open.
               const latestSnapshot = await getDoc(bookingRef);
 
               if (!latestSnapshot.exists()) {
@@ -149,6 +166,10 @@ export default function BookingDetailsScreen() {
                 return;
               }
 
+              // - why only "pending" bookings can be cancelled:
+              // once a provider has accepted/started/completed a job,
+              // deleting it would be unfair to the provider, so deletion
+              // is blocked past the pending stage.
               if (latestData.status !== "pending") {
                 Alert.alert(
                   "Cannot Cancel",
@@ -157,6 +178,9 @@ export default function BookingDetailsScreen() {
                 return;
               }
 
+              // CRUD - DELETE: CUSTOMER BOOKING
+              // deleteDoc() permanently removes this document from the
+              // "bookings" collection in Firestore.
               /*
                 Real deletion: a pending booking can never have a chat
                 (canChat requires confirmed/in_progress/completed) or a
@@ -221,6 +245,8 @@ export default function BookingDetailsScreen() {
 
   const canReview = status === "completed";
 
+  //  eligibility flags: canCancel/canEdit are both only true while
+  // status is "pending", controlling which buttons appear below.
   const canCancel = status === "pending";
   const canEdit = status === "pending";
 
