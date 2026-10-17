@@ -1,4 +1,3 @@
-import ProviderIllustration from "../../components/ProviderIllustration";
 // src/app/provider/jobs.tsx
 
 import { Ionicons } from "@expo/vector-icons";
@@ -140,8 +139,13 @@ export default function ProviderJobsScreen() {
   const [jobToDelete, setJobToDelete] = useState<Booking | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-
+ 
+  // DELETE - MANUAL JOB
+  // Deletes a manually created job from Firestore.
+  // Only the logged-in provider's own manual job
   const deleteManualJob = async () => {
+    // AUTH CHECK:
+    // Get the currently logged-in provider.
     const user = auth.currentUser;
     if (!user || !jobToDelete || deleting) return;
 
@@ -149,10 +153,16 @@ export default function ProviderJobsScreen() {
     setDeleteError("");
     try {
       const jobRef = doc(db, "bookings", jobToDelete.id);
+      // Reads and validates the document before deleting.
+      // This helps prevent deleting another provider's job
       await runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(jobRef);
         if (!snapshot.exists()) return;
         const job = snapshot.data();
+        // SECURITY / VALIDATION:
+        // Provider can only delete:
+        // 1. Their own job
+        // 2. A job created manually
         if (job.providerId !== user.uid || job.source !== "manual") {
           throw new Error("You can only delete your own manual jobs.");
         }
@@ -167,6 +177,9 @@ export default function ProviderJobsScreen() {
   };
 
   useEffect(() => {
+    // READ - PROVIDER JOBS
+    // Reads only jobs assigned to the
+    // currently logged-in provider.
     const user = auth.currentUser;
 
     if (!user) {
@@ -264,6 +277,8 @@ export default function ProviderJobsScreen() {
       unsubscribe();
   }, []);
 
+  // It groups already-loaded jobs into:
+  // All, Upcoming, Completed, Manual.
   const {
     upcomingCount,
     completedCount,
@@ -286,6 +301,8 @@ export default function ProviderJobsScreen() {
           "completed"
       );
 
+    // Manual jobs are identified using:
+    // source === "manual"
     const manual = jobs.filter((job) => job.source === "manual");
 
     const filtered =
@@ -411,6 +428,8 @@ export default function ProviderJobsScreen() {
             styles.manualJobButton
           }
           activeOpacity={0.85}
+          // CREATE - MANUAL JOB ENTRY POINT
+          // Navigates to create-manual-job.tsx
           onPress={() =>
             router.push(
               "/provider/create-manual-job"

@@ -151,6 +151,10 @@ export default function ProviderJobDetailsScreen() {
       .toUpperCase();
   }, [customer]);
 
+  // UPDATE - START JOB
+  // Changes Firestore status:
+  // confirmed -> in_progress
+  // Also stores startedAt and updatedAt timestamps.
   const handleStartJob = async () => {
     if (!bookingId) {
       Alert.alert(
@@ -162,7 +166,8 @@ export default function ProviderJobDetailsScreen() {
 
     try {
       setLoading(true);
-
+      // CRUD - UPDATE
+      // confirmed -> in_progress
       await updateDoc(
         doc(
           db,
@@ -201,6 +206,11 @@ export default function ProviderJobDetailsScreen() {
       setLoading(false);
     }
   };
+
+  // UPDATE - COMPLETE JOB
+  // Changes Firestore status:
+  // in_progress -> completed
+  // Saves completedAt and updatedAt timestamps.
 
   const handleCompleteJob =
     async () => {

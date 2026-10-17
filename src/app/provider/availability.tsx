@@ -110,6 +110,10 @@ export default function ProviderAvailabilityScreen() {
 
   const selectedDayData = availability[selectedDay];
 
+  // READ - LOAD AVAILABILITY
+  // Gets the logged-in provider's saved
+  // availability document from Firestore.
+
   const loadAvailability = async () => {
     const user = auth.currentUser;
 
@@ -140,6 +144,9 @@ export default function ProviderAvailabilityScreen() {
     }
   };
 
+  // CREATE / UPDATE AVAILABILITY
+  // setDoc() creates the document if it
+  // does not exist, or updates it if it does.
   const saveAvailability = async () => {
     const user = auth.currentUser;
 
@@ -171,7 +178,10 @@ export default function ProviderAvailabilityScreen() {
       setSaving(false);
     }
   };
-
+      
+  // DELETE - AVAILABILITY
+  // Permanently removes the provider's
+  // saved availability document.
   const deleteAvailability = () => {
     if (deleting || saving) return;
 

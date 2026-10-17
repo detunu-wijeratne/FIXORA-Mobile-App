@@ -63,6 +63,12 @@ export default function ProviderRequestsScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
 
   useEffect(() => {
+    // ===============================
+    // AUTH CHECK
+    // Gets the currently logged-in provider.
+    // If no provider is logged in, redirect to login.
+    // ===============================
+
     const user = auth.currentUser;
 
     if (!user) {
@@ -77,9 +83,19 @@ export default function ProviderRequestsScreen() {
       where("providerId", "==", user.uid),
     );
 
+    // ===============================
+    // REAL-TIME FIRESTORE LISTENER
+    // onSnapshot keeps the request list updated
+    // automatically whenever Firestore data changes.
+    // ===============================
     const unsubscribe = onSnapshot(
       bookingsQuery,
       (snapshot) => {
+        // ===============================
+        // READ + FILTER PENDING REQUESTS
+        // Converts Firestore documents into booking objects
+        // and only keeps requests with status = "pending".
+        // ===============================
         const loaded: Booking[] = snapshot.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) }))
           .filter((b) => b.status === "pending") as Booking[];

@@ -1,44 +1,47 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { fetch as expoFetch } from "expo/fetch";
+import { useEffect, useState } from "react";
 import ManualJobDateTimePicker, { localDateKey } from "../../components/ManualJobDateTimePicker";
 
 import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    runTransaction,
-    serverTimestamp,
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { auth, db } from "../../services/firebase";
 import {
-    colors,
-    radius,
-    spacing,
+  colors,
+  radius,
+  spacing,
 } from "../../theme/provider";
 
 export default function CreateManualJobScreen() {
   const params = useLocalSearchParams<{ jobId?: string }>();
+  // CREATE OR EDIT MODE
+  // If jobId exists -> Edit mode
+  // If no jobId -> Create mode
   const jobId = typeof params.jobId === "string" ? params.jobId : "";
   const isEditing = !!jobId;
   const [loadingJob, setLoadingJob] = useState(!!jobId);
@@ -79,6 +82,9 @@ export default function CreateManualJobScreen() {
   const [pickingPhoto, setPickingPhoto] = useState(false);
   const [uploadedPhoto, setUploadedPhoto] = useState<{ uri: string; url: string } | null>(null);
 
+  // READ - LOAD EXISTING MANUAL JOB
+  // Runs only in Edit mode.
+  // Reads the selected job from Firestore.
   useEffect(() => {
     if (!jobId) return;
     let active = true;
@@ -88,6 +94,8 @@ export default function CreateManualJobScreen() {
       try {
         const user = auth.currentUser;
         if (!user) { router.replace("/provider/login"); return; }
+        // CRUD - READ:
+        // Load one existing job using its Firestore document ID.
         const snapshot = await getDoc(doc(db, "bookings", jobId));
         if (!snapshot.exists()) throw new Error("This job no longer exists.");
         const job = snapshot.data();
@@ -141,7 +149,7 @@ export default function CreateManualJobScreen() {
       setPickingPhoto(false);
     }
   };
-
+  // CLOUDINARY IMAGE UPLOAD
   const uploadPhoto = async () => {
     if (!photo) return existingImageUrl;
     if (uploadedPhoto?.uri === photo.uri) return uploadedPhoto.url;
@@ -160,6 +168,9 @@ export default function CreateManualJobScreen() {
     return result.secure_url as string;
   };
 
+  // MAIN CREATE / UPDATE HANDLER
+  // Validates the form, uploads image,
+  // then either creates or updates the manual job.
   const handleCreateJob = async () => {
     if (loading || pickingPhoto || loadingJob || loadError) return;
     const user = auth.currentUser;
@@ -185,6 +196,9 @@ export default function CreateManualJobScreen() {
       return;
     }
 
+    // FORM VALIDATION
+    // Prevents incomplete or invalid data
+    // before writing to Firestore
     const phoneDigits = customerPhone.trim().replace(/[\s-]/g, "");
     if (customerPhone.trim() && !/^(?:0?7\d{8}|\+947\d{8})$/.test(phoneDigits)) {
       Alert.alert("Invalid phone number", "Enter 9 digits starting with 7, 10 digits starting with 07, or +94 followed by 9 digits.");
@@ -339,6 +353,11 @@ export default function CreateManualJobScreen() {
             updatedAt:
               serverTimestamp(),
           };
+      
+      // UPDATE - EXISTING MANUAL JOB
+      // Runs when jobId exists.
+      // Uses a Firestore transaction to validate
+      // ownership before updating the document.    
       if (isEditing) {
         await runTransaction(db, async (transaction) => {
           const ref = doc(db, "bookings", jobId);
@@ -346,6 +365,8 @@ export default function CreateManualJobScreen() {
           if (!snapshot.exists()) throw new Error("This job no longer exists.");
           const job = snapshot.data();
           if (job.providerId !== user.uid || job.source !== "manual") throw new Error("You can only edit your own manual jobs.");
+          // CRUD - UPDATE:
+          // Save edited manual job fields.
           transaction.update(ref, {
             customerName: jobData.customerName,
             customerPhone: jobData.customerPhone,
@@ -365,6 +386,10 @@ export default function CreateManualJobScreen() {
         router.replace("/provider/jobs");
         return;
       }
+
+      // CREATE - NEW MANUAL JOB
+      // Adds a new document to the
+      // Firestore "bookings" collection.
       const jobRef = await addDoc(collection(db, "bookings"), jobData);
 
       console.log(

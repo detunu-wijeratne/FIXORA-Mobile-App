@@ -2,11 +2,11 @@ import ProviderPageHeader from "../../components/ProviderPageHeader";
 // src/app/provider/request-details.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -46,6 +46,11 @@ export default function ProviderRequestDetailsScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
 
+  // ROUTE PARAMETERS
+  // Gets the bookingId and booking details
+  // passed from requests.tsx.
+  // bookingId is the unique Firestore document ID.
+
   const bookingId = typeof params.bookingId === "string" ? params.bookingId : "";
 
   const customer = typeof params.customer === "string" ? params.customer : "Customer";
@@ -84,6 +89,10 @@ export default function ProviderRequestDetailsScreen() {
       .toUpperCase();
   }, [customer]);
 
+  // READ - BOOKING DATA
+  // Reads the booking document from Firestore
+  // using bookingId and loads the customer's
+  // uploaded job image.
   useEffect(() => {
     const loadBookingPhoto = async () => {
       if (!bookingId) {
@@ -92,6 +101,8 @@ export default function ProviderRequestDetailsScreen() {
       }
 
       try {
+        // FIRESTORE READ:
+        // getDoc() reads one specific booking document.
         const snap = await getDoc(doc(db, "bookings", bookingId));
         if (snap.exists()) {
           const data: any = snap.data();
@@ -107,6 +118,11 @@ export default function ProviderRequestDetailsScreen() {
     loadBookingPhoto();
   }, [bookingId]);
 
+  // UPDATE - ACCEPT REQUEST
+  // Updates the booking status in Firestore
+  // from "pending" to "confirmed".
+  // Also saves acceptedAt and updatedAt timestamps.
+
   const handleAccept = async () => {
     if (!bookingId) {
       Alert.alert("Error", "Booking ID not found.");
@@ -115,6 +131,10 @@ export default function ProviderRequestDetailsScreen() {
 
     try {
       setLoading(true);
+
+      // FIRESTORE UPDATE:
+      // Update the exact booking document
+      // identified by bookingId.
 
       await updateDoc(doc(db, "bookings", bookingId), {
         status: "confirmed",
@@ -137,6 +157,10 @@ export default function ProviderRequestDetailsScreen() {
     }
   };
 
+  // UPDATE - DECLINE REQUEST
+  // Updates the booking status in Firestore
+  // from "pending" to "declined".
+
   const handleDecline = async () => {
     if (!bookingId) {
       Alert.alert("Error", "Booking ID not found.");
@@ -145,6 +169,9 @@ export default function ProviderRequestDetailsScreen() {
 
     try {
       setLoading(true);
+
+      // FIRESTORE UPDATE:
+      // pending -> declined
 
       await updateDoc(doc(db, "bookings", bookingId), {
         status: "declined",
